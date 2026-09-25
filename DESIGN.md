@@ -734,15 +734,14 @@ consumable by jadx) + `report.json`; `--resugar …`; `--no-tighten`; `8r diff a
    with real code, like `Name$8r3fa9`? The marker must be unambiguous for invariant 0.2.4 and
    for idempotence.
 
-7. **Probabilistic proof.** The Kotlin value-class mangling hash is a 40-bit MD5 fingerprint
-   (collision ≈ n·2⁻⁴⁰); Compose group keys are 32-bit `String.hashCode`s. Do these count as
-   "the evidence determines the preimage uniquely" for S when they confirm exactly one
-   candidate from an exhaustive list? Proposal: accept ≥ 40-bit cryptographic fingerprints as S
-   (with the bound in the report); treat 32-bit non-cryptographic hashes as D-confirming only.
-8. **Template S for hand-writable shapes** (data-class `toString`): require agreement of
-   several independent templates (an ensemble), or keep single matches D? (kotlinc.md §5.3)
-9. **Re-synthesizing `@kotlin.Metadata`** (as D) from recovered facts so Kotlin-aware
-   decompilers show properties, data classes, and suspend functions. (kotlinc.md Q5)
+7. ~~Probabilistic proof~~ **Decided:** cryptographic fingerprints of ≥ 40 bits (e.g. the Kotlin
+   value-class MD5 mangling) count as S when they confirm exactly one candidate from an
+   exhaustive list, with the collision bound (≈ n·2⁻⁴⁰) stated in the report. 32-bit
+   non-cryptographic hashes (Compose group keys, `String.hashCode`) only confirm D names.
+8. ~~Template S~~ **Decided:** hand-writable templates (data-class `toString`) need an ensemble of
+   independent agreeing templates for S (kotlinc.md §5.3); a single match is D.
+9. ~~Re-synthesizing metadata~~ **Decided:** yes. 8R will emit `@kotlin.Metadata` (D) rebuilt from
+   recovered facts, so Kotlin-aware decompilers show properties, data classes, suspend functions.
 
 ## Status (M0)
 
