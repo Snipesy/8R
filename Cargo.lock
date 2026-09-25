@@ -215,6 +215,7 @@ name = "eightr-core"
 version = "0.1.0"
 dependencies = [
  "eightr-dex",
+ "eightr-ir",
  "eightr-mapping",
  "eightr-rules",
  "serde",
@@ -228,6 +229,13 @@ name = "eightr-dex"
 version = "0.1.0"
 dependencies = [
  "sha1",
+]
+
+[[package]]
+name = "eightr-ir"
+version = "0.1.0"
+dependencies = [
+ "eightr-dex",
 ]
 
 [[package]]

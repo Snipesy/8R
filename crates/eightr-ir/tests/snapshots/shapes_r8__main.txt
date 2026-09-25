@@ -1,0 +1,93 @@
+# shapes/r8 Lcom/example/Main;->main([Ljava/lang/String;)V
+registers 13 ins 1 outs 5
+B0  preds []  succs [B1]
+  @0   0000: const v0, 0
+  @1   0001: const v1, 3
+  @2   0002: const v2, 2
+  @3   0003: const v3, 0
+  @4   0004: const v4, 1
+  @5   0005: new-instance v5, La/a;
+  @6   0007: invoke-direct {v5, v3}, La/a;-><init>(I)V
+  @7   000a: new-instance v6, La/a;
+  @8   000c: invoke-direct {v6, v4}, La/a;-><init>(I)V
+  @9   000f: new-array v7, v2, [La/a;
+  @10  0011: aput-object v5, v7, v3
+  @11  0013: aput-object v6, v7, v4
+  @12  0015: const v5, 0
+B1  preds [B0, B5]  succs [B2, B6 (taken)]
+  @13  0016: if-ge v5, v2, @30
+B2  preds [B1]  succs [B3, B4 (case 0)]
+  @14  0018: aget-object v6, v7, v5
+  @15  001a: sget-object v8, Ljava/lang/System;->out:Ljava/io/PrintStream;
+  @16  001c: iget v6, v6, La/a;->a:I
+  @17  001e: packed-switch v6, [0 -> @20]
+B3  preds [B2]  succs [B5 (goto)]
+  @18  0021: const-wide v9, 4616189618054758400
+  @19  0023: goto @21
+B4  preds [B2]  succs [B5]
+  @20  0024: const-wide v9, 4614256656552045848
+B5  preds [B3, B4]  succs [B1 (goto)]
+  @21  0029: new-instance v6, Ljava/lang/StringBuilder;
+  @22  002b: const-string v11, "area="
+  @23  002d: invoke-direct {v6, v11}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+  @24  0030: invoke-virtual {v6, v9, v10}, Ljava/lang/StringBuilder;->append(D)Ljava/lang/StringBuilder;
+  @25  0033: invoke-virtual {v6}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+  @26  0036: move-result-object v6
+  @27  0037: invoke-virtual {v8, v6}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+  @28  003a: add-int v5, v5, v4
+  @29  003b: goto @13
+B6  preds [B1]  succs [B7]
+  @30  003c: new-array v5, v1, [I
+  @31  003e: sget-object v6, La/b;->a:[I
+  @32  0040: invoke-static {v6, v3, v5, v3, v1}, Ljava/lang/System;->arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
+  @33  0043: array-length v6, v5
+B7  preds [B6, B16]  succs [B8, B18 (taken)]
+  @34  0044: if-ge v3, v6, @60
+B8  preds [B7]  succs [B9, B14 (taken)]
+  @35  0046: aget v7, v5, v3
+  @36  0048: sget-object v8, Ljava/lang/System;->out:Ljava/io/PrintStream;
+  @37  004a: if-eq v7, v4, @45
+B9  preds [B8]  succs [B10, B13 (taken)]
+  @38  004c: if-eq v7, v2, @43
+B10  preds [B9]  succs [B11, B12 (taken)]
+  @39  004e: if-ne v7, v1, @42
+B11  preds [B10]  succs [B15 (goto)]
+  @40  0050: const-string v9, "BLUE"
+  @41  0052: goto @46
+B12  preds [B10]  succs []
+  @42  0053: throw v0
+B13  preds [B9]  succs [B15 (goto)]
+  @43  0054: const-string v9, "GREEN"
+  @44  0056: goto @46
+B14  preds [B8]  succs [B15]
+  @45  0057: const-string v9, "RED"
+B15  preds [B11, B13, B14]  succs [B16, B17 (taken)]
+  @46  0059: if-eqz v7, @59
+B16  preds [B15]  succs [B7 (goto)]
+  @47  005b: sub-int v7, v7, v4
+  @48  005c: mul-int v7, v7, #2
+  @49  005e: add-int v7, v7, v4
+  @50  005f: new-instance v10, Ljava/lang/StringBuilder;
+  @51  0061: invoke-direct {v10}, Ljava/lang/StringBuilder;-><init>()V
+  @52  0064: invoke-virtual {v10, v9}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+  @53  0067: invoke-virtual {v10, v7}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+  @54  006a: invoke-virtual {v10}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+  @55  006d: move-result-object v7
+  @56  006e: invoke-virtual {v8, v7}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+  @57  0071: add-int v3, v3, v4
+  @58  0072: goto @34
+B17  preds [B15]  succs []
+  @59  0073: throw v0
+B18  preds [B7]  succs []
+  @60  0074: sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+  @61  0076: array-length v12, v12
+  @62  0077: new-instance v1, Ljava/lang/StringBuilder;
+  @63  0079: const-string v2, "lambda "
+  @64  007b: invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+  @65  007e: invoke-virtual {v1, v12}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+  @66  0081: invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+  @67  0084: move-result-object v12
+  @68  0085: invoke-virtual {v0, v12}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+  @69  0088: return-void
+B19 unreachable  preds []  succs []
+  @70  0089: nop

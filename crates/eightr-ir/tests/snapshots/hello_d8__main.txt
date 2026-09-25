@@ -1,0 +1,7 @@
+# hello/d8 Lcom/example/Hello;->main([Ljava/lang/String;)V
+registers 3 ins 1 outs 2
+B0  preds []  succs []
+  @0   0000: sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+  @1   0002: const-string v1, "Hello, 8R"
+  @2   0004: invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+  @3   0007: return-void
