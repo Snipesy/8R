@@ -1,0 +1,516 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '035'
+Class #0            -
+  Class descriptor  : 'Lcom/example/Main$$ExternalSyntheticLambda0;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/lang/Runnable;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/Main$$ExternalSyntheticLambda0;)
+      name          : 'f$0'
+      type          : '[Ljava/lang/String;'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/Main$$ExternalSyntheticLambda0;)
+      name          : '<init>'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+0004d0:                                        |[0004d0] com.example.Main$$ExternalSyntheticLambda0.<init>:([Ljava/lang/String;)V
+0004e0: 7010 1600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0016
+0004e6: 5b01 0000                              |0003: iput-object v1, v0, Lcom/example/Main$$ExternalSyntheticLambda0;.f$0:[Ljava/lang/String; // field@0000
+0004ea: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/Main$$ExternalSyntheticLambda0;
+        0x0000 - 0x0006 reg=1 (null) [Ljava/lang/String;
+
+  Virtual methods   -
+    #0              : (in Lcom/example/Main$$ExternalSyntheticLambda0;)
+      name          : 'run'
+      type          : '()V'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 6 16-bit code units
+0004ec:                                        |[0004ec] com.example.Main$$ExternalSyntheticLambda0.run:()V
+0004fc: 5410 0000                              |0000: iget-object v0, v1, Lcom/example/Main$$ExternalSyntheticLambda0;.f$0:[Ljava/lang/String; // field@0000
+000500: 7110 1100 0000                         |0002: invoke-static {v0}, Lcom/example/Main;.lambda$main$0:([Ljava/lang/String;)V // method@0011
+000506: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=1 this Lcom/example/Main$$ExternalSyntheticLambda0;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/Main$Shape;'
+  Access flags      : 0x0600 (INTERFACE ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/example/Main$Shape;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 39 (Main.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/Main$Circle;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/Main$Shape;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/Main$Circle;)
+      name          : 'radius'
+      type          : 'D'
+      access        : 0x0012 (PRIVATE FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/Main$Circle;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 6 16-bit code units
+000534:                                        |[000534] com.example.Main$Circle.<init>:(D)V
+000544: 7010 1600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0016
+00054a: 5a01 0100                              |0003: iput-wide v1, v0, Lcom/example/Main$Circle;.radius:D // field@0001
+00054e: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=10
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/Main$Circle;
+        0x0000 - 0x0006 reg=1 radius D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/Main$Circle;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 0
+      insns size    : 14 16-bit code units
+000508:                                        |[000508] com.example.Main$Circle.area:()D
+000518: 1800 182d 4454 fb21 0940               |0000: const-wide v0, #double 3.14159 // #400921fb54442d18
+000522: 5342 0100                              |0005: iget-wide v2, v4, Lcom/example/Main$Circle;.radius:D // field@0001
+000526: ad02 0200                              |0007: mul-double v2, v2, v0
+00052a: 5340 0100                              |0009: iget-wide v0, v4, Lcom/example/Main$Circle;.radius:D // field@0001
+00052e: ad02 0200                              |000b: mul-double v2, v2, v0
+000532: 1002                                   |000d: return-wide v2
+      catches       : (none)
+      positions     :
+        0x0000 line=11
+      locals        :
+        0x0000 - 0x000e reg=4 this Lcom/example/Main$Circle;
+
+  source_file_idx   : 39 (Main.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/Main$Color;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/Main$Color;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/Main$Color;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/Main$Color;)
+      name          : 'BLUE'
+      type          : 'Lcom/example/Main$Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/Main$Color;)
+      name          : 'GREEN'
+      type          : 'Lcom/example/Main$Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/Main$Color;)
+      name          : 'RED'
+      type          : 'Lcom/example/Main$Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/Main$Color;)
+      name          : '$values'
+      type          : '()[Lcom/example/Main$Color;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 0
+      insns size    : 19 16-bit code units
+000574:                                        |[000574] com.example.Main$Color.$values:()[Lcom/example/Main$Color;
+000584: 1230                                   |0000: const/4 v0, #int 3 // #3
+000586: 2300 1600                              |0001: new-array v0, v0, [Lcom/example/Main$Color; // type@0016
+00058a: 6201 0500                              |0003: sget-object v1, Lcom/example/Main$Color;.RED:Lcom/example/Main$Color; // field@0005
+00058e: 1202                                   |0005: const/4 v2, #int 0 // #0
+000590: 4d01 0002                              |0006: aput-object v1, v0, v2
+000594: 6201 0400                              |0008: sget-object v1, Lcom/example/Main$Color;.GREEN:Lcom/example/Main$Color; // field@0004
+000598: 1212                                   |000a: const/4 v2, #int 1 // #1
+00059a: 4d01 0002                              |000b: aput-object v1, v0, v2
+00059e: 6201 0300                              |000d: sget-object v1, Lcom/example/Main$Color;.BLUE:Lcom/example/Main$Color; // field@0003
+0005a2: 1222                                   |000f: const/4 v2, #int 2 // #2
+0005a4: 4d01 0002                              |0010: aput-object v1, v0, v2
+0005a8: 1100                                   |0012: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+
+    #1              : (in Lcom/example/Main$Color;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 37 16-bit code units
+0005d0:                                        |[0005d0] com.example.Main$Color.<clinit>:()V
+0005e0: 2200 0400                              |0000: new-instance v0, Lcom/example/Main$Color; // type@0004
+0005e4: 1a01 2800                              |0002: const-string v1, "RED" // string@0028
+0005e8: 1202                                   |0004: const/4 v2, #int 0 // #0
+0005ea: 7030 0600 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/Main$Color;.<init>:(Ljava/lang/String;I)V // method@0006
+0005f0: 6900 0500                              |0008: sput-object v0, Lcom/example/Main$Color;.RED:Lcom/example/Main$Color; // field@0005
+0005f4: 2200 0400                              |000a: new-instance v0, Lcom/example/Main$Color; // type@0004
+0005f8: 1a01 0b00                              |000c: const-string v1, "GREEN" // string@000b
+0005fc: 1212                                   |000e: const/4 v2, #int 1 // #1
+0005fe: 7030 0600 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/Main$Color;.<init>:(Ljava/lang/String;I)V // method@0006
+000604: 6900 0400                              |0012: sput-object v0, Lcom/example/Main$Color;.GREEN:Lcom/example/Main$Color; // field@0004
+000608: 2200 0400                              |0014: new-instance v0, Lcom/example/Main$Color; // type@0004
+00060c: 1a01 0600                              |0016: const-string v1, "BLUE" // string@0006
+000610: 1222                                   |0018: const/4 v2, #int 2 // #2
+000612: 7030 0600 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/Main$Color;.<init>:(Ljava/lang/String;I)V // method@0006
+000618: 6900 0300                              |001c: sput-object v0, Lcom/example/Main$Color;.BLUE:Lcom/example/Main$Color; // field@0003
+00061c: 7100 0400 0000                         |001e: invoke-static {}, Lcom/example/Main$Color;.$values:()[Lcom/example/Main$Color; // method@0004
+000622: 0c00                                   |0021: move-result-object v0
+000624: 6900 0200                              |0022: sput-object v0, Lcom/example/Main$Color;.$VALUES:[Lcom/example/Main$Color; // field@0002
+000628: 0e00                                   |0024: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+
+    #2              : (in Lcom/example/Main$Color;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+00062c:                                        |[00062c] com.example.Main$Color.<init>:(Ljava/lang/String;I)V
+00063c: 7030 1400 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@0014
+000642: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/Main$Color;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/Main$Color;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/Main$Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000550:                                        |[000550] com.example.Main$Color.valueOf:(Ljava/lang/String;)Lcom/example/Main$Color;
+000560: 1c00 0400                              |0000: const-class v0, Lcom/example/Main$Color; // type@0004
+000564: 7120 1500 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@0015
+00056a: 0c00                                   |0005: move-result-object v0
+00056c: 1f00 0400                              |0006: check-cast v0, Lcom/example/Main$Color; // type@0004
+000570: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/Main$Color;)
+      name          : 'values'
+      type          : '()[Lcom/example/Main$Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+0005ac:                                        |[0005ac] com.example.Main$Color.values:()[Lcom/example/Main$Color;
+0005bc: 6200 0200                              |0000: sget-object v0, Lcom/example/Main$Color;.$VALUES:[Lcom/example/Main$Color; // field@0002
+0005c0: 6e10 1d00 0000                         |0002: invoke-virtual {v0}, [Lcom/example/Main$Color;.clone:()Ljava/lang/Object; // method@001d
+0005c6: 0c00                                   |0005: move-result-object v0
+0005c8: 1f00 1600                              |0006: check-cast v0, [Lcom/example/Main$Color; // type@0016
+0005cc: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 39 (Main.java)
+
+Class #4            -
+  Class descriptor  : 'Lcom/example/Main$Square;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/Main$Shape;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/Main$Square;)
+      name          : 'side'
+      type          : 'D'
+      access        : 0x0012 (PRIVATE FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/Main$Square;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 6 16-bit code units
+000664:                                        |[000664] com.example.Main$Square.<init>:(D)V
+000674: 7010 1600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0016
+00067a: 5a01 0600                              |0003: iput-wide v1, v0, Lcom/example/Main$Square;.side:D // field@0006
+00067e: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=16
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/Main$Square;
+        0x0000 - 0x0006 reg=1 side D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/Main$Square;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 0
+      insns size    : 7 16-bit code units
+000644:                                        |[000644] com.example.Main$Square.area:()D
+000654: 5340 0600                              |0000: iget-wide v0, v4, Lcom/example/Main$Square;.side:D // field@0006
+000658: 5342 0600                              |0002: iget-wide v2, v4, Lcom/example/Main$Square;.side:D // field@0006
+00065c: ad00 0002                              |0004: mul-double v0, v0, v2
+000660: 1000                                   |0006: return-wide v0
+      catches       : (none)
+      positions     :
+        0x0000 line=17
+      locals        :
+        0x0000 - 0x0007 reg=4 this Lcom/example/Main$Square;
+
+  source_file_idx   : 39 (Main.java)
+
+Class #5            -
+  Class descriptor  : 'Lcom/example/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+0006dc:                                        |[0006dc] com.example.Main.<init>:()V
+0006ec: 7010 1600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0016
+0006f2: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/Main;
+
+    #1              : (in Lcom/example/Main;)
+      name          : 'describe'
+      type          : '(Lcom/example/Main$Shape;)Ljava/lang/String;'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 24 16-bit code units
+00069c:                                        |[00069c] com.example.Main.describe:(Lcom/example/Main$Shape;)Ljava/lang/String;
+0006ac: 7210 0b00 0400                         |0000: invoke-interface {v4}, Lcom/example/Main$Shape;.area:()D // method@000b
+0006b2: 0b00                                   |0003: move-result-wide v0
+0006b4: 2202 1300                              |0004: new-instance v2, Ljava/lang/StringBuilder; // type@0013
+0006b8: 7010 1800 0200                         |0006: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0018
+0006be: 1a03 3500                              |0009: const-string v3, "area=" // string@0035
+0006c2: 6e20 1b00 3200                         |000b: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@001b
+0006c8: 0c02                                   |000e: move-result-object v2
+0006ca: 6e30 1900 0201                         |000f: invoke-virtual {v2, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0019
+0006d0: 0c00                                   |0012: move-result-object v0
+0006d2: 6e10 1c00 0000                         |0013: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@001c
+0006d8: 0c00                                   |0016: move-result-object v0
+0006da: 1100                                   |0017: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=25
+      locals        :
+        0x0000 - 0x0018 reg=4 s Lcom/example/Main$Shape;
+
+    #2              : (in Lcom/example/Main;)
+      name          : 'helper'
+      type          : '(I)I'
+      access        : 0x000a (PRIVATE STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 5 16-bit code units
+000680:                                        |[000680] com.example.Main.helper:(I)I
+000690: da00 0102                              |0000: mul-int/lit8 v0, v1, #int 2 // #02
+000694: d800 0001                              |0002: add-int/lit8 v0, v0, #int 1 // #01
+000698: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=21
+      locals        :
+        0x0000 - 0x0005 reg=1 x I
+
+    #3              : (in Lcom/example/Main;)
+      name          : 'lambda$main$0'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 26 16-bit code units
+0006f4:                                        |[0006f4] com.example.Main.lambda$main$0:([Ljava/lang/String;)V
+000704: 6200 0700                              |0000: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+000708: 2141                                   |0002: array-length v1, v4
+00070a: 2202 1300                              |0003: new-instance v2, Ljava/lang/StringBuilder; // type@0013
+00070e: 7010 1800 0200                         |0005: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0018
+000714: 1a03 3c00                              |0008: const-string v3, "lambda " // string@003c
+000718: 6e20 1b00 3200                         |000a: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@001b
+00071e: 0c02                                   |000d: move-result-object v2
+000720: 6e20 1a00 1200                         |000e: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@001a
+000726: 0c01                                   |0011: move-result-object v1
+000728: 6e10 1c00 0100                         |0012: invoke-virtual {v1}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@001c
+00072e: 0c01                                   |0015: move-result-object v1
+000730: 6e20 1300 1000                         |0016: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0013
+000736: 0e00                                   |0019: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=32
+      locals        :
+        0x0000 - 0x001a reg=4 args [Ljava/lang/String;
+
+    #4              : (in Lcom/example/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 10
+      ins           : 1
+      outs          : 3
+      insns size    : 96 16-bit code units
+000738:                                        |[000738] com.example.Main.main:([Ljava/lang/String;)V
+000748: 1220                                   |0000: const/4 v0, #int 2 // #2
+00074a: 2300 1700                              |0001: new-array v0, v0, [Lcom/example/Main$Shape; // type@0017
+00074e: 2201 0300                              |0003: new-instance v1, Lcom/example/Main$Circle; // type@0003
+000752: 1902 f03f                              |0005: const-wide/high16 v2, #long 4607182418800017408 // #3ff0
+000756: 7030 0200 2103                         |0007: invoke-direct {v1, v2, v3}, Lcom/example/Main$Circle;.<init>:(D)V // method@0002
+00075c: 1202                                   |000a: const/4 v2, #int 0 // #0
+00075e: 4d01 0002                              |000b: aput-object v1, v0, v2
+000762: 2201 0600                              |000d: new-instance v1, Lcom/example/Main$Square; // type@0006
+000766: 1903 0040                              |000f: const-wide/high16 v3, #long 4611686018427387904 // #4000
+00076a: 7030 0c00 3104                         |0011: invoke-direct {v1, v3, v4}, Lcom/example/Main$Square;.<init>:(D)V // method@000c
+000770: 1213                                   |0014: const/4 v3, #int 1 // #1
+000772: 4d01 0003                              |0015: aput-object v1, v0, v3
+000776: 2101                                   |0017: array-length v1, v0
+000778: 1203                                   |0018: const/4 v3, #int 0 // #0
+00077a: 3513 1000                              |0019: if-ge v3, v1, 0029 // +0010
+00077e: 4604 0003                              |001b: aget-object v4, v0, v3
+000782: 6205 0700                              |001d: sget-object v5, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+000786: 7110 0f00 0400                         |001f: invoke-static {v4}, Lcom/example/Main;.describe:(Lcom/example/Main$Shape;)Ljava/lang/String; // method@000f
+00078c: 0c06                                   |0022: move-result-object v6
+00078e: 6e20 1300 6500                         |0023: invoke-virtual {v5, v6}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0013
+000794: d803 0301                              |0026: add-int/lit8 v3, v3, #int 1 // #01
+000798: 28f1                                   |0028: goto 0019 // -000f
+00079a: 7100 0a00 0000                         |0029: invoke-static {}, Lcom/example/Main$Color;.values:()[Lcom/example/Main$Color; // method@000a
+0007a0: 0c01                                   |002c: move-result-object v1
+0007a2: 2113                                   |002d: array-length v3, v1
+0007a4: 3532 2900                              |002e: if-ge v2, v3, 0057 // +0029
+0007a8: 4604 0102                              |0030: aget-object v4, v1, v2
+0007ac: 6205 0700                              |0032: sget-object v5, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+0007b0: 6e10 0700 0400                         |0034: invoke-virtual {v4}, Lcom/example/Main$Color;.name:()Ljava/lang/String; // method@0007
+0007b6: 0c06                                   |0037: move-result-object v6
+0007b8: 6e10 0800 0400                         |0038: invoke-virtual {v4}, Lcom/example/Main$Color;.ordinal:()I // method@0008
+0007be: 0a07                                   |003b: move-result v7
+0007c0: 7110 1000 0700                         |003c: invoke-static {v7}, Lcom/example/Main;.helper:(I)I // method@0010
+0007c6: 0a07                                   |003f: move-result v7
+0007c8: 2208 1300                              |0040: new-instance v8, Ljava/lang/StringBuilder; // type@0013
+0007cc: 7010 1800 0800                         |0042: invoke-direct {v8}, Ljava/lang/StringBuilder;.<init>:()V // method@0018
+0007d2: 6e20 1b00 6800                         |0045: invoke-virtual {v8, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@001b
+0007d8: 0c06                                   |0048: move-result-object v6
+0007da: 6e20 1a00 7600                         |0049: invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@001a
+0007e0: 0c06                                   |004c: move-result-object v6
+0007e2: 6e10 1c00 0600                         |004d: invoke-virtual {v6}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@001c
+0007e8: 0c06                                   |0050: move-result-object v6
+0007ea: 6e20 1300 6500                         |0051: invoke-virtual {v5, v6}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0013
+0007f0: d802 0201                              |0054: add-int/lit8 v2, v2, #int 1 // #01
+0007f4: 28d8                                   |0056: goto 002e // -0028
+0007f6: 2201 0200                              |0057: new-instance v1, Lcom/example/Main$$ExternalSyntheticLambda0; // type@0002
+0007fa: 7020 0000 9100                         |0059: invoke-direct {v1, v9}, Lcom/example/Main$$ExternalSyntheticLambda0;.<init>:([Ljava/lang/String;)V // method@0000
+000800: 7210 1700 0100                         |005c: invoke-interface {v1}, Ljava/lang/Runnable;.run:()V // method@0017
+000806: 0e00                                   |005f: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+        0x0017 line=30
+        0x0029 line=31
+        0x0057 line=32
+        0x005c line=33
+        0x005f line=34
+      locals        :
+        0x001d - 0x0026 reg=4 s Lcom/example/Main$Shape;
+        0x0032 - 0x0054 reg=4 c Lcom/example/Main$Color;
+        0x0017 - 0x0060 reg=0 shapes [Lcom/example/Main$Shape;
+        0x005c - 0x0060 reg=1 r Ljava/lang/Runnable;
+        0x0000 - 0x0060 reg=9 args [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 39 (Main.java)
+

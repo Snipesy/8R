@@ -1,0 +1,6 @@
+# Determinism (DESIGN.md §3): iteration order of std hash collections is seeded randomly.
+# Use BTreeMap/BTreeSet, or sort before iterating. Allow locally with a justifying comment.
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "non-deterministic iteration order; use BTreeMap" },
+    { path = "std::collections::HashSet", reason = "non-deterministic iteration order; use BTreeSet" },
+]

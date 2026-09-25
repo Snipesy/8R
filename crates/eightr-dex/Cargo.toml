@@ -1,0 +1,12 @@
+[package]
+name = "eightr-dex"
+description = "Zero-copy DEX reader for 8R"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sha1.workspace = true
+
+[lints]
+workspace = true

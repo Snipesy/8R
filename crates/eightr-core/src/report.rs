@@ -1,0 +1,90 @@
+use std::collections::BTreeMap;
+
+use eightr_rules::{Attribute, Class, Source, REGISTRY};
+use serde::Serialize;
+
+use crate::marker::Marker;
+use crate::sources::DetectedSource;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Report {
+    pub eightr_version: &'static str,
+    pub inputs: Vec<InputSummary>,
+    pub markers: Vec<Marker>,
+    pub sources: Vec<DetectedSource>,
+    pub findings: Vec<Finding>,
+    pub rules: Vec<RuleUsage>,
+    /// Per attribute: how many (item, attribute) pairs ended up S, D, N, or untouched.
+    pub summary: BTreeMap<Attribute, Counts>,
+    /// Every non-identity label, when `Config::verbose_labels` is set.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<LabelEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InputSummary {
+    pub name: String,
+    pub sha256: String,
+    pub dex_version: u32,
+    pub classes: u32,
+    pub checksum_ok: bool,
+    pub signature_ok: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    Info,
+    Warning,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct Finding {
+    pub severity: Severity,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RuleUsage {
+    pub id: &'static str,
+    pub source: Source,
+    pub class: Class,
+    pub applications: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Counts {
+    pub solved: u64,
+    pub deterministic: u64,
+    pub nondeterministic: u64,
+    /// Not touched by any rule: implicitly `core/identity` (D).
+    pub untouched: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LabelEntry {
+    pub item: String,
+    pub attribute: Attribute,
+    pub class: Class,
+    pub rules: Vec<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidates: Option<Vec<String>>,
+}
+
+impl Report {
+    pub fn rule_usage(applications: &BTreeMap<&'static str, u64>) -> Vec<RuleUsage> {
+        REGISTRY
+            .iter()
+            .map(|r| RuleUsage {
+                id: r.id,
+                source: r.source,
+                class: r.class,
+                applications: applications.get(r.id).copied().unwrap_or(0),
+            })
+            .collect()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("report serializes") + "\n"
+    }
+}

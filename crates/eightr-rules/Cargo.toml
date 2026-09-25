@@ -1,0 +1,12 @@
+[package]
+name = "eightr-rules"
+description = "The 8R rule registry: every transformation 8R may perform, with its class and source"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+
+[lints]
+workspace = true

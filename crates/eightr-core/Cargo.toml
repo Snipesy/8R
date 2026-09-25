@@ -1,0 +1,20 @@
+[package]
+name = "eightr-core"
+description = "The 8R pipeline: load, preflight, evidence, un-passes, report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+eightr-dex.workspace = true
+eightr-rules.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+eightr-mapping.workspace = true
+
+[lints]
+workspace = true
