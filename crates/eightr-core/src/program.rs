@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use eightr_dex::{class::access, Dex};
+use eightr_ir::{Body, Interner};
 use serde::Serialize;
 
 use crate::error::{Error, Result};
@@ -26,6 +27,8 @@ pub struct Program {
     pub classes: Vec<Class>,
     /// Descriptor → id.
     pub by_descriptor: BTreeMap<String, ClassId>,
+    /// Interner for every `Sym` in method bodies.
+    pub syms: Interner,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +59,14 @@ pub struct Method {
     pub access: u32,
     /// File offset of the code_item in the class's input dex; `None` for abstract/native.
     pub code_off: Option<u32>,
+    /// Lifted code; `None` for abstract/native methods.
+    pub body: Option<Body>,
+}
+
+impl Method {
+    pub fn is_static(&self) -> bool {
+        self.access & access::STATIC != 0
+    }
 }
 
 impl Class {
@@ -84,6 +95,7 @@ impl Program {
             move |error| Error::Dex { input: input.clone(), error }
         };
         let mut classes: BTreeMap<String, Class> = BTreeMap::new();
+        let mut syms = Interner::default();
         for (input, (name, dex)) in dexes.iter().enumerate() {
             let e = dex_err(name);
             for def in dex.class_defs() {
@@ -108,11 +120,16 @@ impl Program {
                 let mut methods = Vec::new();
                 for m in data.methods() {
                     let id = dex.method_id(m.method_idx).map_err(&e)?;
+                    let body = match dex.code_item(m.code_off).map_err(&e)? {
+                        Some(code) => Some(eightr_ir::lift(dex, &code, &mut syms).map_err(&e)?),
+                        None => None,
+                    };
                     methods.push(Method {
                         name: dex.string(id.name_idx).map_err(&e)?.into_owned(),
                         proto: dex.proto_descriptor(id.proto_idx.into()).map_err(&e)?,
                         access: m.access_flags,
                         code_off: (m.code_off != 0).then_some(m.code_off),
+                        body,
                     });
                 }
                 let class = Class {
@@ -137,7 +154,7 @@ impl Program {
         // Ids follow descriptor order: independent of dex file order and class_def order.
         let classes: Vec<Class> = classes.into_values().collect();
         let by_descriptor = classes.iter().enumerate().map(|(i, c)| (c.descriptor.clone(), ClassId(i as u32))).collect();
-        Ok(Program { classes, by_descriptor })
+        Ok(Program { classes, by_descriptor, syms })
     }
 
     pub fn class(&self, id: ClassId) -> &Class {

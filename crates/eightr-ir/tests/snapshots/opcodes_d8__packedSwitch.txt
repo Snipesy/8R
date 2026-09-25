@@ -1,0 +1,22 @@
+# opcodes/d8 Lcom/example/Opcodes;->packedSwitch(I)I
+registers 3 ins 2 outs 0
+B0  preds []  succs [B1, B6 (case 1), B5 (case 2), B4 (case 3), B3 (case 4), B2 (case 5)]
+  @0   0000: packed-switch v2, [1 -> @11, 2 -> @9, 3 -> @7, 4 -> @5, 5 -> @3]
+B1  preds [B0]  succs []
+  @1   0003: const v0, -1
+  @2   0004: return v0
+B2  preds [B0]  succs []
+  @3   0005: const v0, 55
+  @4   0007: return v0
+B3  preds [B0]  succs []
+  @5   0008: const v0, 40
+  @6   000a: return v0
+B4  preds [B0]  succs []
+  @7   000b: const v0, 30
+  @8   000d: return v0
+B5  preds [B0]  succs []
+  @9   000e: const v0, 20
+  @10  0010: return v0
+B6  preds [B0]  succs []
+  @11  0011: const v0, 10
+  @12  0013: return v0
