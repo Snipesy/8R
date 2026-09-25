@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::input::{self, DexInput};
 use crate::labels::Labels;
 use crate::marker::Marker;
-use crate::passes::{self, Context};
+use crate::passes::{self, Context, NameStats};
 use crate::program::{ItemId, Program};
 use crate::report::{Counts, Finding, InputSummary, LabelEntry, Report, Severity};
 use crate::sources::{self, DetectedSource};
@@ -26,6 +26,7 @@ pub struct Config {
 pub struct Evidence {
     pub markers: Vec<Marker>,
     pub sources: Vec<DetectedSource>,
+    pub name_stats: NameStats,
 }
 
 pub struct Outcome {
@@ -71,7 +72,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     }
     let sources = sources::detect(&dexes, &markers);
     let mut program = Program::build(&dexes)?;
-    let evidence = Evidence { markers: markers.clone(), sources: sources.clone() };
+    let name_stats = name_stats(&dexes, &program);
+    let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
 
     let mut labels = Labels::default();
     for pass in passes::all() {
@@ -82,6 +84,26 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     findings.dedup();
     let report = build_report(&program, &labels, summaries, markers, sources, findings, config);
     Ok(Outcome { program, labels, report })
+}
+
+fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {
+    let mut types = std::collections::BTreeSet::new();
+    let mut members = std::collections::BTreeSet::new();
+    for (_, dex) in dexes {
+        types.extend((0..dex.type_count()).filter_map(|i| dex.type_descriptor(i).ok()));
+        for i in 0..dex.field_count() {
+            if let Ok(f) = dex.field_id(i) {
+                members.extend(dex.string(f.name_idx).ok());
+            }
+        }
+        for i in 0..dex.method_count() {
+            if let Ok(m) = dex.method_id(i) {
+                members.extend(dex.string(m.name_idx).ok());
+            }
+        }
+    }
+    let packages: std::collections::BTreeSet<&str> = program.classes.iter().map(|c| c.package()).collect();
+    NameStats { type_descriptors: types.len() as u64, member_names: members.len() as u64, packages: packages.len() as u64 }
 }
 
 fn collect_markers(dexes: &[(String, Dex)]) -> Vec<Marker> {

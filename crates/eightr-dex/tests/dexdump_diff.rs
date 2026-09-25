@@ -214,7 +214,9 @@ fn our_code(dex: &Dex, code: &CodeItem) -> DCode {
     let positions = dex
         .debug_info(code.debug_info_off)
         .unwrap()
-        .map(|d| d.positions.iter().map(|p| (p.addr, p.line)).collect())
+        // R8 shares one debug_info_item (a pc→line table) across methods; entries past this
+        // method's code are irrelevant to it, and dexdump omits them.
+        .map(|d| d.positions.iter().filter(|p| (p.addr as usize) < code.insns.len()).map(|p| (p.addr, p.line)).collect())
         .unwrap_or_default();
     DCode {
         registers: code.registers_size.into(),

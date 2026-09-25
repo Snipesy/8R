@@ -72,13 +72,13 @@ impl Method {
 impl Class {
     /// `Lcom/example/Main$Inner;` → `com/example`
     pub fn package(&self) -> &str {
-        let inner = self.descriptor.trim_start_matches('L').trim_end_matches(';');
+        let inner = self.descriptor.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(&self.descriptor);
         inner.rsplit_once('/').map(|(p, _)| p).unwrap_or("")
     }
 
     /// `Lcom/example/Main$Inner;` → `Main$Inner`
     pub fn simple_name(&self) -> &str {
-        let inner = self.descriptor.trim_start_matches('L').trim_end_matches(';');
+        let inner = self.descriptor.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(&self.descriptor);
         inner.rsplit_once('/').map(|(_, n)| n).unwrap_or(inner)
     }
 

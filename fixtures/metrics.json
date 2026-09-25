@@ -1,9 +1,27 @@
 {
+  "dontobfuscate": {
+    "Body": 0,
+    "ClassName": 3,
+    "Lines": 0,
+    "MemberName": 3,
+    "Package": 3,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "hello": {
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
     "MemberName": 1,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "names_stress": {
+    "Body": 0,
+    "ClassName": 2,
+    "Lines": 0,
+    "MemberName": 69,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
