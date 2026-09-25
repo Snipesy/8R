@@ -27,6 +27,10 @@ reverse order (§1.1).
 | **Deterministic (D)** | Not fully undone, but deterministically put back into an easier-to-read form | The output is a **canonical function of the input's meaning**. It's semantically equivalent and more readable. It is *not* claimed to be the original. | α-invariance (§0.3), semantic equivalence, snapshot tests. |
 | **NonDeterministic (N)** | Ambiguous: several preimages are consistent with the evidence | The rule outputs the **complete** candidate set, in canonical order. **All possible paths are accounted for**: the original is guaranteed to be a member. N is allowed, but not preferred. | Exhaustiveness: the true original (from the oracle) must be in the candidate set, every time. The set itself must be α-invariant. |
 
+**N requires a finite, enumerable candidate set.** If the preimage is unbounded (e.g. "the
+serial name, or *any* identifier annotated `@SerialName(s)`"), N is impossible and the rule
+must be D (a hint-bearing canonical name) or identity.
+
 What is never allowed is an *unaccounted* choice: picking one candidate arbitrarily (by
 obfuscated name, input order, hash order, or randomness) and presenting it alone. An ambiguous
 problem is handled in one of four ways, in order of preference:
@@ -150,7 +154,7 @@ approach would be an unaccounted choice, so it's not done (shown for the record)
 | **Kotlin intrinsics parameter names** | **S** | **S**: the `checkNotNullParameter(p, "name")` string is compiler-emitted and exact. |
 | **Enum constant names** | **S** | **S**: the `<clinit>` name strings are exact. |
 | **Kotlin data-class / record `toString`** | **S** | **S** for the simple class name and field names. The package is **D**. |
-| **kotlinx.serialization descriptor names** | **S** | **D** (hint only). `@SerialName` can override it, so it isn't proof. |
+| **kotlinx.serialization descriptor names** | **S** | **D** (hint only) on its own: `@SerialName` can override it and can even mimic the default. **S** when independent Tier-A evidence (data-class `toString`, `checkNotNullParameter`, lateinit message) names the same bound field; that also proves whether an override happened. Enum-entry overrides are always exactly detectable (S). See `docs/sources/kotlinx-serialization.md`. |
 | **Log tags, exception messages** | n/a | **D** (hint only) |
 | **SigDB library match** | n/a | **D** (hint only). Fuzzy matching is never proof. |
 
@@ -180,6 +184,33 @@ factory names), covered in `other-plugins.md`.
 Source detection is positive-evidence only (a D8/R8 marker, or referenced types like
 `Landroidx/compose/runtime/Composer;`). Because R8 also renames library classes, absence of
 evidence is never treated as absence of a source.
+
+### 1.3 Per-source research and proposed rules
+
+Proposed rules live in `docs/sources/*.md` until implemented. A rule is added to the registry
+(`crates/eightr-rules`) only together with its implementation, runtime precondition checks,
+and a fixture. That keeps "registered" meaning "real".
+
+| Source doc | Status | Headline findings |
+|---|---|---|
+| `kotlinx-serialization.md` | Done (plugin `06003680c5`, runtime `397bb56009`; verified with kotlinc 2.4.20 + R8 8.10.9) | ~25 proposed `kxs/` rules. **S:** `$serializer`/companion structure and names the plugin fixes or consumer rules keep, synthetic-ctor marker restoration (the plugin always passes `null`), element table, element↔field binding, property order, optionality, enum-entry `@SerialName`. **Names:** S only via Tier-A evidence; otherwise D hints. **Finite N:** collection interface choice (`List`/`MutableList`), FQN package/nesting split. **R8 effects:** inlines `write$Self$<module>` (the module name is lost, D), strips `@SerialName` and `kotlin.Metadata`. Fixtures need real (non-constant) encoders or R8 folds the fingerprints away. |
+| `compose.md` | Pending | |
+| `kotlinc.md` | Pending | |
+| `r8-desugar.md` | Pending | |
+| `r8-rule-audit.md` | Pending | |
+| `other-plugins.md` | Pending | |
+
+**Cross-source evidence tiers** (from the kxs study; to be confirmed by the kotlinc study):
+- **Tier A (compiler-emitted, exact, S-grade when structurally bound):** data-class `toString`
+  templates, `Intrinsics.checkNotNullParameter` names, `throwUninitializedPropertyAccessException`
+  names, enum `<clinit>` names, Moshi codegen `missingProperty` names and adapter `toString`, names
+  kept by library consumer rules.
+- **Tier B (wire-format names, hint-grade):** serial names, JSON names, Gson `@SerializedName`.
+- **Tier C (library templates):** identify runtime/library code, not app names.
+
+**Fixture prerequisite:** Kotlin sources need a pinned kotlinc and plugin jars in
+`cargo xtask fixtures`, the way R8 is pinned. That's the next infrastructure task after the
+DEX writer.
 
 ### 1.2 Scope
 What 8R is *not*: it's not a decompiler. 8R emits DEX (plus a mapping and a report). You then

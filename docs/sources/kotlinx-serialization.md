@@ -430,10 +430,10 @@ default. The canonical counterexample is common in real code: after a class is m
 | id | Class | Preconditions | Evidence / output |
 |---|---|---|---|
 | `kxs/prop-name-proven` | **S** | Element `i` is bound to field `f` (`kxs/element-field-binding`), **and** at least one independent Kotlin-name source (§4, Tier A) names `f`. | Property name = that source's string. If it equals `serialName_i`, the output has no `@SerialName` and "no override" is **S**. If it differs, emit `@SerialName(serialName_i)`, which is **S** (the plugin's rule is exactly `name = @SerialName ?: kotlinName`). A redundant `@SerialName("x")` on a property named `x` can't be told apart from no annotation, but the two are semantically identical, so the S claim is about semantics, not source text. |
-| `kxs/prop-name-override-proven` | S (fact) + D (name) | `serialName_i` isn't a legal Kotlin identifier even with backticks. Backticked JVM names forbid `.;[]/<>:\\` and some others, so strings like `"user-name"`, `"@type"`, `""` or those containing `.` are caught. | Emitting `@SerialName(s)` is S. The property name falls to D `{sanitized(s)}_{hash}`. |
+| `kxs/prop-name-override-proven` | S (fact) + D (name) | `serialName_i` isn't a legal Kotlin/JVM identifier even with backticks. On JVM, backticked names may contain spaces, `-` and `@`, but not `.`, `;`, `[`, `]`, `/`, `<`, `>`, `:`, `\`, a backtick, or a newline, and they can't be empty [I: Kotlin JVM identifier rules, needs fixture]. So `""`, `"a.b"` and `"x:y"` prove an override. **`"user-name"` and `"@type"` do not**, because `` val `user-name` `` is legal. | Emitting `@SerialName(s)` is S. The property name falls to D `{sanitized(s)}_{hash}`. |
 | `kxs/prop-name-hint` | **D** | Neither of the above. | Name `{sanitized(serialName_i)}_{hash}`, per DESIGN §5.5. **Not N**: the candidate set is "serialName_i, or any identifier at all", which is infinite and can't be enumerated. The hash is structural (WL), so it's α-invariant. The serial name is a string constant, so it's α-invariant too. |
 | `kxs/class-name-hint` | **D** | Class descriptor serialName `s`. | The class name is D with hint = last segment of `s` (package hint = prefix). Never S: an override can't be ruled out (see above). |
-| `kxs/class-serialname-override-proven` | S (fact) | Either `s` isn't a syntactically valid dotted JVM FQN, or the last segment of `s` ≠ an **S** simple name of `C` from Tier-A evidence (data-class `toString` prefix, Moshi `GeneratedJsonAdapter(…)`). | Emit `@SerialName(s)` on `C` (S). The FQN stays D. |
+| `kxs/class-serialname-override-proven` | S (fact) | Either `s` isn't a syntactically valid dotted JVM FQN (an empty segment, or a segment containing a JVM-forbidden character). Note that `"acct"` *is* valid, as a root-package class. Or the last segment of `s` ≠ an **S** simple name of `C` from Tier-A evidence (data-class `toString` prefix, Moshi `GeneratedJsonAdapter(…)`). | Emit `@SerialName(s)` on `C` (S). The FQN stays D. |
 | `kxs/class-simple-name` | S | Data-class `toString` prefix `"Name("` bound to `C` (DESIGN §1 row "Kotlin data-class `toString`"). | S simple name. This isn't a `kxs` rule, but `kxs` consumes it. If `s`'s last segment agrees, only the *package* stays D. |
 | `kxs/enum-entry-serialname` | S | Enum `values()` array + `<clinit>` constant names (DESIGN §1 "Enum constant names") + the `createAnnotatedEnumSerializer` `names[]` array, or the legacy `EnumDescriptor.addElement` sequence. | Per entry: `names[k] == null` means no override (S). A non-null value is `@SerialName(names[k])` (S). In the legacy path, compare `addElement` name `k` with `<clinit>` name `k` (ordinal-aligned): equal means no override, S, modulo the redundant-annotation caveat. A `createSimpleEnumSerializer` call proves that **no** entry has `@SerialName` or SerialInfo annotations (S). |
 | `kxs/companion-simple-name` | S | See `kxs/companion`. | Named-companion simple name = the kept field name (S). |
@@ -572,8 +572,9 @@ uses `serializer(Type)` so that annotation retention is exercised.
    `@Required` detection, and property names S via `toString`.
 2. `kxs-serialname-prop`: data class with `@SerialName("user_name") val name`. Expect the name
    S (`name`) + `@SerialName` S. Non-data twin: expect the D hint `user_name_{hash}`.
-3. `kxs-serialname-illegal`: `@SerialName("user-name")`, `@SerialName("")`. Expect
-   override-proven.
+3. `kxs-serialname-illegal`: `@SerialName("a.b")`, `@SerialName("x:y")`, `@SerialName("")`.
+   Expect override-proven. Control cases: `@SerialName("user-name")` against a real
+   `` val `user-name` `` must **not** be flagged as override-proven.
 4. `kxs-serialname-lookalike`: class `a.b.User` with `@SerialName("x.y.User")`. Expect D
    (must **not** emit S `x.y.User`). This is a negative test for over-claiming.
 5. `kxs-class-serialname-mismatch`: data class `Account` with `@SerialName("acct")`. Expect
