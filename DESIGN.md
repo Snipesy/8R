@@ -89,6 +89,11 @@ structural.
 This invariant is a property test (§6.4). It is what keeps unaccounted choices out of the
 pipeline.
 
+It applies to the **final** output, after naming (§5.5). The identity labels used during
+passes are not α-invariant for names (renaming the input renames them), which is expected:
+identity is a placeholder until the naming stage replaces every non-S name with a structural D
+name. (Flagged by the R8 audit.)
+
 ### 0.4 The rule registry
 
 Every transformation 8R performs is a registered rule. It's code, not prose, and lives in
@@ -127,21 +132,21 @@ approach would be an unaccounted choice, so it's not done (shown for the record)
 
 | R8 transformation | With mapping | Without mapping |
 |---|---|---|
-| **Class/member renaming** | **S**. Mapping lines are exact. | **S** where proof-evidence exists (§5). Otherwise **D**: `{hint}_{hash}` names (§5.5). |
-| **Repackaging** (`-repackageclasses`) | **S** | **D**: structural package clustering, packages named `p_{hash}`. Falls back to D·id (flat) if the clustering isn't α-invariant. |
+| **Class/member renaming** | **S** (oracle) | **S** only via `r8/kept-name` (generator-shape predicate, §1.2 audit) and proven evidence. Otherwise **D**: `{hint}_{hash}` names (§5.5). |
+| **Repackaging** (`-repackageclasses`, and **by default**: R8 ≤8.x moves packages to `a`, `b`, …; ≥9.0 repackages into the root) | **S** | **D**: structural package clustering. A kept class name in a possible repackaging target has a **D** package; a trailing-digit name there is a collision suffix candidate (N: `{Rep1, Rep}`). |
 | **Aggressive overloading** (same name, different return type) | **S** | **D**: split into distinct `_{hash}` names |
 | **Line numbers** (compaction, pc-encoding) | **S** | D·id: pc-lines are stripped, not fabricated. ✗N: inventing plausible line numbers. |
-| **Source file attribute** (`r8-map-id-…`) | **S** | **D**: `{OuterClass}_{hash}.kt`/`.java`, with the language from Kotlin metadata or intrinsics use. ✗N: guessing `FooKt` file facades. |
+| **Source file attribute** (plain R8 writes `SourceFile`; AGP may write `r8-map-id-…`) | **S** | **D**: `{OuterClass}_{hash}.kt`/`.java`, with the language from Kotlin evidence. ✗N: guessing `FooKt` file facades. |
 | **Inlining** | **D**: frame-guided extraction (§4.6). The body *may* equal the original, but 8R can't prove that R8 didn't optimize across the boundary after inlining, so it's labelled D. Specialized per-site copies are also D. | D·id. ✗N: splitting methods into guessed callees with no frame boundaries. |
 | **Outlining** | **S**: `outlineCallsite` gives exact positions, and inlining back is pure code motion. | **D**: synthetic + static + leaf + shape match. It might inline a genuine synthetic helper, which is still readable and still correct. |
 | **Lambda desugaring** | **S** when re-sugared to `invoke-custom` with the body method named from the mapping (min-api permitting). **D** when emitted as a named inner class (the default). | **D** |
-| **Backports** | **S**: the synthetic body matches R8's backport template exactly *for the R8 version in the marker*, so the replaced API is uniquely determined. | **S** (same argument, since templates are version-keyed). Downgrade to **D** if the marker is missing. |
+| **Backports** (usually *inlined* by R8, even with many callers) | **S** | Where a synthetic survives: **S** if the body matches exactly one version-keyed template; **N** when templates are shared (e.g. `Math.X`/`StrictMath.X` compile to byte-identical dex). |
 | **API-model outlines** | **S** | **S** (exact template shape, unique target) |
-| **Interface `$-CC` companions** | **S** | **S** for structure (which interface owns them is unambiguous). Names follow the renaming row. |
-| **Nest-access bridges** | **S** | **S** for structure. Names follow the renaming row. |
-| **Horizontal class merging** (`$r8$classId`) | **S**: the partition comes from `classId`, and the names and owners come from the mapping. | **D**: the partition is structural (classId constants), names are `_{hash}`. |
+| **Interface `$-CC` companions** | **S** | **SPLIT**: default methods (with their dispatch stub) S; a static method on the companion is **N** {static interface method, other} since default and static shapes are indistinguishable and statics have no owner link. |
+| **Nest-access bridges** | **S** | **SPLIT on `ACC_BRIDGE`/synthetic**: S when flagged; otherwise it may be a javac `access$NNN` accessor, which is original code → D·id. |
+| **Horizontal class merging** | **S** | **D** when a `$r8$classId` dispatch is visible; the number of distinct classId values is only a **lower bound** on the original class count. Often **invisible** (no classId when no virtual dispatch is needed, merged classes with different interfaces, shared fields) → D·id. |
 | **Vertical class merging** | **S**: original owners come from the mapping. | D·id. ✗N: guessing where the subclass boundary was. |
-| **Enum unboxing** | **S**: residual signatures plus utility synthetics | **D**: the class is re-boxed via the utility pattern. Constant names are **S** (from strings). The enum class name is D. |
+| **Enum unboxing** | **S** | **D**: re-boxed via the utility pattern. Constant names are a **hint** (strings are deleted when `name()` is unused, and survive as ordinary int→string code otherwise). |
 | **Staticizing / devirtualization** | **S** (`residualsignature`) | D·id. ✗N: guessing that a static method was once an instance method. |
 | **Argument reordering** | **S** | D·id. ✗N |
 | **Unused-argument removal** | **D**: the signature is restored exactly and the body is S, but call sites pass a canonical `0`/`null`, because the original values are lost (and never mattered). | D·id. ✗N |
@@ -150,11 +155,11 @@ approach would be an unaccounted choice, so it's not done (shown for the record)
 | **Constant / member-value propagation** | D·id, annotated where detectable. ✗N: re-parameterizing guessed constants. | D·id |
 | **Dead code / tree shaking** | D·id. The report lists mapping entries with no residual code. | D·id |
 | **Class inlining / scalar replacement** | D·id, annotated from frames | D·id |
-| **Local names, generics, stripped annotations** | D·id (S if R8 kept them) | D·id |
-| **Kotlin intrinsics parameter names** | **S** | **S**: the `checkNotNullParameter(p, "name")` string is compiler-emitted and exact. |
-| **Enum constant names** | **S** | **S**: the `<clinit>` name strings are exact. |
-| **Kotlin data-class / record `toString`** | **S** | **S** for the simple class name and field names. The package is **D**. |
-| **kotlinx.serialization descriptor names** | **S** | **D** (hint only) on its own: `@SerialName` can override it and can even mimic the default. **S** when independent Tier-A evidence (data-class `toString`, `checkNotNullParameter`, lateinit message) names the same bound field; that also proves whether an override happened. Enum-entry overrides are always exactly detectable (S). See `docs/sources/kotlinx-serialization.md`. |
+| **Local names, generics, stripped annotations** | D·id | D·id. Kept `Signature` strings contain *minified* type names → D, never S. |
+| **Kotlin intrinsics parameter names** | **S** | **Hint** (audit E10): inlining moves a callee's `checkNotNullParameter(p, "title")` into a caller whose parameter is `headline`, and R8 can fold the string into a larger constant. S only with an inlining-proof binding (open problem). |
+| **Enum constant names** | **S** | **Hint**: pre-obfuscated SDKs ship enums whose field is `a` but whose name string is `"EUROPE"`, and the strings vanish when unused. |
+| **Kotlin data-class / record `toString`** | **S** | **Records: nothing** (R8 rewrites the names string to minified `"a;b"`). **Kotlin: hint**, S only for an *unfused* template bound to the class (R8 folds call-site constants into the template). |
+| **kotlinx.serialization descriptor names** | **S** | **D** (hint) on its own: `@SerialName` can override and even mimic the default. The kxs study's S path relies on Tier-A evidence, which the audit downgraded (see §1.2): S claims there wait on an inlining-proof binding. Enum-entry overrides are exactly detectable (S). |
 | **Log tags, exception messages** | n/a | **D** (hint only) |
 | **SigDB library match** | n/a | **D** (hint only). Fuzzy matching is never proof. |
 
@@ -194,14 +199,18 @@ and a fixture. That keeps "registered" meaning "real".
 | Source doc | Status | Headline findings |
 |---|---|---|
 | `kotlinx-serialization.md` | Done (plugin `06003680c5`, runtime `397bb56009`; verified with kotlinc 2.4.20 + R8 8.10.9) | ~25 proposed `kxs/` rules. **S:** `$serializer`/companion structure and names the plugin fixes or consumer rules keep, synthetic-ctor marker restoration (the plugin always passes `null`), element table, element↔field binding, property order, optionality, enum-entry `@SerialName`. **Names:** S only via Tier-A evidence; otherwise D hints. **Finite N:** collection interface choice (`List`/`MutableList`), FQN package/nesting split. **R8 effects:** inlines `write$Self$<module>` (the module name is lost, D), strips `@SerialName` and `kotlin.Metadata`. Fixtures need real (non-constant) encoders or R8 folds the fingerprints away. |
-| `compose.md` | Pending | |
+| `r8-desugar.md` | Done (R8 `a7ad18a7` = 8.10.9, HEAD, spot checks to 9.4.23) | R8's generator is `[a-zA-Z][0-9a-zA-Z]*` (little-endian; `a0` after 26/52 names), inner classes `Outer$gen`, `allowrepackage` keeps names but moves packages (collision suffix `Rep1`), ≥9.0 repackages into root by default, 8.13+ lowercase class names. Supplied the sound predicate now used by `r8/kept-name`. Synthetic fingerprints, backport templates, optimization fingerprints, line/SourceFile, N enumerations, 28 fixture ideas. |
+| `r8-rule-audit.md` | Done (R8 `decf0a4a`, branch 8.10) | Adversarial pass over every §1 row. **`r8/kept-name` was unsound** (now fixed and regression-tested by `names_stress` and `dontobfuscate`). Downgrades folded into §1: backports S→S/N, `$-CC` and nest bridges split, intrinsics/enum/toString names → hints, records → nothing, horizontal merging often invisible. Unverifiable preconditions: `-applymapping` and dictionaries. New sound rules proposed: `r8/library-override-name`, `r8/annotation-member-name`, `r8/jni-symbol`. |
+| `compose.md` | Done (kotlinc 2.3.20, runtime 1.10.6, R8 8.10.9) | **`sourceInformation` strings never survive R8** (consumer rules mark them side-effect free); trace strings only with a tracer or `-dontoptimize`. **Group keys always survive**: `hash("fun-Name(Params)Ret/pkg-…/file-….kt")`, usable to confirm candidates (never invertible). `$changed`/`$default` bitmasks survive and index original parameter positions; `$stable` is removed. R8 drops/reorders params and re-homes methods. Rules: `@Composable` detection S, synthetic-param naming by behavior S, defaults from `$default` bits S; everything else annotates rather than rewrites (the Compose lowering must stay for the runtime). |
+| `other-plugins.md` | Done (R8 8.10.9) | Best S names per effort: **Moshi** (`unexpectedNull`/`missingProperty` carry the Kotlin name separately from the JSON name), **Room** (schema-validation strings give entity FQNs; no annotation overrides them), **ViewBinding/Safe Args** (id constants + resources.arsc → exact generated names), Parcelize (order-linking), Dagger/Hilt (nothing survives, only manifest-kept names propagate). javac lowerings are D-only re-sugaring. |
 | `kotlinc.md` | Pending | |
-| `r8-desugar.md` | Pending | |
-| `r8-rule-audit.md` | Pending | |
-| `other-plugins.md` | Pending | |
 
-**Cross-source evidence tiers** (from the kxs study; to be confirmed by the kotlinc study):
-- **Tier A (compiler-emitted, exact, S-grade when structurally bound):** data-class `toString`
+**Cross-source evidence tiers** (from the kxs study, **corrected by the R8 audit**):
+- **Tier A (compiler-emitted strings).** These were proposed as S-grade when structurally
+  bound, but R8's inlining and constant folding can move a string into a different method or
+  fuse it into a larger template (audit E10, E11). **They are hints until a binding is proven to
+  survive inlining** (open problem: e.g. evidence that the method wasn't an inline target, or
+  agreement between independent sources). Candidates: data-class `toString`
   templates, `Intrinsics.checkNotNullParameter` names, `throwUninitializedPropertyAccessException`
   names, enum `<clinit>` names, Moshi codegen `missingProperty` names and adapter `toString`, names
   kept by library consumer rules.
@@ -417,9 +426,10 @@ Name evidence sources, highest priority first. Each is marked **[S]** (proof: th
 a clean original name) or **[hint]** (it contributes only the `{hint}` of a D name
 `{hint}_{hash}`).
 
-1. **[S] Kept names.** Anything R8 didn't rename (manifest components, JNI `native` methods, keep
-   rules, reflection targets). Detected as names that aren't in the minifier's alphabet, or
-   that are referenced from the manifest or layouts. This assumes the default minifier
+1. **[S] Kept names** (`r8/kept-name`). Names R8's generator cannot produce: see the rule's
+   preconditions in `crates/eightr-rules`. Also planned: library-override names, annotation
+   member names, manifest components, JNI symbols exported from `.so` files. Note: `native`
+   methods **are** renamed by R8 unless a keep rule (AGP's default file has one) prevents it. This assumes the default minifier
    dictionary. If the names look like a custom `-obfuscationdictionary` was used, kept-name
    detection is limited to manifest, layout, and JNI references.
 2. **[hint] Serialization descriptors.** kotlinx.serialization `PluginGeneratedSerialDescriptor("com.x.User", …)`

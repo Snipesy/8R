@@ -118,13 +118,14 @@ pub static REGISTRY: &[Rule] = &[
         attributes: &[A::Package, A::ClassName, A::MemberName],
         summary: "A name R8's minifier cannot have produced is the original name.",
         preconditions: &[
-            "The build used R8's default naming (no -obfuscationdictionary / -classobfuscationdictionary).",
-            "Class: neither the simple name nor its last '$' segment is 1-3 ASCII letters.",
-            "Package: R8 renames a class descriptor as a unit, so a kept class name implies a kept package.",
-            "Member: the name is not 1-3 ASCII letters, or it is <init>/<clinit>.",
+            "Unverifiable from the dex, stated in the report: no -obfuscationdictionary/-classobfuscationdictionary/-packageobfuscationdictionary, no -applymapping.",
+            "Generator shape: R8 names are [a-zA-Z][0-9a-zA-Z]* (SymbolGenerationUtils.numberToIdentifier). A name is maybe-minified if it has that shape and is no longer than the namespace's capacity bound (computed from distinct type/member-name counts plus slack); it/by/do are never generated.",
+            "Class: the part after the last '$' (R8 names inner classes <outer>$<gen>) is not maybe-minified; no R8/D8 synthetic marker; not a j$ (desugared library) class; not a trailing-digit name inside a repackaging target (collision suffix, Rep -> Rep1).",
+            "Package: the class name is kept and the package is not a possible repackaging target (root, all-generator-shaped segments, or the package holding the most maybe-minified classes).",
+            "Member: <init>/<clinit>, or not maybe-minified, not synthetic, and not a fresh name$N.",
         ],
         fallback: Some(IDENTITY),
-        fixtures: &["hello", "shapes", "opcodes"],
+        fixtures: &["hello", "shapes", "opcodes", "names_stress"],
     },
 ];
 

@@ -1,0 +1,529 @@
+# Source: Jetpack Compose compiler plugin (`compose/`), and how R8 interacts with it
+
+Status: research notes · Undo order: 3 (after `r8/` and `desugar/`, before `kxs/` … `kotlinc/`)
+
+## 0. Scope, provenance, legend
+
+**What was read.**
+
+| Artifact | Revision | Used for |
+|---|---|---|
+| `JetBrains/kotlin` `plugins/compose/compiler-hosted` (+ `group-mapping`, golden test data) | HEAD `06003680c56d09dffcf82b3817372c5aaea66b50` (2026-09-25) | current compiler (K2) |
+| Same files at tags `v2.0.0`, `v2.0.20`, `v2.1.0`, `v2.1.20`, `v2.2.0`, `v2.2.20`, `v2.3.0` | raw.githubusercontent | version history (§1.14) |
+| `androidx.compose.compiler:compiler-hosted:1.5.14` sources jar (Google Maven) | last androidx-hosted release | "old" compiler (Kotlin 1.9, K1) |
+| `androidx/androidx` `compose/runtime/runtime` | HEAD `c772ca87cac06fbf47d34f86ab0b1202c71fb559` (2026-09-25) | runtime API and consumer keep rules |
+| `JetBrains/kotlin` `libraries/tools/kotlin-compose-compiler` | same HEAD | Gradle plugin defaults |
+
+**What was run (experiment).** `kotlinc` 2.3.20 with `kotlin-compose-compiler-plugin-embeddable` 2.3.20,
+`sourceInformation=true` and trace markers on (both are Gradle-plugin defaults), against
+`androidx.compose.runtime:runtime-android:1.10.6`. The classes were then shrunk with **R8 8.10.9-dev**
+(`--release --min-api 24`), using the runtime AAR's own `proguard.txt`, with runtime, collection, stdlib and
+coroutines all as program input (so the runtime is obfuscated as it would be in a real app). Three
+variants were built: `base` (plain), `trace` (the app also calls `Composer.setTracer(...)`, as the
+`runtime-tracing` artifact does), and `noopt` (`-dontoptimize`). The mapping file was only used as an
+oracle to interpret the results. The sample (`Main.kt`: defaults, 12-param function, member function,
+`remember`, `key`, `@ReadOnlyComposable`, `@NonRestartableComposable`, inline composable, composable
+lambdas) lived in the scratchpad. §6 turns it into fixtures.
+
+**File abbreviations** (all under `plugins/compose/compiler-hosted/src/main/java/androidx/compose/compiler/plugins/kotlin/`):
+`CFBT` = `lower/ComposableFunctionBodyTransformer.kt`, `CPT` = `lower/ComposerParamTransformer.kt`,
+`CLM` = `lower/ComposerLambdaMemoization.kt`, `ACL` = `lower/AbstractComposeLowering.kt`,
+`DKT` = `lower/DurableKeyTransformer.kt`, `DFKT` = `lower/DurableFunctionKeyTransformer.kt`,
+`DKV` = `lower/DurableKeyVisitor.kt`, `CST` = `lower/ClassStabilityTransformer.kt`,
+`LLT` = `lower/LiveLiteralTransformer.kt`, `CIGE` = `ComposeIrGenerationExtension.kt`,
+`RT/` = androidx `compose/runtime/runtime/src/`.
+
+**Legend.** **[src]** = verified by reading source. **[exp]** = verified by the compile/R8 experiment.
+**[inf]** = inferred, not verified; treat it as a hypothesis for a fixture to confirm.
+
+**Two contract notes for the rule registry.**
+
+1. *N rules.* DESIGN §0.1 forbids N in the pipeline. The brief for this document allows N when the rule
+   enumerates **every** candidate in canonical order. Every N rule below does two things. It
+   (a) reports the exhaustive candidate set. It (b) writes only a D or identity result into `dex'`,
+   unless a filter (usually a compiler-emitted hash) leaves **exactly one** candidate. The true preimage
+   is guaranteed to be in the set, and it is the only survivor, so the rule is promoted to S.
+2. *Semantics (§0.2.1).* The Compose lowering **cannot be physically undone in an executable `dex'`**.
+   Removing `$composer`/`$changed`, groups or restart lambdas would break the runtime contract.
+   So `compose/` rules are **annotative**. They set names and parameter names, label synthetic
+   parameters and groups, record the Kotlin-level ("source") signature, default arguments, file and
+   lines in the output mapping and the report, and they may attach a marker annotation. Body rewrites
+   are limited to what R8-undo already allows. Any "de-lowered" view belongs in the report or a
+   decompiler-hint sidecar, not in `dex'`.
+
+---
+
+## 1. Transformations catalog
+
+The plugin runs these IR lowerings in this order [src, `CIGE` 65–235]: ComposableLambdaAnnotator →
+ClassStabilityTransformer → (LiveLiteralTransformer if enabled) → ComposableFunInterfaceLowering →
+**DurableFunctionKeyTransformer** → ComposableVersionOverloadsLowering → ComposableDefaultParamLowering →
+AdaptedComposableReferenceTypePatcher → **ComposerLambdaMemoization** → **ComposerParamTransformer** →
+ComposableTargetAnnotationsTransformer → ComposerIntrinsicTransformer → **ComposableFunctionBodyTransformer**
+→ ComposableAnnotationRemover → (FunctionKeyMeta annotations, if requested).
+
+### 1.1 Synthetic parameters: `$composer`, `$changed[N]`, `$default[N]`  [src, exp]
+
+Every `@Composable` function gets parameters appended after its regular parameters ([src] `CPT` 645–755):
+
+```
+JVM order:  [this] [context params…] [ext receiver] p1..pn  $composer:Composer  $changed:int ×c  [$default:int ×d]
+c = changedParamCount(n, t) = max(1, ceil((n + t) / 10))        t = #dispatch + #context + #extension receivers
+d = defaultParamCount(n)    = ceil(n / 31)   (only if requiresDefaultParameter(); n counts Regular params only)
+```
+
+- Constants: `BITS_PER_INT = 31`, `SLOTS_PER_INT = 10`, `BITS_PER_SLOT = 3` ([src] `CFBT` 108–110). Formulas:
+  `CFBT` 137–174. Names: `$composer`, `$changed`, `$changed1`, …, `$default`, `$default1`, …
+  ([src] `CPT` 705–723; `ComposeNames.kt` 6–9).
+- The compiler **asserts** this exact arity when it builds the restart lambda
+  (`composerIndex = real + thisParamCount; changedIndex = composerIndex+1; defaultIndex = changedIndex + c`,
+  `require(parameterCount == …)`, [src] `CFBT` 1708–1731). This is why the shape is a proof when it is
+  intact.
+- `requiresDefaultParameter()` ([src] `CPT` 545–557): true for regular functions with any default,
+  for default stubs, and for legacy open functions. **False for open/abstract virtual functions**, which instead
+  get a static wrapper `<name>$default` in a nested `ComposeDefaultImpls` class ([src]
+  `lower/ComposableDefaultParamLowering.kt` 30–80, 233, 294; `ComposeNames.DefaultImpls`).
+- `$composer` has type `androidx/compose/runtime/Composer` (nullable at IR level). Regular param names are
+  sanitized with `dexSafeName` ([src] `ACL` 1215–1224, `CPT` 688).
+- Composable **property getters** get `@JvmName("getX")` added, so the name is unchanged even with extra params ([src] `CPT` 668–680).
+- Composable **function types** `@Composable (A) -> R` are lowered to `FunctionN+2`: `(A, Composer, Int) -> R`.
+  This is also true of lambdas (`Function2<Composer,Integer,Unit>` for `@Composable () -> Unit`) [exp, javap].
+  Calls go through `FunctionN.invoke(…, composer, Integer.valueOf(bits))`. Lambdas with more than 22 params
+  use `ComposableLambdaN` ([src] `CLM` 1219).
+- Verified examples [exp]: `Greeting(String,int,boolean,Composer,int,int)` (n=3, c=1, d=1);
+  `Many(int×11,String,Composer,int,int,int)` (n=12, c=2, d=1);
+  `Screens.Member(Point,Wrapper,Composer,int)` (instance member: t=1, c=1).
+
+**`$changed` encoding** ([src] `CFBT` 66–115, 4575–4700). Bit 0 is the "force/restart" bit. Slot *s*
+(receivers first, then regular params, 10 slots per int) uses bits `3s+1 .. 3s+3`:
+low two bits `ParamState` = Uncertain `00` / Same `01` / Different `10` / Static `11`, and the high bit
+`0b100` = Unstable. The body copies it into `$dirty` and fills uncertain slots with
+`if ($changed & (0b110<<(3s+1)) == 0) $dirty |= $composer.changed(p) ? 0b100<<(3s) : 0b010<<(3s)`. The
+concrete values seen in the experiment [exp] were `changed(x)?4:2`, `?32:16`, `?256:128` for slots 0–2, and
+callers passed `6` = Static slot 0. The skip test is `$dirty & M1 != M2`, where `M1`/`M2` have `0b001` in every
+**used** parameter's slot, plus bit 0 (`irHasDifferences`, [src] `CFBT` 4619–4700; e.g. `0x13/0x12`,
+`147/146`, `0x12492493/0x12492492` [exp]). Callers pass per-slot certainty bits computed at the call
+site ("comparison propagation").
+
+**`$default` encoding** ([src] `CFBT` 219–236 doc, 1337–1420). Bit *i* (= regular-param index,
+`defaultIndexForSlotIndex = slot − valueArgsStart`, [src] `CFBT` 4196) is 1 when the caller omitted
+argument *i*. The prologue emits `if ($default & (1<<i) != 0) p_i = <default expr>`. For a static default in a
+skippable function it also emits `$dirty |= Static<<slot`. For non-static defaults
+(e.g. `remember {}`, theme reads) the prologue is wrapped in
+`$composer.startDefaults(); if ($changed&1==0 || $composer.defaultsInvalid) {…} else {skipToGroupEnd; …}; $composer.endDefaults()`
+([src] `CFBT` 1620–1660, 2143–2153). Seen in the experiment: `$default & 1024` / `& 2048` for params a11/a12 [exp].
+
+### 1.2 Restart groups, skipping, `updateScope` (restartable functions)  [src, exp]
+
+For a Unit-returning, non-inline, not-`@NonRestartableComposable` function ([src] `CFBT` 1055–1195):
+
+```
+$composer = $composer.startRestartGroup(KEY_fn)               // returns Composer
+[sourceInformation($composer, "C(Name)…")]                      // §1.6
+$dirty = $changed; <per-param dirty checks>; [defaults prologue]
+if ($composer.shouldExecute(<differences>, $dirty & 1)) {       // ≥2.1.0 with PausableComposition; else
+    if (isTraceInProgress()) traceEventStart(KEY_fn, $dirty, $dirty1|-1, "fq.Name (File.kt:L)")   //   `(<diff>) || !$composer.skipping`
+    <body>
+    if (isTraceInProgress()) traceEventEnd()
+} else $composer.skipToGroupEnd()
+$composer.endRestartGroup()?.updateScope { c, _ -> Fn(p…, c, updateChangedFlags($changed | 1), $default) }
+```
+
+- **Restart lambda.** In K2 it is an indy lambda over a private static synthetic `Fn$lambda$N(captures…, $changed…, $default…, Composer, int)`.
+  D8/R8 desugar it to `…$$ExternalSyntheticLambdaN` [exp]. In K1 (androidx ≤1.5.x) it is an inner class extending
+  `kotlin.jvm.internal.Lambda` [inf]. Its body passes every captured param through unchanged, puts
+  its own Composer arg in the `$composer` slot, `updateChangedFlags(x|1)` in every `$changed` slot, and the
+  captured `$default` unchanged ([src] `CFBT` 1710–1770; [exp] javap of `Greeting$lambda$1`).
+  `updateChangedFlags` ([src] `RT/commonMain/.../RecomposeScopeImpl.kt` 44–60) uses the masks
+  `0x12492492`, `0x24924924`, `~0x36DB6DB6`. After R8 inlines it, these constants appear literally [exp].
+- Members: `this` is saved to a temp and captured ([src] `CFBT` 1703–1708).
+- `shouldExecute(boolean,int)` replaced `(diff) || !skipping` when the runtime has it and
+  `PausableComposition` is on ([src] `CFBT` 476–487, 1805–1822). See §1.14 for defaults by version.
+
+### 1.3 Non-restartable, read-only, inline, lambdas  [src, exp]
+
+- **Non-restartable** (non-Unit return, `@NonRestartableComposable`, inline lambdas, …): `visitNonRestartableComposableFunction`
+  ([src] `CFBT` 722–870). With `OptimizeNonSkippingGroups` (default on since 2.2.0, §1.14) it gets **no outer
+  group**, only `sourceInformationMarkerStart(composer, KEY_fn, "C(Name)…")`/`…End` when source info is on.
+  Without it, it gets `startReplaceGroup(KEY_fn)` … `endReplaceGroup()`. `@ReadOnlyComposable` gets markers only.
+  [exp]: `NonRestart`, `readOnly` and `rememberDouble` have only marker calls.
+- **Composable lambdas** get no root group, because `ComposableLambdaImpl.invoke` owns it. They get
+  `sourceInformation(c,"C<locs>:File#pkg")` (no name), skipping logic and trace markers ([src] `CFBT` 875–1050; [exp]).
+- **Inline composables** (`CC(Name)`) get only markers, and no trace markers ([src] `CFBT` 752–754; [exp] `InlineRow`).
+  Their bodies are inlined by kotlinc into callers, **including library inline composables** such as
+  `Column`/`Row`/`Box`, with their marker strings `CC(Column)…:Column.kt#<pkghash>` [inf, from the mechanism; seen for
+  runtime `remember`: `CC(remember):Main.kt#9igjgp` [exp]].
+
+### 1.4 Replace, movable and reusable groups (control flow, `key`, `remember`)  [src, exp]
+
+- Each composable-containing branch of `if`/`when`, early return or loop gets
+  `startReplaceGroup(KEY_elem)`/`endReplaceGroup()`. Runtime < 1.7 uses `startReplaceableGroup`/`endReplaceableGroup`.
+  The compiler picks whichever the runtime on the compile classpath has ([src] `ACL` 1479–1495).
+- `key(k1, …) { }` becomes `startMovableGroup(KEY_elem, k)`, or `joinKey(k1,k2)` for multiple keys ([src] `CFBT` 2239–2280,
+  3458–3530; [exp] `startMovableGroup(-1133656910, i)`).
+- **Intrinsic remember**: `remember(k…) { calc }` is inlined to `changed(k)… || rememberedValue()===Composer.Empty → updateRememberedValue(calc())`.
+  In cases where a group is needed it is wrapped in `startReplaceGroup(KEY(remember fn))`, where the key is computed with
+  `functionSourceKey(remember)` ([src] `CFBT` 3290–3310). For an external function that has no durable key, this is
+  `("$fqName$jvmDescriptor").hashCode()` ([src] `ACL` 1264–1275). Its marker string is forged as
+  `CC(remember)<locs>:<callerFile>#9igjgp`, using the runtime package hash ([src] `CFBT` 3322–3346; [exp]).
+- Early returns use `currentMarker`/`endToMarker(marker)` ([src] `CFBT` 448–466, 2263–2270).
+
+### 1.5 Group keys: `KEY_fn` and `KEY_elem` (durable keys)  [src, exp: exact]
+
+**Function key.** `DurableFunctionKeyTransformer` always runs ([src] `CIGE` 118–128; also in 1.5.14 [src]).
+`sourceKey()` returns `durableFunctionKey.key` ([src] `ACL` 1264–1275) = `String.hashCode()` of:
+
+```
+"fun-" + [ExtRecvSimpleName "."] + jvmFriendly(name) + "(" + join(",", simpleName(type) for regular+context params) + ")" + simpleName(returnType)
+       + PATH
+PATH   = for node from innermost enclosing scope to root: "/" + node.key [ + ":" + siblingIndex if >0 ]
+node.key ∈ { "class-<Name>", "pkg-<fqName or <root>>", "file-<basename>", "fun-<sig>", "call-<name>", "arg-<i>", "$this", "$$this",
+             "val-<n>", "set-<n>", "loop", "cond", "body", "branch", "else", "try", "catch", "finally", "str", "vararg", "<i>", "param-<n>", "entry-<n>", "get", "set" }
+```
+
+(`DFKT` 128–145; `DKT` 57–363; `DKV` 19–185 [src]). `jvmFriendly` turns specials into `$…$` (`<anonymous>` → `$anonymous$`).
+`simpleName` is the classifier's **simple** name. In K2, composable function types are named `ComposableFunctionN`.
+Verified by recomputation [exp]:
+
+| key string | hash | where seen |
+|---|---|---|
+| `fun-Test()Unit/pkg-<root>/file-Test.kt` | −1794342280 | golden `DefaultParamTransformTests/testComposableWithAndWithoutDefaultParams.txt` |
+| `fun-B(Int)Unit/class-A/pkg-<root>/file-Test.kt` | 666085442 | golden `TraceInformationTest/testBasicComposableFunctions.txt` |
+| `fun-Foo(ComposableFunction0)Unit/pkg-<root>/file-Test.kt` | −239871899 | golden `FunctionKeyMetaAnnotationsTests/testComposableLambda.txt` |
+| `fun-$anonymous$()Unit/arg-0/call-Foo/fun-Bar()Unit/pkg-<root>/file-Test.kt` | −420233864 | same golden (lambda) |
+| `fun-$anonymous$()Unit/arg-0/call-Foo:1/fun-Bar()Unit/pkg-<root>/file-Test.kt` | 511230191 | same (2nd sibling call) |
+| `fun-Greeting(String,Int,Boolean)Unit/pkg-com.example.app/file-Main.kt` | −1918547072 | experiment, javap **and R8 dex** |
+| `fun-Member(Point,Wrapper)Unit/class-Screens/pkg-com.example.app/file-Main.kt` | 1115589987 (`0x427e8d63`) | experiment, **R8 dex** |
+
+The key is **α-invariant evidence that commits to the original simple name, simple parameter-type names,
+enclosing class chain, package and file basename**. It is a 32-bit hash, so it can confirm candidates but it cannot be inverted.
+
+**Element key** (inner groups, markers) ([src] `CFBT` 1969–1991):
+`h = 31*(31*KEY_fn + (start−fnStart)) + (end−fnStart)`, then `31*h + value.hashCode()` for `IrConst`,
+`+2` for `IrBlock`, `+3` for `IrComposite`. Offsets are file char offsets.
+
+**Lambda key** = the durable key of the lambda's function. It is passed as the first int to
+`composableLambdaInstance`/`rememberComposableLambda`/`ComposableLambdaImpl(<init>)` ([src] `CLM` 996–1003).
+
+**Old keys.** If no durable key exists (external functions, or configurations that skip the transformer),
+the fallback is `"$fqName$jvmDescriptorWithoutName".hashCode()` of the *pre-lowering* descriptor ([src] `ACL`
+1264–1275; the same code is in 1.5.14 `AbstractComposeLowering.kt` 1203–1216).
+
+### 1.6 `sourceInformation*` strings  [src, exp]
+
+Calls: `ComposerKt.sourceInformation(Composer,String)` after a group start, and
+`sourceInformationMarkerStart(Composer,int KEY,String)`/`…End(Composer)` for group-less scopes ([src] `CFBT` 2025–2090).
+Strings are filled in late by `applySourceFixups` ([src] `CFBT` 1300–1321). Grammar ([src] `CFBT` 4096–4114, 4339–4368,
+4866–5020):
+
+```
+function-info := call-info [param-info] [locations] ":" file ["#" base36(abs(pkgHash))]
+call-info     := "C" ["C"] ["(" simpleName ")"]            // "CC" = inline fn; no "(…)" for lambdas
+param-info    := "P(" sorted-index-encoding ")"            // compiler ≤2.2.x or runtime <1.9
+               | "N(" name[":" inlineClassFqn] ("," …)* ")" // ≥2.3.0 && runtime ≥1.9 (JVM only)
+locations     := loc ("," loc)*        loc := ["*"] line0 "@" offset ["L" length]   // line0 is 0-based
+block-info    := [locations]                                // inner groups: e.g. "12@314L38"
+pkgHash       := fold(0){h,c -> h*31 + c.code} over the package FqName; "c#" abbreviates "androidx.compose."
+```
+
+- Example [exp]: `C(Greeting)N(name,times,enabled)10@256L30:Main.kt#bw24ds`. Here `bw24ds` = base36 hash of `com.example.app`,
+  offset 256 = `remember { mutableStateOf(0) }`, line 10 (0-based) = source line 11.
+- `N(...)`/`P(...)` drop params whose name starts with `$`. So anonymous `_` lambda params, which are sanitized to `$…`,
+  are **omitted** ([src] `CFBT` 4913, 4967; `ACL` 1215).
+- With `sourceInformation=false`, **public** functions still get `C(Name)P(...)` with no file ([src] `CFBT` 4110–4113).
+- Gradle default: `includeSourceInformation = true` ([src] `libraries/tools/kotlin-compose-compiler/.../ComposeCompilerGradlePluginExtension.kt` 61;
+  `ComposeCompilerSubplugin.kt` 71–75, which can be suppressed when AGP configures it).
+
+### 1.7 Trace markers  [src, exp]
+
+`if (isTraceInProgress()) traceEventStart(KEY_fn, dirty1|-1, dirty2|-1, info)` / `traceEventEnd()` on
+restartable, non-restartable (non-inline) functions and composable lambdas ([src] `CFBT` 2098–2141).
+`info = "${kotlinFqName} (${file.name}:${line0})"`, where `line0 = getLineNumber(body.startOffset)`, which is **0-based**.
+Example: `com.example.app.Greeting (Main.kt:9)` for a body that starts on source line 10 [exp]. Lambdas:
+`com.example.app.Screen.<anonymous> (Main.kt:31)` and
+`com.example.app.ComposableSingletons$MainKt.lambda$-1495921124.<anonymous> (Main.kt:30)` [exp]. The format is the same in 1.5.14 [src].
+Gradle default `includeTraceMarkers = true` ([src] `ComposeCompilerGradlePluginExtension.kt` 158).
+
+### 1.8 Composable lambdas and `ComposableSingletons$<FileKt>`  [src, exp]
+
+- A composable lambda **with captures** becomes `rememberComposableLambda(KEY, tracked=true, block, $composer, $changed)`
+  (runtime ≥1.7). Older runtimes use `composableLambda($composer, KEY, tracked, block)` ([src] `CLM` 965–1010).
+  Arity >22 uses the `…N` variants with an arity arg.
+- A composable lambda **without captures** is hoisted to a static field of `object ComposableSingletons$<FileKt>`
+  (`FileKt` = `PackagePartClassUtils.getFilePartShortName(fileName)`, which comes from the file name and **not** from `@file:JvmName`)
+  and initialized in `<clinit>` with `composableLambdaInstance(KEY, false, block)` ([src] `CLM` 317–345, 834–905; [exp]).
+  Field name: **`lambda$<KEY>`** since Kotlin 2.1.20 (`$0`,`$1`… appended on collision); **`lambda-<i>`** before
+  that ([src] `CLM` 835–846; tag diff §1.14). The internal getter is `getLambda$<KEY>$<module>`, which leaks the Gradle
+  module name ([exp] `getLambda$-1495921124$main`). The old name is still emitted for public inline scopes ([src] `CLM` 893–910).
+- `tracked` = "has captures" ([src] `CLM` 1001–1002).
+
+### 1.9 Non-composable lambda memoization  [src]
+
+Inside composable functions, non-composable lambdas (with or without captures on JVM/K2) are wrapped in an
+intrinsic-remember keyed on their captures: `changed(capture)… || rememberedValue()===Empty` → `updateRememberedValue(lambda)`
+([src] `CLM` 690–730, 1036–1110).
+
+### 1.10 Stability: `$stable` and `@StabilityInferred`  [src, exp]
+
+For public/internal, non-enum, non-interface, non-inline, non-inner classes: `public static final int $stable`
+(`@JvmField`) with values `0` = stable, `8` = `UNSTABLE(0b100)<<1` = unstable, or an OR-expression of other
+classes' `$stable` fields for generic or external dependencies ([src] `CST` 45–50, 100–215; `ACL` 780–930;
+[exp] `Holder(var)` → `8`, `Point` → `0`). `@StabilityInferred(parameters=mask)` has **BINARY** retention
+([src] `RT/commonMain/.../internal/StabilityInferred.kt` 33), so it is dropped from DEX.
+Call sites read `Other.$stable` only for classes from other modules whose stability is only known at runtime ([src] `CFBT` 3590–3600).
+
+### 1.11 Live literals  [src]
+
+These are only generated with `liveLiterals`/`liveLiteralsEnabled` (IDE Live Edit, debug). The plugin makes an
+`object LiveLiterals$<FileKt>` with `@LiveLiteralFileInfo(file="/path/File.kt")` (**RUNTIME** retention) and one
+getter per literal, annotated `@LiveLiteralInfo(key, offset)` (RUNTIME). The getter calls
+`liveLiteral("<Type>$<durable path>", value)` when `isLiveLiteralsEnabled` is true. Example key:
+`Int$fun-bar$class-$no-name-provided$$fun-a` ([src] `LLT`; golden `LiveLiteralTransformTests/testAnonymousClass.txt`;
+`RT/commonMain/.../internal/LiveLiteral.kt` 33–62).
+
+### 1.12 Other lowering
+
+- `@FunctionKeyMeta(key,startOffset,endOffset)`: BINARY retention, and only when requested or when the runtime
+  annotation is not RUNTIME ([src] `CIGE` 236–241; `RT/.../internal/FunctionKeyMeta.kt` 33). **Not in DEX.**
+- `@ComposableTarget`/`@ComposableInferredTarget`/`…Constraints`/`@Composable` itself: BINARY, so they are gone from DEX
+  ([src] runtime sources). `ComposableAnnotationRemover` strips `@Composable` from IR types.
+- Composable fun-interfaces, function references (adapted into `AdaptedFunctionReference`), and value-class
+  default stubs (`makeStubsForDefaultValueClassIfNeeded`, [src] `CPT` 796–950) are all covered by fixtures §6.
+- **Compose mapping (Kotlin ≥2.3 + AGP).** The Gradle plugin runs `group-mapping`, which scans bytecode for groups
+  and appends `ComposeStackTrace -> $$compose:` entries (`1:1:<method>:<line>:<line> -> m$<key>`) to the R8
+  mapping ([src] `plugins/compose/group-mapping/.../ComposeMapping.kt`; `kotlin-compose-compiler/.../ComposeAgpMappingFile.kt`).
+  This is useless to 8R, since there is no mapping, but it confirms that the ecosystem treats keys as function identifiers.
+
+### 1.13 Kotlin-level vs JVM shape summary
+
+| Original | Emitted (K2, runtime ≥1.7) |
+|---|---|
+| `@Composable fun F(p1..pn)` | `static void F(p1..pn, Composer, int×c [, int×d])` + restart lambda + groups |
+| `@Composable fun F(): R` | no restart group; `R F(…, Composer, int×c [, int×d])` |
+| `@Composable () -> Unit` value | `Function2<Composer,Integer,Unit>`; `ComposableLambdaImpl` at runtime |
+| no-capture composable lambda | static field `ComposableSingletons$FileKt.lambda$KEY` |
+| class `C` | `+ public static final int $stable` |
+
+### 1.14 Version matrix (compiler × runtime)
+
+| Feature | androidx 1.0–1.5.x (K1, Kotlin ≤1.9) | Kotlin 2.0.x | 2.1.0–2.1.x | 2.2.x | 2.3.x / HEAD |
+|---|---|---|---|---|---|
+| Durable `KEY_fn` string scheme | same scheme [src 1.5.14] | same | same | same | same [exp] |
+| Replace groups | `startReplaceableGroup` | `startReplaceGroup` if runtime has it, else fallback [src] | same | same | same |
+| Composable lambda factory | `composableLambda(c,KEY,…)` | `rememberComposableLambda` if runtime has it [src] | same | same | same |
+| Singleton field names | `lambda-<i>` [src] | `lambda-<i>` [src] | `lambda-<i>` (2.1.0) / **`lambda$KEY` (2.1.20+)** [src] | `lambda$KEY` | `lambda$KEY` |
+| Skip condition | `(dirty&M1!=M2) \|\| !skipping` | same [src] | `shouldExecute(…)` if flag on (default **off**) [src] | flag default **on** [src] | on |
+| OptimizeNonSkippingGroups | n/a | default off | default off | **default on** [src] | on |
+| Strong skipping | opt-in | option; flag default on at 2.0.20 [src] | always | always | always (flag removed) |
+| Param info | `P(...)` | `P(...)` | `P(...)` | `P(...)` | **`N(names)`** when runtime ≥1.9 [src] |
+| Restart lambda codegen | inner class (K1) [inf] | indy → D8 synthetic [inf] | same | same | indy → `$$ExternalSyntheticLambdaN` [exp] |
+| Trace string | `fq (File:line0)` [src] | same | same | same | same |
+
+"Runtime has it" matters: the **runtime version on the compile classpath** selects the shape, not just the compiler version
+([src] `ACL` 1479–1495; `CFBT` 476–487, 545–552, 586–590). A single APK can mix shapes, because libraries were compiled by
+different compilers.
+
+---
+
+## 2. What survives R8 (no mapping)
+
+Experiment results ([exp], R8 8.10.9, runtime 1.10.6, consumer rules applied):
+
+| Transformation | After R8 | Evidence |
+|---|---|---|
+| `sourceInformation*` calls and strings | **Removed in all three variants, including `-dontoptimize`.** | runtime `proguard.txt` has `-assumenosideeffects` on the three `ComposerKt.sourceInformation*` ([src] `RT/androidMain/keepRules/rules.keep` 1–5). 0 hits for `bw24ds`/`C(` in all dumps. |
+| Trace `info` strings | **Removed** when `compositionTracer` is never written (R8 folds `isTraceInProgress()` → false). **Kept** when anything reachable calls `Composer.setTracer` (e.g. `runtime-tracing`'s initializer [inf]) or with `-dontoptimize`. | `base`: 0 strings; `trace` and `noopt`: all 12 `"… (Main.kt:N)"` strings present, each next to `const KEY_fn`. |
+| `KEY_fn`, `KEY_elem`, lambda keys | **Survive as `const` ints.** `startRestartGroup` is renamed (e.g. `Ld/k;.B:(I)Ld/k;`). | `const #427e8d63` in `Member`; lambda keys in `new ComposableLambdaImpl(IZ…)` and `<clinit>` sequences. |
+| Bitmask constants (`$changed`/`$dirty`/`$default`) | Survive. Masks index the *original* slots. | `and-int/lit8 …,#19` / `#18`, `0x36db6db6` (inlined `updateChangedFlags`). |
+| Synthetic params | Present but **R8 may remove or reorder params**: `Greeting (String,int,boolean,C,int,int)` → `(I I Ld/k; Z)V`; `Many` lost the 10 constant-arg params → `(ILjava/lang/String;Ld/k;III)V`. | mapping `residualsignature`. |
+| `Composer` type | Renamed. The interface gets **merged into `ComposerImpl`** (`Ld/k;`), as the keep rule intends ([src] rules.keep 7–15). | every residual signature has `Ld/k;` |
+| Non-restartable composables | Often **inlined** into callers (`rememberDouble`, `NonRestart`, `readOnly` → into `Screen`). | mapping inline frames |
+| Restartable composables | Survived as methods (≥2 call sites: caller plus own restart lambda) [exp; generalization inf] but **moved to unrelated host classes** (MainKt statics → `ComposableSingletons$EntryKt`). | mapping |
+| Restart lambdas | `$$ExternalSyntheticLambdaN` classes, **horizontally merged** (`m.c` = 3 lambdas). | mapping |
+| `ComposableSingletons$FileKt` | Lambda body classes merged with runtime synthetics; `composableLambdaInstance` inlined to `new ComposableLambdaImpl(key, false, block)` in some class's `<clinit>`. | dump `m.a.<clinit>` |
+| `$stable` fields | **Removed** (never read). | `Static fields -` on all app classes |
+| `@StabilityInferred`, `@FunctionKeyMeta`, `@Composable` | Not in DEX at all (BINARY). | [src] |
+| Live literals | `LiveLiterals$…` and key strings folded away when `isLiveLiteralsEnabled` is never set [inf]. The `@LiveLiteralInfo` annotations are RUNTIME but go with their removed methods [inf]. | — |
+| Kotlin metadata | Stripped unless kept; if kept, it holds the **pre-lowering** signature [inf]. | — |
+
+**Structural fingerprints that survive** (all α-invariant):
+
+1. **Composer class `C`.** The unique class type that appears as a parameter in many app methods, right after the "real"
+   parameters, followed by `int` params. Methods begin with `invoke-* C.x(I)C` whose result is written back to the same
+   parameter register (`startRestartGroup`). Almost every such method ends with `invoke C.y()LS;` + null-check +
+   `S.z(LFunction2;)V` (`endRestartGroup`/`updateScope`). A runtime SigDB (§5.4 of DESIGN) can also pin `ComposerImpl` by
+   body shape.
+2. **Restartable composable.** An entry `startRestartGroup(const)` on a `C`-typed parameter, plus exactly one
+   restart-lambda class whose invoke calls this method back with the pass-through pattern (§1.2).
+3. **Composable lambda.** `new ComposableLambdaImpl(const int, const boolean, <lambda>)` (inlined
+   `composableLambdaInstance`) or the `rememberedValue`/`Empty`/`new ComposableLambdaImpl`/`updateRememberedValue` sequence
+   (inlined `rememberComposableLambda`) [exp].
+4. **Group constants.** `startReplaceGroup(const)`, `startMovableGroup(const, x)`, `C.shouldExecute(Z,I)Z`, `skipToGroupEnd`.
+5. **`$changed` slot masks** of the forms `0b110<<(3s+1)`, `4<<3s|2<<3s`, `0x12492492…`, and **`$default` single-bit tests** guarding a store to a parameter register.
+
+**What does not survive.** Function names, file names and lines (except via trace strings when they survive),
+`N()`/`P()` param info, the `$stable` stability table, and the Kotlin-level arity if R8 removed params.
+
+**Non-minified builds** (D8 only, `~~D8{…}` marker): everything in §1 survives, including all strings, names and
+`$stable`. The `compose/` rules still apply and are mostly S there.
+
+---
+
+## 3. Undo rules
+
+Preconditions are checked per item at runtime. "roles" means `$composer`/`$changed`/`$default` identified by dataflow
+(R-roles below), not by position.
+
+**R-roles (shared analysis, D).**
+- `$composer` = the `C`-typed param that receives `startRestartGroup`/`startReplaceGroup`/marker calls, or is passed on as the composer to other composables.
+- `$changed` = the int params that flow into bit tests of slot-mask form, into `shouldExecute(_, x&1)`/`x&1`, into trace dirty args,
+  and in the restart lambda into `updateChangedFlags(x|1)` (or its inlined mask expression).
+- `$default` = the int params used only in single-bit tests `x & (1<<i)` whose true branch stores into a parameter
+  register (or ORs Static bits into `$dirty`), and which the restart lambda passes through unchanged.
+
+Classification is by role, so it does not care about R8 argument reordering. It is α-invariant because it uses no names.
+
+| id | class | preconditions | evidence / proof |
+|---|---|---|---|
+| `compose/detect` | D | ≥1 method matches fingerprint 2, and C is unique | positive structural evidence (DESIGN §1.1) |
+| `compose/composable-marker` | **S** (restartable) / D (others) | fingerprint 2 holds for this method | only the Compose compiler emits `startRestartGroup(K)` + a self-calling restart lambda. Output: report flag and optional marker annotation. |
+| `compose/synthetic-param-names` | **S** | roles identified; count of `$changed` = c and of `$default` ∈ {0, d} for n = remaining params (ordered by role, index) | names are compiler constants `$composer`, `$changed`, `$changedK`, `$default`, `$defaultK` ([src] `CPT` 705–723). Written as parameter names / debug-info names. |
+| `compose/source-signature` | **S** if an `N(...)` string is bound to the method and its count equals the remaining real params (after removing receivers); **D** otherwise | roles identified | `N()` lists every named param ([src] `CFBT` 4964–4990). Without it R8 may have removed params (seen [exp]), so arity is not provable. D output = remaining params in residual order, with names from other rules. Recorded in the mapping/report; **`dex'` keeps the synthetic params** (§0 note 2). |
+| `compose/original-arity-bound` | D (annotation) | roles identified | the highest slot referenced by any `$changed` mask in the body or in callers' constant `$changed` args, and the highest `$default` bit, give a **lower bound** on the original slot/param count. A gap (slot with no live param) proves R8 removed a param at that position. |
+| `compose/fn-name/sourceinfo` | **S** | a `sourceInformation(C, s)` or `sourceInformationMarkerStart(C, K, s)` call is the **first** such call after the method's entry group, `s` parses as function-info, has `(Name)`, and **for markers `K` equals the method's own entry key** | compiler-emitted exact simple name ([src] `CFBT` 4866–4875). Later `CC(Name)` strings in the body belong to **inlined inline composables** (kotlinc inlining). They must not name the method, but they label regions (`compose/inline-region`). |
+| `compose/fn-name/trace` | **S** (simple name) | `traceEventStart(K, …, s)` with `K` == the method's entry-group key, and `s` parses uniquely (see `compose/trace-parse`) | `kotlinFqName` last segment ([src] `CFBT` 2107–2138). For lambdas the last segment is `<anonymous>`, which gives no name but does give the **enclosing function's fq name**. |
+| `compose/trace-parse` | N→S | trace string present | Regex `^(.+) \((.+):(-?\d+)\)$` is ambiguous when the file name or a backticked function name contains `" ("`. **Enumerate** every split at each `" ("` occurrence whose suffix matches `(.+):(\d+)\)$`, ordered by split position. The set is exhaustive because the true split is one of those occurrences. **Filter**: file ∈ {sourceInfo file, SourceFile attr}, or the `KEY_fn` hash check. One survivor → S. Otherwise D: use the rightmost split and annotate. |
+| `compose/fqname-split` | N→S | fq name from trace | Candidates: every split of the dotted fq name into `package` + `Class(.Nested)*` + `fn` (for top-level: `package` + `fn`). That is `k+1` candidates for `k` dots, which is exhaustive (JVM names cannot contain `.`). **Filters**: (a) `#pkgHash` from any sourceInformation in the same file, or (b) the `KEY_fn` hash with a known signature, or (c) Kotlin metadata if kept. Exactly one survivor → S package + class chain. |
+| `compose/param-names` | **S** | `N(...)` bound to the method (as in `fn-name/sourceinfo`) | exact names in declaration order, receivers excluded. Inline-class params carry `:<fqn>` with `c#` = `androidx.compose.` → also S **type** names for those params. |
+| `compose/param-order` | **S** (a permutation only) | `P(...)` bound to the method | gives each param's rank in name-sorted order. It cross-validates names from `checkNotNullParameter` (DESIGN §5 item 3), and inline-class entries give S type FQNs. |
+| `compose/source-file` | **S** per method; class-level only if all methods hosted by the class agree **and** the class is not an R8 merge/host target | file from `…:File.kt#h` or `(File.kt:L)` | compiler-emitted `file.name`. The class-level SourceFile attr is D because R8 moves statics across classes ([exp]: MainKt methods hosted by `ComposableSingletons$EntryKt`). |
+| `compose/source-line` | **S** for the function's body-start line (`L+1`); **S** for call-site lines listed in sourceInformation, D for mapping them to instructions | trace or sourceInfo | lines are 0-based ([src] `getLineNumber`; [exp]). Assigning the *k*-th location to the *k*-th composable call is D, because R8 reorders code. |
+| `compose/package` | **S** when `fqname-split` resolves, or when a candidate package's hash equals `#pkgHash` and the candidate comes from an exhaustive set | — | `pkgHash` = 31-fold of the package string, abs, base36 ([src] `CFBT` 5008–5020; [exp] `com.example.app`→`bw24ds`). The hash alone is never inverted. |
+| `compose/key-confirm` | **S** when used as a filter on an exhaustive finite candidate set with exactly one survivor. Otherwise it is only a consistency check: it can **refute** (demote S→D on mismatch). | all components of the durable key string are candidate-known (name, simple type names of params and return, receiver, class chain, package, file basename) | `KEY_fn = hash("fun-…/…/pkg-…/file-…")` (§1.5, reproduced exactly [exp]). A mismatch **proves** some component is wrong. A match on the only enumerated candidate proves it (the true string is in the set and hashes to `K`). |
+| `compose/default-args` | **S** "param *i* had a default value" when a `$default` bit-*i* test exists; **D** for the default expression (R8 may have optimized it); absence proves nothing | roles identified | the prologue exists only for params with defaults ([src] `CFBT` 1356–1410). Record `(param i → default expr region)` in the report, and in the Kotlin-signature sidecar as `= <expr>`. |
+| `compose/restart-lambda` | **S** (role) / D (name) | a synthetic lambda class whose invoke is the pass-through self-call (§1.2) | label it "restart scope of F". The K2 original body name is `F$lambda$N`, where N is the per-function lambda index, so it is D (index order is not provable after R8). |
+| `compose/singletons` | D; the **field name `lambda$K` is S** when compiler ≥2.1.20 is established (see §5) | `<clinit>` builds `ComposableLambdaImpl(K,false,…)` into a static field | the class name is `ComposableSingletons$<FileKt>` (S if the file name and package are S and every lambda in the class traces to that file); names from [src] `CLM` 317–345, 835. |
+| `compose/lambda-name` | S (enclosing fq name only) | trace string of a lambda | `Outer.fn.<anonymous>` names the enclosing function. |
+| `compose/inline-region` | S (region identity), D (bounds) | `sourceInformationMarkerStart(C, K, "CC(Name)…:File#h")` … `End` inside a body | an evidence source for kotlinc `inline`-function un-inlining (a `kotlinc/` concern): exact callee simple name, file, package hash. Only present when source info survived. |
+| `compose/lib-key` | D hint; S only with key match **and** synthetic-shape match **and** body-hash match against a versioned library DB | library composables in the app (material3, foundation, ui…) | build a DB `KEY_fn → (owner, name, desc)` by scanning `startRestartGroup`/marker constants in library AARs (no hashing needed). One app-vs-DB accidental collision is ~`N_app·N_db/2³²` (~1% per app at 10³×5·10⁴), so a bare key match is not proof. |
+| `compose/stable-field` | S (name `$stable`) where the field exists (non-minified or kept) | `public static final int` written only in `<clinit>` with `0`, `8`, or ORs of other such fields | value → stability annotation in the report (`0` stable, `8` unstable). |
+| `compose/live-literals` | S | `liveLiteral("<Type>$<path>", v)` strings or `@LiveLiteralInfo`/`@LiveLiteralFileInfo` present | durable paths (§1.5 grammar) name functions, callees, arg indices and the file path. Rare in release builds. |
+| `compose/group-offset` | N (reported only) | `KEY_fn` known **and** the function's source length `L` known (from sourceInfo offsets) | for an inner key `k` and each discriminator `c∈{none,2,3}`: `H=(k−c)·31⁻¹ mod 2³²`, `d=H−961·KEY_fn mod 2³²`; candidates `{(a,d−31a) : 0≤a≤d−31a≤L}`, ordered by `a`. Exhaustive by construction. [exp] gave 1–4 candidates per group with `L`=232. If `L` is unknown the set is unbounded, so the rule is identity. Low value. |
+
+**Output placement.** S names go into the output mapping as clean names. Parameter names go into debug info. The
+Kotlin-level signature, defaults, stability, lines and inline regions go into the report and the Kotlin-signature
+sidecar. Nothing changes executable semantics.
+
+---
+
+## 4. Evidence for original names
+
+| Evidence | Carries | Survives R8? | Class |
+|---|---|---|---|
+| `sourceInformation(c,"C(Greeting)N(name,times,enabled)10@256L30:Main.kt#bw24ds")` | fn simple name, param names (≥2.3.0) or order (`P`), inline-class param type FQNs, file basename, package hash, call-site lines/offsets | **No** (assumenosideeffects) — only in D8/no-consumer-rules builds | S |
+| `sourceInformationMarkerStart(c, K, "CC(Column)…:Column.kt#<h>")` | inlined inline-composable name + file + package hash | No | S (region) |
+| `traceEventStart(K, d1, d2, "com.example.app.Screens.Member (Main.kt:69)")` | full Kotlin fq name (package + class chain + fn), file basename, 0-based body line; lambdas: enclosing fq name | **Yes if a tracer is ever set** (runtime-tracing, perfetto integrations) or `-dontoptimize` [exp] | S (split ambiguity §5.2) |
+| `KEY_fn` const | hash commits to simple name, param/return simple type names, receiver, class chain, package, file | **Yes** [exp] | verification only |
+| `KEY` of lambdas | hash commits to the enclosing fn, callee simple name, arg index, sibling index | Yes | verification only |
+| `#pkgHash` in sourceInfo | package | with sourceInfo | verification only |
+| `ComposableSingletons$<FileKt>` class name, `lambda$<K>` / `lambda-<i>` field names, `getLambda$K$<module>` getter | file facade short name, lambda key, **Gradle module name** | No (renamed) unless kept | S (when unminified) |
+| `$stable` field | "this class was compiled by Compose", stability | No (removed) | S (when present) |
+| `liveLiteral("Int$arg-0$call-Label$fun-Greeting", …)`, `@LiveLiteralFileInfo("/abs/path/Main.kt")` | durable paths, absolute source path | debug/Live-Edit builds only | S |
+| Kotlin metadata (if kept) | pre-lowering signature | only if kept | S |
+
+---
+
+## 5. Ambiguity analysis
+
+1. **R8 changes composable signatures** (param removal, constant propagation, reordering, Composer→ComposerImpl merge).
+   [exp] Positional stripping is unsafe. *Resolution:* use dataflow roles (§3 R-roles), which are invariant to reordering.
+   Arity is S only via `N()`, and otherwise D with `compose/original-arity-bound`. The formula check alone is **not** proof:
+   removing one param from an 11-param function (c=2→n=10 gives c=1) can accidentally satisfy `d∈{0,1}`.
+2. **fq-name split** (package vs class vs nesting) in trace strings. There are `k+1` candidates. Filters: package hash,
+   `KEY_fn`, Kotlin metadata. The Kotlin naming convention (lowercase packages) is **not** proof and is never used.
+3. **Extension receiver vs first regular param.** They are indistinguishable in the JVM descriptor and both count toward `c`.
+   Candidates are {receiver, not receiver}, plus context params for Kotlin ≥2.2 (0..m leading params may be
+   context/extension). *Filters:* `N()`/`P()` length (receivers excluded), `KEY_fn` (`Recv.name(...)` prefix),
+   `$default` count when `ceil(n/31)` differs, and the `$$this` path segment in lambda keys. Fallback D: treat all as
+   regular params.
+4. **Trace-string parsing** with `" ("` in file names or backticked function names. Enumerated in `compose/trace-parse`.
+5. **Which `sourceInformation` string belongs to the method.** Kotlin inlining of library inline composables, and R8
+   inlining of non-restartable composables (seen [exp]), put foreign `C(...)`/`CC(...)` strings and foreign
+   `startReplaceGroup(KEY_fn')` groups into a body. *Resolution:* bind only the string attached to the method's **entry**
+   group, and require the trace/marker key to equal the entry key. R8-inlined **restartable** composables did not happen in the
+   experiment, but if one did, its `startRestartGroup(K')` would appear mid-body and would itself be proof of inlining at that
+   point (an `r8/` un-inline hint).
+6. **Host class ≠ original class.** R8 moves static composables to unrelated classes and merges `Composer` into
+   `ComposerImpl`. Names from trace strings name the *method*. Class names derived from them are D unless §3
+   `compose/source-file` class-level conditions hold. Re-homing methods into a reconstructed `FileKt` class is a structural
+   D transform (Relocation), and it belongs in the naming phase.
+7. **Compiler era** (`lambda-<i>` vs `lambda$K`, `P` vs `N`, `startReplaceableGroup` vs `startReplaceGroup`). A single
+   dex can mix eras across libraries. Era is decided **per method** from positive shape evidence only: a
+   `shouldExecute` call means ≥2.1.0; an `N(` string means ≥2.3.0; `rememberComposableLambda` means runtime ≥1.7.
+   Where the era is undetermined, singleton field names are N with candidates `{lambda$K} ∪ {lambda-<i> : i∈[0, #fields]}`. The
+   fallback is D (`lambda_<hash>`).
+8. **Hash evidence.** 32-bit hashes (`KEY_fn`, `pkgHash`) never *invert*. They only filter an exhaustive candidate set or refute.
+   A match on a non-exhaustive guess (a SigDB hint, a name "that looks right") stays D, but is marked hash-confirmed. Cross-app
+   collisions against large DBs are realistic (~1%), see `compose/lib-key`.
+9. **Anonymous lambda params** (`_`) are missing from `N()` ([src]), so `|N| < arity` for lambdas is expected.
+   Compare `|N|` with the lambda's real arity (FunctionN − 2) before using it for arity.
+10. **Line numbers are 0-based** in both trace and sourceInfo, and the trace line is the *body* start (`{`), not the
+    `fun` keyword ([src] FIXME at `CFBT` 2114–2117). Off-by-one bugs here would silently break S.
+
+All filters use strings and int constants only, and ordering is by candidate string or split position. So every rule is
+α-invariant (DESIGN §0.3).
+
+---
+
+## 6. Fixture ideas
+
+Each fixture is built at least twice: once plain D8 (the oracle for strings/names) and once R8 with runtime consumer rules
+(and a third time with `Composer.setTracer` reachable where trace strings matter). Compile with Kotlin 2.3.x, and where it matters also
+2.0.x/2.1.0 (pre-`lambda$K`, pre-`N()`) and androidx 1.5.14 (K1).
+
+| id | program | isolates |
+|---|---|---|
+| F1 `compose-min` | `@Composable fun A() {}` | c=1 with n=0; restartable skeleton; `KEY_fn` for `fun-A()Unit/pkg-…/file-…` |
+| F2 `params-10-11` | functions with 10 and 11 params, plus a member with 10 params (t=1) | `$changed1` boundary; `thisParamCount` effect |
+| F3 `defaults-31-32` | 31 and 32 params with defaults (mirror `test31Parameters` golden) | `$default1` boundary; bit index = regular index |
+| F4 `defaults-static-vs-dynamic` | `x: Int = 0` vs `x: Int = remember{…}` | static-default Static bits vs `startDefaults/defaultsInvalid` |
+| F5 `ext-receiver` | `@Composable fun Foo.Bar(a: Int)` vs `fun Bar(f: Foo, a: Int)` with defaults near 31 | §5.3 ambiguity; `KEY_fn` `Foo.Bar(Int)Unit` resolves it |
+| F6 `context-params` | Kotlin 2.2 context parameters on a composable | JVM order; `N()` content |
+| F7 `nonrestartable` | `@NonRestartableComposable`, `@ReadOnlyComposable`, non-Unit return; with and without `-featureFlag=-OptimizeNonSkippingGroups` | outer replace group vs markers; R8 inlining |
+| F8 `inline-lib` | caller of foundation `Column{}` (library inline composable) | `CC(Column)` markers in caller; `compose/inline-region`; binding rule §5.5 |
+| F9 `lambdas` | capturing + non-capturing composable lambdas; two sibling calls to the same callee | `rememberComposableLambda`; `ComposableSingletons$FileKt.lambda$K`; sibling `:1` path; lambda trace names |
+| F10 `lambda-arity-23` | 23-param composable lambda | `ComposableLambdaN` |
+| F11 `control-flow` | if/when/loop/early return/`key(a,b)` | replace/movable groups, `joinKey`, `currentMarker/endToMarker`; `compose/group-offset` |
+| F12 `remember-intrinsic` | `remember{}`, `remember(k){}`, `remember(k1,k2,k3){}` | intrinsic remember shapes; runtime `remember` key constants |
+| F13 `stability` | `class A(val x:Int)`, `class B(var x:Int)`, `class G<T>(val t:T)`, class with external-module field | `$stable` values `0`/`8`/expr; R8 removal |
+| F14 `r8-param-removal` | composable called once with constants; one with an unused param | the `Greeting`/`Many` residual-signature phenomena; `original-arity-bound`; role analysis under reordering |
+| F15 `r8-host-move` | two files, top-level composables only | statics relocated into another file's class; `source-file` class-level refusal |
+| F16 `trace-reachable` | F9 + `Composer.setTracer(...)` | trace strings survive; `trace-parse`, `fqname-split` |
+| F17 `weird-names` | file `Main (1).kt`, backticked ``fun `a (b)`()`` | `trace-parse` enumeration |
+| F18 `same-name-packages` | `a.b.C.f` vs package `a.b.c` + class `C` | `fqname-split` filter by pkgHash and `KEY_fn` |
+| F19 `open-default` | abstract/open composable with defaults; interface default | `ComposeDefaultImpls.<name>$default` wrapper; `requiresDefaultParameter=false` |
+| F20 `value-class-param` | composable with `Color`/`Dp` params and value-class defaults | `N(x:c#ui.graphics.Color)`; default stubs; long-packed params |
+| F21 `property` | `val x: Int @Composable get()` | `@JvmName` getter keeps the name |
+| F22 `era-mix` | the same source compiled with 1.5.14 (K1), 2.0.20, 2.1.20 and 2.3.x into four modules of one app | per-method era detection §5.7 |
+| F23 `live-literals` | debug build with `liveLiteralsEnabled` | `compose/live-literals` strings and annotations |
+
+---
+
+## Appendix A — reference snippets
+
+```text
+java String.hashCode: h = 0; for each UTF-16 unit u: h = 31*h + u (int32 wrap)
+KEY_fn   = hash("fun-" + sig + path)        // §1.5
+pkgHash  = abs(fold31(packageFqName)) → base36    (Kotlin Int.absoluteValue; MIN_VALUE stays negative)
+changedCount(n,t) = (n+t==0) ? 1 : ceil((n+t)/10);  defaultCount(n) = ceil(n/31)
+slotBits(state, s) = state << (3*(s%10) + 1)
+updateChangedFlags(f) = (f & ~0x36DB6DB6) | (lo | (hi >> 1)) | ((lo << 1) & hi), lo=f&0x12492492, hi=f&0x24924924
+```
+
+## Appendix B — open questions for fixtures
+
+- K1 (1.5.x) restart-lambda class naming and field layout (`$changed`/`$default` captured field names). [inf]
+- Whether AGP's own Compose configuration overrides `includeSourceInformation` for release variants
+  (`isDisableIncludeSourceInformationForAgp`). [src shows the switch exists, but not its trigger]
+- Whether `runtime-tracing`'s startup initializer is the usual reason trace strings survive in production apps. [inf]
+- R8 behaviour when inlining a *restartable* composable (not seen at the sample's size).

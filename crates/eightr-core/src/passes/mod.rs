@@ -2,6 +2,8 @@
 
 mod kept_name;
 
+pub use kept_name::NameStats;
+
 use eightr_rules::Source;
 
 use crate::error::Result;

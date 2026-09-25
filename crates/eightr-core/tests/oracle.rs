@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use eightr_core::input::DexInput;
 use eightr_core::program::{ItemId, Program};
 use eightr_core::{run, Config, Outcome};
-use eightr_mapping::{Mapping, Metadata};
+use eightr_mapping::{Mapping, MemberKind, Metadata};
 use eightr_rules::{Attribute, Class};
 
 fn fixtures_root() -> PathBuf {
@@ -57,7 +57,7 @@ fn java_to_descriptor(t: &str) -> String {
 }
 
 fn dotted(descriptor: &str) -> String {
-    descriptor.trim_start_matches('L').trim_end_matches(';').replace('/', ".")
+    descriptor.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(descriptor).replace('/', ".")
 }
 
 /// Every S label on a name must agree with the mapping R8 wrote.
@@ -82,16 +82,35 @@ fn solved_names_match_held_back_mapping() {
             let class = p.class(class_id);
             let obf = dotted(&class.descriptor);
             let cm = &mapping.classes[*by_obf.get(obf.as_str()).unwrap_or_else(|| panic!("{ctx}: class not in mapping"))];
+            // Nothing compiler-synthesized is "original", whatever its name, except the name of a
+            // constructor, which is <init>/<clinit> by definition.
+            let ctor_name = matches!(member, Some((true, index)) if matches!(class.methods[index as usize].name.as_str(), "<init>" | "<clinit>"));
+            assert!(ctor_name || !cm.is_synthesized(), "{ctx}: S label on a synthesized class");
             match (attr, member) {
-                (Attribute::ClassName | Attribute::Package, None) => {
-                    assert_eq!(cm.original, obf, "{ctx}: claimed original, but R8 renamed {} -> {}", cm.original, obf);
+                (Attribute::ClassName, None) => {
+                    let simple = |d: &str| d.rsplit('.').next().unwrap_or(d).to_string();
+                    assert_eq!(simple(&cm.original), simple(&obf), "{ctx}: R8 renamed {} -> {}", cm.original, obf);
+                }
+                (Attribute::Package, None) => {
+                    let pkg = |d: &str| d.rsplit_once('.').map(|(p, _)| p.to_string()).unwrap_or_default();
+                    assert_eq!(pkg(&cm.original), pkg(&obf), "{ctx}: R8 moved {} -> {}", cm.original, obf);
                 }
                 (Attribute::MemberName, Some((false, index))) => {
                     let f = &class.fields[index as usize];
                     // R8 omits members it neither renamed nor attached line info to, so an
                     // absent member means "unchanged".
-                    let matches: Vec<_> = cm.fields().filter(|m| m.obfuscated == f.name && java_to_descriptor(&m.ty) == f.ty).collect();
-                    for m in matches {
+                    let matches: Vec<_> = cm
+                        .members
+                        .iter()
+                        .filter_map(|mm| match &mm.kind {
+                            MemberKind::Field(m) if m.obfuscated == f.name && java_to_descriptor(&m.ty) == f.ty => {
+                                Some((m, &mm.metadata))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    for (m, md) in matches {
+                        assert!(!md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized field");
                         assert_eq!(m.original_name, f.name, "{ctx}");
                     }
                 }
@@ -116,7 +135,12 @@ fn solved_names_match_held_back_mapping() {
                             m.obfuscated == meth.name && own && residual.unwrap_or(sig) == meth.proto
                         })
                         .collect();
-                    for (m, _) in matches {
+                    for (m, md) in matches {
+                        // Constructor names are the one exception: every constructor is named
+                        // <init>, so the name claim holds even for a synthesized constructor (whose
+                        // *signature* isn't original; that's a different attribute).
+                        let ctor = meth.name == "<init>" || meth.name == "<clinit>";
+                        assert!(ctor || !md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized method");
                         assert_eq!(m.original_name, meth.name, "{ctx}");
                     }
                 }
@@ -172,9 +196,9 @@ fn solved_names_exist_in_d8_ground_truth() {
 /// Same input, any order, any number of runs: byte-identical report.
 #[test]
 fn report_is_deterministic() {
-    // R8 builds of different fixtures reuse minified names (a/a, …), so combine the D8 builds,
-    // whose class names are distinct, into one multidex input.
-    let mut inputs: Vec<DexInput> = fixture_names()
+    // R8 builds of different fixtures reuse minified names (a/a, …), so combine D8 builds of
+    // fixtures whose class names are disjoint into one multidex input.
+    let mut inputs: Vec<DexInput> = ["hello", "names_stress", "opcodes", "shapes"]
         .iter()
         .enumerate()
         .map(|(i, f)| {
