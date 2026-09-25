@@ -156,7 +156,7 @@ approach would be an unaccounted choice, so it's not done (shown for the record)
 | **Dead code / tree shaking** | D·id. The report lists mapping entries with no residual code. | D·id |
 | **Class inlining / scalar replacement** | D·id, annotated from frames | D·id |
 | **Local names, generics, stripped annotations** | D·id | D·id. Kept `Signature` strings contain *minified* type names → D, never S. |
-| **Kotlin intrinsics parameter names** | **S** | **Hint** (audit E10): inlining moves a callee's `checkNotNullParameter(p, "title")` into a caller whose parameter is `headline`, and R8 can fold the string into a larger constant. S only with an inlining-proof binding (open problem). |
+| **Kotlin intrinsics parameter names** | **S** | **Hint**, and usually **absent**: R8 ≥ 9.0.26 rewrites Kotlin null checks to `getClass()` by default, dropping the string. Where present (≤ 9.0.25, or opted out), inlining can move a callee's `checkNotNullParameter(p, "title")` into a caller whose parameter is `headline` (audit E10). S only with an inlining-proof binding (open problem). |
 | **Enum constant names** | **S** | **Hint**: pre-obfuscated SDKs ship enums whose field is `a` but whose name string is `"EUROPE"`, and the strings vanish when unused. |
 | **Kotlin data-class / record `toString`** | **S** | **Records: nothing** (R8 rewrites the names string to minified `"a;b"`). **Kotlin: hint**, S only for an *unfused* template bound to the class (R8 folds call-site constants into the template). |
 | **kotlinx.serialization descriptor names** | **S** | **D** (hint) on its own: `@SerialName` can override and even mimic the default. The kxs study's S path relies on Tier-A evidence, which the audit downgraded (see §1.2): S claims there wait on an inlining-proof binding. Enum-entry overrides are exactly detectable (S). |
@@ -203,7 +203,7 @@ and a fixture. That keeps "registered" meaning "real".
 | `r8-rule-audit.md` | Done (R8 `decf0a4a`, branch 8.10) | Adversarial pass over every §1 row. **`r8/kept-name` was unsound** (now fixed and regression-tested by `names_stress` and `dontobfuscate`). Downgrades folded into §1: backports S→S/N, `$-CC` and nest bridges split, intrinsics/enum/toString names → hints, records → nothing, horizontal merging often invisible. Unverifiable preconditions: `-applymapping` and dictionaries. New sound rules proposed: `r8/library-override-name`, `r8/annotation-member-name`, `r8/jni-symbol`. |
 | `compose.md` | Done (kotlinc 2.3.20, runtime 1.10.6, R8 8.10.9) | **`sourceInformation` strings never survive R8** (consumer rules mark them side-effect free); trace strings only with a tracer or `-dontoptimize`. **Group keys always survive**: `hash("fun-Name(Params)Ret/pkg-…/file-….kt")`, usable to confirm candidates (never invertible). `$changed`/`$default` bitmasks survive and index original parameter positions; `$stable` is removed. R8 drops/reorders params and re-homes methods. Rules: `@Composable` detection S, synthetic-param naming by behavior S, defaults from `$default` bits S; everything else annotates rather than rewrites (the Compose lowering must stay for the runtime). |
 | `other-plugins.md` | Done (R8 8.10.9) | Best S names per effort: **Moshi** (`unexpectedNull`/`missingProperty` carry the Kotlin name separately from the JSON name), **Room** (schema-validation strings give entity FQNs; no annotation overrides them), **ViewBinding/Safe Args** (id constants + resources.arsc → exact generated names), Parcelize (order-linking), Dagger/Hilt (nothing survives, only manifest-kept names propagate). javac lowerings are D-only re-sugaring. |
-| `kotlinc.md` | Pending | |
+| `kotlinc.md` | Done (kotlinc 2.4.20; R8 8.10.9 and 9.5.20-dev) | ~40 proposed `kotlinc/` rules. **Null-check parameter names are dead by default from R8 9.0.26** (`-processkotlinnullchecks` rewrites them to `getClass()`, which R8 also emits for its own checks). **Surviving evidence:** lateinit names (all R8 setups tried); function-reference and delegated-property strings (`"load(Ljava/lang/String;…)"`, `"getObserved()I"`), which carry member names, `@JvmName`, and class names in JVM signatures; coroutine `DebugMetadata` (class/function/file/lines, compat mode only), which is a rare source of original **package** names for repackaged classes. **Value-class mangling** is a 40-bit MD5 of parameter types (not the name): it verifies candidates, never recovers names. Kotlin metadata survives only on pinned classes with `kotlin.Metadata` kept; then property/parameter names are original but functions/classes are renamed. Ambiguous cases (spill fields, when-mapping indices, lambda indices) are finite N sets. |
 
 **Cross-source evidence tiers** (from the kxs study, **corrected by the R8 audit**):
 - **Tier A (compiler-emitted strings).** These were proposed as S-grade when structurally
@@ -734,6 +734,16 @@ consumable by jadx) + `report.json`; `--resugar …`; `--no-tighten`; `8r diff a
    with real code, like `Name$8r3fa9`? The marker must be unambiguous for invariant 0.2.4 and
    for idempotence.
 
+7. **Probabilistic proof.** The Kotlin value-class mangling hash is a 40-bit MD5 fingerprint
+   (collision ≈ n·2⁻⁴⁰); Compose group keys are 32-bit `String.hashCode`s. Do these count as
+   "the evidence determines the preimage uniquely" for S when they confirm exactly one
+   candidate from an exhaustive list? Proposal: accept ≥ 40-bit cryptographic fingerprints as S
+   (with the bound in the report); treat 32-bit non-cryptographic hashes as D-confirming only.
+8. **Template S for hand-writable shapes** (data-class `toString`): require agreement of
+   several independent templates (an ensemble), or keep single matches D? (kotlinc.md §5.3)
+9. **Re-synthesizing `@kotlin.Metadata`** (as D) from recovered facts so Kotlin-aware
+   decompilers show properties, data classes, and suspend functions. (kotlinc.md Q5)
+
 ## Status (M0)
 
 Implemented and tested (`cargo test`: dex, mapping, rules, core):
@@ -757,4 +767,3 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   report determinism under input reordering; an S-coverage ratchet (`fixtures/metrics.json`).
 - `xtask fixtures`: javac → D8 (ground truth) / R8 (+mapping) / dexdump for each fixture,
   with tool versions recorded in `BUILD.txt`.
-
