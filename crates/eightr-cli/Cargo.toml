@@ -1,0 +1,19 @@
+[package]
+name = "eightr-cli"
+description = "The `8r` command-line tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "8r"
+path = "src/main.rs"
+
+[dependencies]
+eightr-core.workspace = true
+eightr-dex.workspace = true
+eightr-rules.workspace = true
+clap = { version = "4", features = ["derive"] }
+
+[lints]
+workspace = true

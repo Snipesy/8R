@@ -1,0 +1,11 @@
+# compiler: R8
+# compiler_version: 8.10.9-dev
+# min_api: 21
+# compiler_hash: a7ad18a70460b799d0482e497c109a75bf7f91de
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 08087c5
+# pg_map_hash: SHA-256 08087c5b11aa36f9c4607c96e940c33db88d8d84ed78c67dd01b9b6d55350b15
+com.example.Hello -> com.example.Hello:
+# {"id":"sourceFile","fileName":"Hello.java"}
+    1:1:void main(java.lang.String[]):5:5 -> main

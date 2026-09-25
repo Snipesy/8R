@@ -1,0 +1,43 @@
+# compiler: R8
+# compiler_version: 8.10.9-dev
+# min_api: 21
+# compiler_hash: a7ad18a70460b799d0482e497c109a75bf7f91de
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 3b65028
+# pg_map_hash: SHA-256 3b6502851fb2e6a656d31dd2151f5292f084211310d463f41e84db9849888692
+com.example.Main -> com.example.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:void main(java.lang.String[]):29:29 -> main
+    2:2:void com.example.Main$Circle.<init>(double):10:10 -> main
+    2:2:void main(java.lang.String[]):29 -> main
+    3:3:void main(java.lang.String[]):29:29 -> main
+    4:4:void com.example.Main$Square.<init>(double):16:16 -> main
+    4:4:void main(java.lang.String[]):29 -> main
+    5:6:void main(java.lang.String[]):29:30 -> main
+    7:7:java.lang.String describe(com.example.Main$Shape):25:25 -> main
+    7:7:void main(java.lang.String[]):30 -> main
+      # {"id":"com.android.tools.r8.rewriteFrame","conditions":["throws(Ljava/lang/NullPointerException;)"],"actions":["removeInnerFrames(1)"]}
+    8:8:java.lang.String describe(com.example.Main$Shape):25:25 -> main
+    8:8:void main(java.lang.String[]):30 -> main
+    9:9:void main(java.lang.String[]):30:30 -> main
+    10:10:com.example.Main$Color[] com.example.Main$Color.values():4:4 -> main
+    10:10:void main(java.lang.String[]):31 -> main
+    11:11:void main(java.lang.String[]):31:31 -> main
+    12:12:void lambda$main$0(java.lang.String[]):32:32 -> main
+    12:12:void main(java.lang.String[]):33 -> main
+com.example.Main$Circle -> a.a:
+# {"id":"sourceFile","fileName":"Main.java"}
+    int a.Main$Circle.$r8$classId -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:void a.Main$Circle.<init>(int):0:0 -> <init>
+      # {"id":"com.android.tools.r8.synthesized"}
+com.example.Main$Color -> R8$$REMOVED$$CLASS$$0:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.Main$Color$EnumUnboxingSharedUtility -> a.b:
+# {"id":"sourceFile","fileName":"R8$$SyntheticClass"}
+# {"id":"com.android.tools.r8.synthesized"}
+    int[] $VALUES -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:void a.Main$Color$EnumUnboxingSharedUtility.<clinit>():0:0 -> <clinit>
+      # {"id":"com.android.tools.r8.synthesized"}

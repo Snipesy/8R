@@ -1,0 +1,60 @@
+# compiler: R8
+# compiler_version: 8.10.9-dev
+# min_api: 26
+# compiler_hash: a7ad18a70460b799d0482e497c109a75bf7f91de
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 54f481b
+# pg_map_hash: SHA-256 54f481bee851ce2137d181d28cdb969093d96278aabf4859b09da725b92e7e7e
+com.example.Opcodes -> com.example.Opcodes:
+# {"id":"sourceFile","fileName":"Opcodes.java"}
+    0:2:void <init>():9:9 -> <init>
+    3:10:void <init>():32:32 -> <init>
+    10:28:int arithmetic(int,int,long,float,double):36:36 -> arithmetic
+    29:57:int arithmetic(int,int,long,float,double):38:38 -> arithmetic
+    58:148:int arithmetic(int,int,long,float,double):40:40 -> arithmetic
+    2:27:long arrays():80:80 -> arrays
+    28:32:long arrays():81:81 -> arrays
+    33:41:long arrays():82:82 -> arrays
+    42:46:long arrays():83:83 -> arrays
+    47:56:long arrays():84:84 -> arrays
+    57:61:long arrays():86:86 -> arrays
+    62:70:long arrays():87:87 -> arrays
+    71:84:long arrays():88:88 -> arrays
+    85:89:long arrays():90:90 -> arrays
+    90:97:long arrays():91:91 -> arrays
+    98:103:long arrays():92:92 -> arrays
+    104:110:long arrays():93:93 -> arrays
+    111:133:long arrays():94:94 -> arrays
+    65:79:long branches(int,int,long):130:130 -> branches
+    80:81:long branches(int,int,long):134:134 -> branches
+    82:85:long branches(int,int,long):135:135 -> branches
+    21:47:java.lang.Object constants():145:145 -> constants
+    0:4:java.lang.String exceptions(java.lang.Object):100:100 -> exceptions
+    5:8:java.lang.String exceptions(java.lang.Object):101:101 -> exceptions
+    9:15:java.lang.String exceptions(java.lang.Object):102:102 -> exceptions
+    16:24:java.lang.String exceptions(java.lang.Object):111:111 -> exceptions
+    25:38:java.lang.String exceptions(java.lang.Object):104:104 -> exceptions
+    39:44:java.lang.String exceptions(java.lang.Object):105:105 -> exceptions
+    45:49:java.lang.String exceptions(java.lang.Object):109:109 -> exceptions
+    50:71:java.lang.String exceptions(java.lang.Object):107:107 -> exceptions
+    72:77:java.lang.String exceptions(java.lang.Object):111:111 -> exceptions
+    78:78:java.lang.String exceptions(java.lang.Object):112:112 -> exceptions
+    0:4:void main(java.lang.String[]):164:164 -> main
+    5:21:void main(java.lang.String[]):165:165 -> main
+    22:46:void main(java.lang.String[]):166:166 -> main
+    47:55:void main(java.lang.String[]):167:167 -> main
+    56:90:void main(java.lang.String[]):168:168 -> main
+    91:103:void main(java.lang.String[]):169:169 -> main
+    104:112:void main(java.lang.String[]):170:170 -> main
+    113:133:void main(java.lang.String[]):171:171 -> main
+    134:143:void main(java.lang.String[]):172:172 -> main
+    0:16:int manyArgs(int,long,double,java.lang.Object,int,int,long,java.lang.String):149:149 -> manyArgs
+    0:19:java.lang.Object methodHandles():157:157 -> methodHandles
+    20:23:java.lang.Object methodHandles():158:158 -> methodHandles
+    24:33:java.lang.Object methodHandles():157:157 -> methodHandles
+    34:53:java.lang.Object methodHandles():160:160 -> methodHandles
+    17:24:int staticMany(int,long,double,java.lang.Object,int,int,long,java.lang.String):153:153 -> staticMany
+    3:55:int stringSwitch(java.lang.String):71:71 -> stringSwitch
+com.example.Opcodes$Info -> com.example.Opcodes$Info:
+# {"id":"sourceFile","fileName":"Opcodes.java"}

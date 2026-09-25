@@ -1,0 +1,29 @@
+{
+  "hello": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 1,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "opcodes": {
+    "Body": 0,
+    "ClassName": 2,
+    "Lines": 0,
+    "MemberName": 20,
+    "Package": 2,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "shapes": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 3,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  }
+}

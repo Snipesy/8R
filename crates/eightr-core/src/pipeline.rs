@@ -1,0 +1,182 @@
+//! load → preflight → program → evidence → un-passes (undo order) → report.
+
+use std::collections::BTreeMap;
+
+use eightr_dex::Dex;
+use eightr_rules::Attribute;
+use sha2::{Digest, Sha256};
+
+use crate::error::{Error, Result};
+use crate::input::{self, DexInput};
+use crate::labels::Labels;
+use crate::marker::Marker;
+use crate::passes::{self, Context};
+use crate::program::{ItemId, Program};
+use crate::report::{Counts, Finding, InputSummary, LabelEntry, Report, Severity};
+use crate::sources::{self, DetectedSource};
+
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    /// Include every non-identity label in the report.
+    pub verbose_labels: bool,
+}
+
+/// Read-only facts gathered before any pass runs.
+#[derive(Debug, Clone)]
+pub struct Evidence {
+    pub markers: Vec<Marker>,
+    pub sources: Vec<DetectedSource>,
+}
+
+pub struct Outcome {
+    pub program: Program,
+    pub labels: Labels,
+    pub report: Report,
+}
+
+pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
+    // Canonical order first: nothing downstream may depend on the order the caller used.
+    let mut inputs = inputs.to_vec();
+    input::canonical_order(&mut inputs);
+
+    let mut findings = Vec::new();
+    let mut summaries = Vec::new();
+    let mut dexes = Vec::new();
+    for input in &inputs {
+        let dex = Dex::parse(&input.bytes).map_err(|error| Error::Dex { input: input.name.clone(), error })?;
+        let (checksum_ok, signature_ok) = (dex.checksum_ok(), dex.signature_ok());
+        if !checksum_ok || !signature_ok {
+            findings.push(Finding {
+                severity: Severity::Warning,
+                message: format!("{}: checksum or signature mismatch (file modified after build?)", input.name),
+            });
+        }
+        summaries.push(InputSummary {
+            name: input.name.clone(),
+            sha256: hex(&Sha256::digest(&input.bytes)),
+            dex_version: dex.header.version,
+            classes: dex.class_count(),
+            checksum_ok,
+            signature_ok,
+        });
+        dexes.push((input.name.clone(), dex));
+    }
+
+    let markers = collect_markers(&dexes);
+    if markers.is_empty() {
+        findings.push(Finding {
+            severity: Severity::Info,
+            message: "no D8/R8 marker found; build tool identified by heuristics only".into(),
+        });
+    }
+    let sources = sources::detect(&dexes, &markers);
+    let mut program = Program::build(&dexes)?;
+    let evidence = Evidence { markers: markers.clone(), sources: sources.clone() };
+
+    let mut labels = Labels::default();
+    for pass in passes::all() {
+        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels })?;
+    }
+
+    findings.sort();
+    findings.dedup();
+    let report = build_report(&program, &labels, summaries, markers, sources, findings, config);
+    Ok(Outcome { program, labels, report })
+}
+
+fn collect_markers(dexes: &[(String, Dex)]) -> Vec<Marker> {
+    let mut markers: Vec<Marker> = Vec::new();
+    for (_, dex) in dexes {
+        for s in dex.strings().flatten() {
+            if let Some(m) = Marker::parse(&s) {
+                if !markers.contains(&m) {
+                    markers.push(m);
+                }
+            }
+        }
+    }
+    markers.sort_by(|a, b| (&a.tool, serde_json::to_string(&a.fields).ok()).cmp(&(&b.tool, serde_json::to_string(&b.fields).ok())));
+    markers
+}
+
+/// Which attributes apply to an item.
+fn attributes(program: &Program, item: ItemId) -> &'static [Attribute] {
+    use Attribute::*;
+    match item {
+        ItemId::Class { .. } => &[Package, ClassName, SourceFile],
+        ItemId::Field { .. } => &[MemberName, Signature],
+        ItemId::Method { class, index } => {
+            if program.class(class).methods[index as usize].code_off.is_some() {
+                &[MemberName, Signature, Body, Lines]
+            } else {
+                &[MemberName, Signature]
+            }
+        }
+    }
+}
+
+fn all_items(program: &Program) -> Vec<ItemId> {
+    let mut v = Vec::new();
+    for class in program.class_ids() {
+        v.push(ItemId::Class { class });
+        let c = program.class(class);
+        v.extend((0..c.fields.len() as u32).map(|index| ItemId::Field { class, index }));
+        v.extend((0..c.methods.len() as u32).map(|index| ItemId::Method { class, index }));
+    }
+    v
+}
+
+fn build_report(
+    program: &Program,
+    labels: &Labels,
+    inputs: Vec<InputSummary>,
+    markers: Vec<Marker>,
+    sources: Vec<DetectedSource>,
+    findings: Vec<Finding>,
+    config: &Config,
+) -> Report {
+    use eightr_rules::Class::*;
+    let mut summary: BTreeMap<Attribute, Counts> = BTreeMap::new();
+    for item in all_items(program) {
+        for &attr in attributes(program, item) {
+            let c = summary.entry(attr).or_default();
+            match labels.get(item, attr).map(|l| l.class) {
+                None => c.untouched += 1,
+                Some(Solved) => c.solved += 1,
+                Some(Deterministic) => c.deterministic += 1,
+                Some(NonDeterministic) => c.nondeterministic += 1,
+            }
+        }
+    }
+    let mut applications: BTreeMap<&'static str, u64> = BTreeMap::new();
+    let mut entries = Vec::new();
+    for ((item, attr), label) in labels.iter() {
+        for r in &label.rules {
+            *applications.entry(r).or_default() += 1;
+        }
+        if config.verbose_labels {
+            entries.push(LabelEntry {
+                item: program.describe(*item),
+                attribute: *attr,
+                class: label.class,
+                rules: label.rules.clone(),
+                candidates: label.candidates.clone(),
+            });
+        }
+    }
+    entries.sort_by(|a, b| (&a.item, a.attribute).cmp(&(&b.item, b.attribute)));
+    Report {
+        eightr_version: env!("CARGO_PKG_VERSION"),
+        inputs,
+        markers,
+        sources,
+        findings,
+        rules: Report::rule_usage(&applications),
+        summary,
+        labels: entries,
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}

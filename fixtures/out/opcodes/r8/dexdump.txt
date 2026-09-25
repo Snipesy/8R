@@ -1,0 +1,860 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/Opcodes$Info;'
+  Access flags      : 0x2601 (PUBLIC INTERFACE ABSTRACT ANNOTATION)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/lang/annotation/Annotation;'
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/example/Opcodes$Info;)
+      name          : 'arr'
+      type          : '()[I'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lcom/example/Opcodes$Info;)
+      name          : 'b'
+      type          : '()B'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #2              : (in Lcom/example/Opcodes$Info;)
+      name          : 'c'
+      type          : '()C'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #3              : (in Lcom/example/Opcodes$Info;)
+      name          : 'cls'
+      type          : '()Ljava/lang/Class;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #4              : (in Lcom/example/Opcodes$Info;)
+      name          : 'd'
+      type          : '()D'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #5              : (in Lcom/example/Opcodes$Info;)
+      name          : 'e'
+      type          : '()Ljava/lang/Thread$State;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #6              : (in Lcom/example/Opcodes$Info;)
+      name          : 'f'
+      type          : '()F'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #7              : (in Lcom/example/Opcodes$Info;)
+      name          : 'i'
+      type          : '()I'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #8              : (in Lcom/example/Opcodes$Info;)
+      name          : 'l'
+      type          : '()J'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #9              : (in Lcom/example/Opcodes$Info;)
+      name          : 's'
+      type          : '()S'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #10              : (in Lcom/example/Opcodes$Info;)
+      name          : 'str'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #11              : (in Lcom/example/Opcodes$Info;)
+      name          : 'z'
+      type          : '()Z'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 50 (SourceFile)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/Opcodes;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/Opcodes;)
+      name          : 'CONST_DOUBLE'
+      type          : 'D'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3.5
+    #1              : (in Lcom/example/Opcodes;)
+      name          : 'CONST_INT'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 123456
+    #2              : (in Lcom/example/Opcodes;)
+      name          : 'CONST_LONG'
+      type          : 'J'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : -1
+    #3              : (in Lcom/example/Opcodes;)
+      name          : 'CONST_STR'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : "static value"
+    #4              : (in Lcom/example/Opcodes;)
+      name          : 'counter'
+      type          : 'I'
+      access        : 0x0008 (STATIC)
+  Instance fields   -
+    #0              : (in Lcom/example/Opcodes;)
+      name          : 'lock'
+      type          : 'Ljava/lang/Object;'
+      access        : 0x0012 (PRIVATE FINAL)
+    #1              : (in Lcom/example/Opcodes;)
+      name          : 'wide'
+      type          : 'J'
+      access        : 0x0040 (VOLATILE)
+  Direct methods    -
+    #0              : (in Lcom/example/Opcodes;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 11 16-bit code units
+000dd4:                                        |[000dd4] com.example.Opcodes.<init>:()V
+000de4: 7010 2000 0100                         |0000: invoke-direct {v1}, Ljava/lang/Object;.<init>:()V // method@0020
+000dea: 2200 1000                              |0003: new-instance v0, Ljava/lang/Object; // type@0010
+000dee: 7010 2000 0000                         |0005: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0020
+000df4: 5b10 0500                              |0008: iput-object v0, v1, Lcom/example/Opcodes;.lock:Ljava/lang/Object; // field@0005
+000df8: 0e00                                   |000a: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #1              : (in Lcom/example/Opcodes;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 13
+      ins           : 1
+      outs          : 12
+      insns size    : 144 16-bit code units
+000dfc:                                        |[000dfc] com.example.Opcodes.main:([Ljava/lang/String;)V
+000e0c: 2200 0700                              |0000: new-instance v0, Lcom/example/Opcodes; // type@0007
+000e10: 7010 0c00 0000                         |0002: invoke-direct {v0}, Lcom/example/Opcodes;.<init>:()V // method@000c
+000e16: 620c 0a00                              |0005: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000e1a: 1505 c040                              |0007: const/high16 v5, #int 1086324736 // #40c0
+000e1e: 1906 1c40                              |0009: const-wide/high16 v6, #long 4619567317775286272 // #401c
+000e22: 1231                                   |000b: const/4 v1, #int 3 // #3
+000e24: 1242                                   |000c: const/4 v2, #int 4 // #4
+000e26: 1603 0500                              |000d: const-wide/16 v3, #int 5 // #5
+000e2a: 7408 0d00 0000                         |000f: invoke-virtual/range {v0, v1, v2, v3, v4, v5, v6, v7}, Lcom/example/Opcodes;.arithmetic:(IIJFD)I // method@000d
+000e30: 0a01                                   |0012: move-result v1
+000e32: 6e20 1900 1c00                         |0013: invoke-virtual {v12, v1}, Ljava/io/PrintStream;.println:(I)V // method@0019
+000e38: 620c 0a00                              |0016: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000e3c: 1231                                   |0018: const/4 v1, #int 3 // #3
+000e3e: 6e20 1500 1000                         |0019: invoke-virtual {v0, v1}, Lcom/example/Opcodes;.packedSwitch:(I)I // method@0015
+000e44: 0a01                                   |001c: move-result v1
+000e46: 1402 9f86 0100                         |001d: const v2, #float 1.40128e-40 // #0001869f
+000e4c: 6e20 1600 2000                         |0020: invoke-virtual {v0, v2}, Lcom/example/Opcodes;.sparseSwitch:(I)I // method@0016
+000e52: 0a02                                   |0023: move-result v2
+000e54: b012                                   |0024: add-int/2addr v2, v1
+000e56: 1a01 4b00                              |0025: const-string v1, "beta" // string@004b
+000e5a: 6e20 1800 1000                         |0027: invoke-virtual {v0, v1}, Lcom/example/Opcodes;.stringSwitch:(Ljava/lang/String;)I // method@0018
+000e60: 0a01                                   |002a: move-result v1
+000e62: b021                                   |002b: add-int/2addr v1, v2
+000e64: 6e20 1900 1c00                         |002c: invoke-virtual {v12, v1}, Ljava/io/PrintStream;.println:(I)V // method@0019
+000e6a: 620c 0a00                              |002f: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000e6e: 6e10 0e00 0000                         |0031: invoke-virtual {v0}, Lcom/example/Opcodes;.arrays:()J // method@000e
+000e74: 0b01                                   |0034: move-result-wide v1
+000e76: 6e30 1a00 1c02                         |0035: invoke-virtual {v12, v1, v2}, Ljava/io/PrintStream;.println:(J)V // method@001a
+000e7c: 620c 0a00                              |0038: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000e80: 1a01 0000                              |003a: const-string v1, "  x " // string@0000
+000e84: 6e20 1100 1000                         |003c: invoke-virtual {v0, v1}, Lcom/example/Opcodes;.exceptions:(Ljava/lang/Object;)Ljava/lang/String; // method@0011
+000e8a: 0c01                                   |003f: move-result-object v1
+000e8c: 1212                                   |0040: const/4 v2, #int 1 // #1
+000e8e: 7110 1f00 0200                         |0041: invoke-static {v2}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@001f
+000e94: 0c03                                   |0044: move-result-object v3
+000e96: 6e20 1100 3000                         |0045: invoke-virtual {v0, v3}, Lcom/example/Opcodes;.exceptions:(Ljava/lang/Object;)Ljava/lang/String; // method@0011
+000e9c: 0c03                                   |0048: move-result-object v3
+000e9e: 2204 1200                              |0049: new-instance v4, Ljava/lang/StringBuilder; // type@0012
+000ea2: 7010 2800 0400                         |004b: invoke-direct {v4}, Ljava/lang/StringBuilder;.<init>:()V // method@0028
+000ea8: 6e20 2a00 1400                         |004e: invoke-virtual {v4, v1}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000eae: 6e20 2a00 3400                         |0051: invoke-virtual {v4, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000eb4: 6e10 2b00 0400                         |0054: invoke-virtual {v4}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@002b
+000eba: 0c01                                   |0057: move-result-object v1
+000ebc: 6e20 1c00 1c00                         |0058: invoke-virtual {v12, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@001c
+000ec2: 620c 0a00                              |005b: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000ec6: 1301 1400                              |005d: const/16 v1, #int 20 // #14
+000eca: 1603 0300                              |005f: const-wide/16 v3, #int 3 // #3
+000ece: 6e54 0f00 2031                         |0061: invoke-virtual {v0, v2, v1, v3, v4}, Lcom/example/Opcodes;.branches:(IIJ)J // method@000f
+000ed4: 0b01                                   |0064: move-result-wide v1
+000ed6: 6e30 1a00 1c02                         |0065: invoke-virtual {v12, v1, v2}, Ljava/io/PrintStream;.println:(J)V // method@001a
+000edc: 620c 0a00                              |0068: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000ee0: 6e10 1000 0000                         |006a: invoke-virtual {v0}, Lcom/example/Opcodes;.constants:()Ljava/lang/Object; // method@0010
+000ee6: 0c01                                   |006d: move-result-object v1
+000ee8: 6e20 1b00 1c00                         |006e: invoke-virtual {v12, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@001b
+000eee: 620c 0a00                              |0071: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000ef2: 1609 0700                              |0073: const-wide/16 v9, #int 7 // #7
+000ef6: 1a0b 5600                              |0075: const-string v11, "eight" // string@0056
+000efa: 1211                                   |0077: const/4 v1, #int 1 // #1
+000efc: 1602 0200                              |0078: const-wide/16 v2, #int 2 // #2
+000f00: 1904 0840                              |007a: const-wide/high16 v4, #long 4613937818241073152 // #4008
+000f04: 1206                                   |007c: const/4 v6, #int 0 // #0
+000f06: 1257                                   |007d: const/4 v7, #int 5 // #5
+000f08: 1268                                   |007e: const/4 v8, #int 6 // #6
+000f0a: 740c 1300 0000                         |007f: invoke-virtual/range {v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11}, Lcom/example/Opcodes;.manyArgs:(IJDLjava/lang/Object;IIJLjava/lang/String;)I // method@0013
+000f10: 0a01                                   |0082: move-result v1
+000f12: 6e20 1900 1c00                         |0083: invoke-virtual {v12, v1}, Ljava/io/PrintStream;.println:(I)V // method@0019
+000f18: 620c 0a00                              |0086: sget-object v12, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000a
+000f1c: 6e10 1400 0000                         |0088: invoke-virtual {v0}, Lcom/example/Opcodes;.methodHandles:()Ljava/lang/Object; // method@0014
+000f22: 0c00                                   |008b: move-result-object v0
+000f24: 6e20 1b00 0c00                         |008c: invoke-virtual {v12, v0}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@001b
+000f2a: 0e00                                   |008f: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #2              : (in Lcom/example/Opcodes;)
+      name          : 'staticMany'
+      type          : '(IJDLjava/lang/Object;IIJLjava/lang/String;)I'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 13
+      ins           : 11
+      outs          : 1
+      insns size    : 25 16-bit code units
+0008f4:                                        |[0008f4] com.example.Opcodes.staticMany:(IJDLjava/lang/Object;IIJLjava/lang/String;)I
+000904: 8120                                   |0000: int-to-long v0, v2
+000906: bb30                                   |0001: add-long/2addr v0, v3
+000908: 8602                                   |0002: long-to-double v2, v0
+00090a: cb52                                   |0003: add-double/2addr v2, v5
+00090c: 3907 0400                              |0004: if-nez v7, 0008 // +0004
+000910: 1204                                   |0006: const/4 v4, #int 0 // #0
+000912: 2802                                   |0007: goto 0009 // +0002
+000914: 1214                                   |0008: const/4 v4, #int 1 // #1
+000916: 8344                                   |0009: int-to-double v4, v4
+000918: cb42                                   |000a: add-double/2addr v2, v4
+00091a: 8384                                   |000b: int-to-double v4, v8
+00091c: cb42                                   |000c: add-double/2addr v2, v4
+00091e: 8394                                   |000d: int-to-double v4, v9
+000920: cb42                                   |000e: add-double/2addr v2, v4
+000922: 86a4                                   |000f: long-to-double v4, v10
+000924: cb42                                   |0010: add-double/2addr v2, v4
+000926: 6e10 2500 0c00                         |0011: invoke-virtual {v12}, Ljava/lang/String;.length:()I // method@0025
+00092c: 0a04                                   |0014: move-result v4
+00092e: 8344                                   |0015: int-to-double v4, v4
+000930: cb42                                   |0016: add-double/2addr v2, v4
+000932: 8a22                                   |0017: double-to-int v2, v2
+000934: 0f02                                   |0018: return v2
+      catches       : (none)
+      positions     :
+      locals        :
+
+  Virtual methods   -
+    #0              : (in Lcom/example/Opcodes;)
+      name          : 'arithmetic'
+      type          : '(IIJFD)I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 26
+      ins           : 8
+      outs          : 0
+      insns size    : 149 16-bit code units
+0006ec:                                        |[0006ec] com.example.Opcodes.arithmetic:(IIJFD)I
+0006fc: 0500 1500                              |0000: move-wide/from16 v0, v21
+000700: 9002 1314                              |0002: add-int v2, v19, v20
+000704: 9203 1314                              |0004: mul-int v3, v19, v20
+000708: b132                                   |0006: sub-int/2addr v2, v3
+00070a: 1213                                   |0007: const/4 v3, #int 1 // #1
+00070c: de04 1401                              |0008: or-int/lit8 v4, v20, #int 1 // #01
+000710: b342                                   |000a: div-int/2addr v2, v4
+000712: dc02 0207                              |000b: rem-int/lit8 v2, v2, #int 7 // #07
+000716: d522 ff00                              |000d: and-int/lit16 v2, v2, #int 255 // #00ff
+00071a: d622 0001                              |000f: or-int/lit16 v2, v2, #int 256 // #0100
+00071e: 9702 0213                              |0011: xor-int v2, v2, v19
+000722: 1224                                   |0013: const/4 v4, #int 2 // #2
+000724: b842                                   |0014: shl-int/2addr v2, v4
+000726: b932                                   |0015: shr-int/2addr v2, v3
+000728: ba32                                   |0016: ushr-int/2addr v2, v3
+00072a: d802 0205                              |0017: add-int/lit8 v2, v2, #int 5 // #05
+00072e: d122 e803                              |0019: rsub-int v2, v2, #int 1000 // #03e8
+000732: d222 2c01                              |001b: mul-int/lit16 v2, v2, #int 300 // #012c
+000736: d322 3930                              |001d: div-int/lit16 v2, v2, #int 12345 // #3039
+00073a: 1235                                   |001f: const/4 v5, #int 3 // #3
+00073c: b452                                   |0020: rem-int/2addr v2, v5
+00073e: 1606 0300                              |0021: const-wide/16 v6, #int 3 // #3
+000742: 9d08 0006                              |0023: mul-long v8, v0, v6
+000746: a40a 0004                              |0025: shr-long v10, v0, v4
+00074a: bba8                                   |0027: add-long/2addr v8, v10
+00074c: a30a 0005                              |0028: shl-long v10, v0, v5
+000750: bca8                                   |002a: sub-long/2addr v8, v10
+000752: 124a                                   |002b: const/4 v10, #int 4 // #4
+000754: a50b 000a                              |002c: ushr-long v11, v0, v10
+000758: bbb8                                   |002e: add-long/2addr v8, v11
+00075a: 170b ffff 0000                         |002f: const-wide/32 v11, #float 9.18341e-41 // #0000ffff
+000760: c00b                                   |0032: and-long/2addr v11, v0
+000762: bbb8                                   |0033: add-long/2addr v8, v11
+000764: 160b 0700                              |0034: const-wide/16 v11, #int 7 // #7
+000768: c10b                                   |0036: or-long/2addr v11, v0
+00076a: bbb8                                   |0037: add-long/2addr v8, v11
+00076c: 7e0b                                   |0038: not-long v11, v0
+00076e: bbb8                                   |0039: add-long/2addr v8, v11
+000770: 9e06 0806                              |003a: div-long v6, v8, v6
+000774: 160b 0500                              |003c: const-wide/16 v11, #int 5 // #5
+000778: bfb8                                   |003e: rem-long/2addr v8, v11
+00077a: bb68                                   |003f: add-long/2addr v8, v6
+00077c: 1506 0040                              |0040: const/high16 v6, #int 1073741824 // #4000
+000780: a806 0617                              |0042: mul-float v6, v6, v23
+000784: 1507 4040                              |0044: const/high16 v7, #int 1077936128 // #4040
+000788: a907 1707                              |0046: div-float v7, v23, v7
+00078c: c667                                   |0048: add-float/2addr v7, v6
+00078e: 1506 c03f                              |0049: const/high16 v6, #int 1069547520 // #3fc0
+000792: aa06 1706                              |004b: rem-float v6, v23, v6
+000796: c767                                   |004d: sub-float/2addr v7, v6
+000798: 897b                                   |004e: float-to-double v11, v7
+00079a: ad0d 180b                              |004f: mul-double v13, v24, v11
+00079e: 8683                                   |0051: long-to-double v3, v8
+0007a0: ae03 1803                              |0052: div-double v3, v24, v3
+0007a4: cbd3                                   |0054: add-double/2addr v3, v13
+0007a6: 190d 0040                              |0055: const-wide/high16 v13, #long 4611686018427387904 // #4000
+0007aa: af0d 180d                              |0057: rem-double v13, v24, v13
+0007ae: ccd3                                   |0059: sub-double/2addr v3, v13
+0007b0: 7b2d                                   |005a: neg-int v13, v2
+0007b2: 7c2e                                   |005b: not-int v14, v2
+0007b4: b0ed                                   |005c: add-int/2addr v13, v14
+0007b6: 7d8e                                   |005d: neg-long v14, v8
+0007b8: 7e85                                   |005e: not-long v5, v8
+0007ba: bb5e                                   |005f: add-long/2addr v14, v5
+0007bc: 81d5                                   |0060: int-to-long v5, v13
+0007be: bbe5                                   |0061: add-long/2addr v5, v14
+0007c0: 0510 0b00                              |0062: move-wide/from16 v16, v11
+0007c4: 887a                                   |0064: float-to-long v10, v7
+0007c6: bba5                                   |0065: add-long/2addr v5, v10
+0007c8: 8b3a                                   |0066: double-to-long v10, v3
+0007ca: bba5                                   |0067: add-long/2addr v5, v10
+0007cc: 8d27                                   |0068: int-to-byte v7, v2
+0007ce: 817a                                   |0069: int-to-long v10, v7
+0007d0: bba5                                   |006a: add-long/2addr v5, v10
+0007d2: 8e27                                   |006b: int-to-char v7, v2
+0007d4: 817a                                   |006c: int-to-long v10, v7
+0007d6: bba5                                   |006d: add-long/2addr v5, v10
+0007d8: 8f27                                   |006e: int-to-short v7, v2
+0007da: 817a                                   |006f: int-to-long v10, v7
+0007dc: bba5                                   |0070: add-long/2addr v5, v10
+0007de: 3b02 0400                              |0071: if-gez v2, 0075 // +0004
+0007e2: 1212                                   |0073: const/4 v2, #int 1 // #1
+0007e4: 2802                                   |0074: goto 0076 // +0002
+0007e6: 1202                                   |0075: const/4 v2, #int 0 // #0
+0007e8: 812a                                   |0076: int-to-long v10, v2
+0007ea: bba5                                   |0077: add-long/2addr v5, v10
+0007ec: 2f02 1003                              |0078: cmpl-double v2, v16, v3
+0007f0: 3d02 0400                              |007a: if-lez v2, 007e // +0004
+0007f4: 1213                                   |007c: const/4 v3, #int 1 // #1
+0007f6: 2802                                   |007d: goto 007f // +0002
+0007f8: 1223                                   |007e: const/4 v3, #int 2 // #2
+0007fa: 8132                                   |007f: int-to-long v2, v3
+0007fc: bb25                                   |0080: add-long/2addr v5, v2
+0007fe: 3100 0800                              |0081: cmp-long v0, v8, v0
+000802: 3900 0400                              |0083: if-nez v0, 0087 // +0004
+000806: 123d                                   |0085: const/4 v13, #int 3 // #3
+000808: 2802                                   |0086: goto 0088 // +0002
+00080a: 124d                                   |0087: const/4 v13, #int 4 // #4
+00080c: 81d0                                   |0088: int-to-long v0, v13
+00080e: bb05                                   |0089: add-long/2addr v5, v0
+000810: 85e0                                   |008a: long-to-float v0, v14
+000812: 8700                                   |008b: float-to-int v0, v0
+000814: 8100                                   |008c: int-to-long v0, v0
+000816: bb05                                   |008d: add-long/2addr v5, v0
+000818: 0500 1000                              |008e: move-wide/from16 v0, v16
+00081c: 8a00                                   |0090: double-to-int v0, v0
+00081e: 8100                                   |0091: int-to-long v0, v0
+000820: bb05                                   |0092: add-long/2addr v5, v0
+000822: 8450                                   |0093: long-to-int v0, v5
+000824: 0f00                                   |0094: return v0
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #1              : (in Lcom/example/Opcodes;)
+      name          : 'arrays'
+      type          : '()J'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 17
+      ins           : 1
+      outs          : 3
+      insns size    : 168 16-bit code units
+000bb8:                                        |[000bb8] com.example.Opcodes.arrays:()J
+000bc8: 1300 0800                              |0000: const/16 v0, #int 8 // #8
+000bcc: 2301 2400                              |0002: new-array v1, v0, [I // type@0024
+000bd0: 1202                                   |0004: const/4 v2, #int 0 // #0
+000bd2: 1213                                   |0005: const/4 v3, #int 1 // #1
+000bd4: 4b03 0102                              |0006: aput v3, v1, v2
+000bd8: 1224                                   |0008: const/4 v4, #int 2 // #2
+000bda: 4b04 0103                              |0009: aput v4, v1, v3
+000bde: 1235                                   |000b: const/4 v5, #int 3 // #3
+000be0: 4b05 0104                              |000c: aput v5, v1, v4
+000be4: 1246                                   |000e: const/4 v6, #int 4 // #4
+000be6: 4b06 0105                              |000f: aput v6, v1, v5
+000bea: 1257                                   |0011: const/4 v7, #int 5 // #5
+000bec: 4b07 0106                              |0012: aput v7, v1, v6
+000bf0: 1268                                   |0014: const/4 v8, #int 6 // #6
+000bf2: 4b08 0107                              |0015: aput v8, v1, v7
+000bf6: 1277                                   |0017: const/4 v7, #int 7 // #7
+000bf8: 4b07 0108                              |0018: aput v7, v1, v8
+000bfc: 4b00 0107                              |001a: aput v0, v1, v7
+000c00: 2357 2500                              |001c: new-array v7, v5, [J // type@0025
+000c04: 2607 6800 0000                         |001e: fill-array-data v7, 00000086 // +00000068
+000c0a: 2358 2100                              |0021: new-array v8, v5, [B // type@0021
+000c0e: 4f03 0802                              |0023: aput-byte v3, v8, v2
+000c12: 12e9                                   |0025: const/4 v9, #int -2 // #fe
+000c14: 4f09 0803                              |0026: aput-byte v9, v8, v3
+000c18: 4f05 0804                              |0028: aput-byte v5, v8, v4
+000c1c: 2349 2200                              |002a: new-array v9, v4, [C // type@0022
+000c20: 2609 6a00 0000                         |002c: fill-array-data v9, 00000096 // +0000006a
+000c26: 234a 2900                              |002f: new-array v10, v4, [S // type@0029
+000c2a: 130b d4fe                              |0031: const/16 v11, #int -300 // #fed4
+000c2e: 510b 0a02                              |0033: aput-short v11, v10, v2
+000c32: 130b 2c01                              |0035: const/16 v11, #int 300 // #12c
+000c36: 510b 0a03                              |0037: aput-short v11, v10, v3
+000c3a: 234b 2300                              |0039: new-array v11, v4, [D // type@0023
+000c3e: 260b 6100 0000                         |003b: fill-array-data v11, 0000009c // +00000061
+000c44: 1a0c 4a00                              |003e: const-string v12, "b" // string@004a
+000c48: 120d                                   |0040: const/4 v13, #int 0 // #0
+000c4a: 1a0e 4400                              |0041: const-string v14, "a" // string@0044
+000c4e: 2430 2800 ce0d                         |0043: filled-new-array {v14, v12, v13}, [Ljava/lang/String; // type@0028
+000c54: 0c0c                                   |0046: move-result-object v12
+000c56: 234d 2400                              |0047: new-array v13, v4, [I // type@0024
+000c5a: 4b05 0d03                              |0049: aput v5, v13, v3
+000c5e: 4b04 0d02                              |004b: aput v4, v13, v2
+000c62: 1c0e 1000                              |004d: const-class v14, Ljava/lang/Object; // type@0010
+000c66: 7120 3100 de00                         |004f: invoke-static {v14, v13}, Ljava/lang/reflect/Array;.newInstance:(Ljava/lang/Class;[I)Ljava/lang/Object; // method@0031
+000c6c: 0c0d                                   |0052: move-result-object v13
+000c6e: 1f0d 2a00                              |0053: check-cast v13, [[Ljava/lang/Object; // type@002a
+000c72: 440e 0105                              |0055: aget v14, v1, v5
+000c76: b00e                                   |0057: add-int/2addr v14, v0
+000c78: 4b0e 0104                              |0058: aput v14, v1, v4
+000c7c: 4800 0803                              |005a: aget-byte v0, v8, v3
+000c80: 4901 0902                              |005c: aget-char v1, v9, v2
+000c84: b010                                   |005e: add-int/2addr v0, v1
+000c86: 8d00                                   |005f: int-to-byte v0, v0
+000c88: 4f00 0802                              |0060: aput-byte v0, v8, v2
+000c8c: 4a01 0a02                              |0062: aget-short v1, v10, v2
+000c90: b061                                   |0064: add-int/2addr v1, v6
+000c92: 8f11                                   |0065: int-to-short v1, v1
+000c94: 5101 0a03                              |0066: aput-short v1, v10, v3
+000c98: 4606 0d03                              |0068: aget-object v6, v13, v3
+000c9c: 4608 0c02                              |006a: aget-object v8, v12, v2
+000ca0: 4d08 0604                              |006c: aput-object v8, v6, v4
+000ca4: 81ee                                   |006e: int-to-long v14, v14
+000ca6: 4506 0702                              |006f: aget-wide v6, v7, v2
+000caa: bb6e                                   |0071: add-long/2addr v14, v6
+000cac: 8106                                   |0072: int-to-long v6, v0
+000cae: bb6e                                   |0073: add-long/2addr v14, v6
+000cb0: 4900 0903                              |0074: aget-char v0, v9, v3
+000cb4: 8106                                   |0076: int-to-long v6, v0
+000cb6: bb6e                                   |0077: add-long/2addr v14, v6
+000cb8: 8110                                   |0078: int-to-long v0, v1
+000cba: bb0e                                   |0079: add-long/2addr v14, v0
+000cbc: 8130                                   |007a: int-to-long v0, v3
+000cbe: bb0e                                   |007b: add-long/2addr v14, v0
+000cc0: 4500 0b03                              |007c: aget-wide v0, v11, v3
+000cc4: 8b00                                   |007e: double-to-long v0, v0
+000cc6: bb0e                                   |007f: add-long/2addr v14, v0
+000cc8: 21d0                                   |0080: array-length v0, v13
+000cca: 8100                                   |0081: int-to-long v0, v0
+000ccc: bb0e                                   |0082: add-long/2addr v14, v0
+000cce: 8150                                   |0083: int-to-long v0, v5
+000cd0: bb0e                                   |0084: add-long/2addr v14, v0
+000cd2: 100e                                   |0085: return-wide v14
+000cd4: 0003 0800 0300 0000 0000 0000 0001 ... |0086: array-data (16 units)
+000cf4: 0003 0200 0200 0000 6100 6200          |0096: array-data (6 units)
+000d00: 0003 0800 0200 0000 0000 0000 0000 ... |009c: array-data (12 units)
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #2              : (in Lcom/example/Opcodes;)
+      name          : 'branches'
+      type          : '(IIJ)J'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 9
+      ins           : 5
+      outs          : 0
+      insns size    : 86 16-bit code units
+000d18:                                        |[000d18] com.example.Opcodes.branches:(IIJ)J
+000d28: 3365 0500                              |0000: if-ne v5, v6, 0005 // +0005
+000d2c: 1600 0100                              |0002: const-wide/16 v0, #int 1 // #1
+000d30: 2803                                   |0004: goto 0007 // +0003
+000d32: 1600 0000                              |0005: const-wide/16 v0, #int 0 // #0
+000d36: 3265 0500                              |0007: if-eq v5, v6, 000c // +0005
+000d3a: 1602 0200                              |0009: const-wide/16 v2, #int 2 // #2
+000d3e: bb20                                   |000b: add-long/2addr v0, v2
+000d40: 3565 0500                              |000c: if-ge v5, v6, 0011 // +0005
+000d44: 1602 0300                              |000e: const-wide/16 v2, #int 3 // #3
+000d48: bb20                                   |0010: add-long/2addr v0, v2
+000d4a: 3465 0500                              |0011: if-lt v5, v6, 0016 // +0005
+000d4e: 1602 0400                              |0013: const-wide/16 v2, #int 4 // #4
+000d52: bb20                                   |0015: add-long/2addr v0, v2
+000d54: 3765 0500                              |0016: if-le v5, v6, 001b // +0005
+000d58: 1602 0500                              |0018: const-wide/16 v2, #int 5 // #5
+000d5c: bb20                                   |001a: add-long/2addr v0, v2
+000d5e: 3665 0500                              |001b: if-gt v5, v6, 0020 // +0005
+000d62: 1602 0600                              |001d: const-wide/16 v2, #int 6 // #6
+000d66: bb20                                   |001f: add-long/2addr v0, v2
+000d68: 3905 0500                              |0020: if-nez v5, 0025 // +0005
+000d6c: 1602 0700                              |0022: const-wide/16 v2, #int 7 // #7
+000d70: bb20                                   |0024: add-long/2addr v0, v2
+000d72: 3805 0500                              |0025: if-eqz v5, 002a // +0005
+000d76: 1602 0800                              |0027: const-wide/16 v2, #int 8 // #8
+000d7a: bb20                                   |0029: add-long/2addr v0, v2
+000d7c: 3b05 0500                              |002a: if-gez v5, 002f // +0005
+000d80: 1602 0900                              |002c: const-wide/16 v2, #int 9 // #9
+000d84: bb20                                   |002e: add-long/2addr v0, v2
+000d86: 3a05 0500                              |002f: if-ltz v5, 0034 // +0005
+000d8a: 1602 0a00                              |0031: const-wide/16 v2, #int 10 // #a
+000d8e: bb20                                   |0033: add-long/2addr v0, v2
+000d90: 3d05 0500                              |0034: if-lez v5, 0039 // +0005
+000d94: 1602 0b00                              |0036: const-wide/16 v2, #int 11 // #b
+000d98: bb20                                   |0038: add-long/2addr v0, v2
+000d9a: 3c05 0500                              |0039: if-gtz v5, 003e // +0005
+000d9e: 1602 0c00                              |003b: const-wide/16 v2, #int 12 // #c
+000da2: bb20                                   |003d: add-long/2addr v0, v2
+000da4: 1205                                   |003e: const/4 v5, #int 0 // #0
+000da6: 3565 1100                              |003f: if-ge v5, v6, 0050 // +0011
+000daa: dc02 0503                              |0041: rem-int/lit8 v2, v5, #int 3 // #03
+000dae: 3902 0300                              |0043: if-nez v2, 0046 // +0003
+000db2: 2808                                   |0045: goto 004d // +0008
+000db4: 1302 e803                              |0046: const/16 v2, #int 1000 // #3e8
+000db8: 3725 0300                              |0048: if-le v5, v2, 004b // +0003
+000dbc: 2806                                   |004a: goto 0050 // +0006
+000dbe: 8152                                   |004b: int-to-long v2, v5
+000dc0: bb20                                   |004c: add-long/2addr v0, v2
+000dc2: d805 0501                              |004d: add-int/lit8 v5, v5, #int 1 // #01
+000dc6: 28f0                                   |004f: goto 003f // -0010
+000dc8: 5a47 0600                              |0050: iput-wide v7, v4, Lcom/example/Opcodes;.wide:J // field@0006
+000dcc: 5345 0600                              |0052: iget-wide v5, v4, Lcom/example/Opcodes;.wide:J // field@0006
+000dd0: bb50                                   |0054: add-long/2addr v0, v5
+000dd2: 1000                                   |0055: return-wide v0
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #3              : (in Lcom/example/Opcodes;)
+      name          : 'constants'
+      type          : '()Ljava/lang/Object;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 48 16-bit code units
+0009e8:                                        |[0009e8] com.example.Opcodes.constants:()Ljava/lang/Object;
+0009f8: 1800 efcd ab89 6745 3341               |0000: const-wide v0, #double 1.26295e+06 // #4133456789abcdef
+000a02: 1502 ff7f                              |0005: const/high16 v2, #int 2147418112 // #7fff
+000a06: 8122                                   |0007: int-to-long v2, v2
+000a08: bb20                                   |0008: add-long/2addr v0, v2
+000a0a: 1402 f902 1550                         |0009: const v2, #float 1e+10 // #501502f9
+000a10: 8822                                   |000c: float-to-long v2, v2
+000a12: bb20                                   |000d: add-long/2addr v0, v2
+000a14: 1802 9c75 0088 3ce4 377e               |000e: const-wide v2, #double 1e+300 // #7e37e43c8800759c
+000a1e: 8b22                                   |0013: double-to-long v2, v2
+000a20: bb20                                   |0014: add-long/2addr v0, v2
+000a22: 1c02 2400                              |0015: const-class v2, [I // type@0024
+000a26: 6e10 1d00 0200                         |0017: invoke-virtual {v2}, Ljava/lang/Class;.getName:()Ljava/lang/String; // method@001d
+000a2c: 0c02                                   |001a: move-result-object v2
+000a2e: 2203 1200                              |001b: new-instance v3, Ljava/lang/StringBuilder; // type@0012
+000a32: 7010 2800 0300                         |001d: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@0028
+000a38: 6e30 2900 0301                         |0020: invoke-virtual {v3, v0, v1}, Ljava/lang/StringBuilder;.append:(J)Ljava/lang/StringBuilder; // method@0029
+000a3e: 6e20 2a00 2300                         |0023: invoke-virtual {v3, v2}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000a44: 1a00 7100                              |0026: const-string v0, "static value" // string@0071
+000a48: 6e20 2a00 0300                         |0028: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000a4e: 6e10 2b00 0300                         |002b: invoke-virtual {v3}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@002b
+000a54: 0c00                                   |002e: move-result-object v0
+000a56: 1100                                   |002f: return-object v0
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #4              : (in Lcom/example/Opcodes;)
+      name          : 'exceptions'
+      type          : '(Ljava/lang/Object;)Ljava/lang/String;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 2
+      outs          : 2
+      insns size    : 79 16-bit code units
+000ad4:                                        |[000ad4] com.example.Opcodes.exceptions:(Ljava/lang/Object;)Ljava/lang/String;
+000ae4: 1a00 6b00                              |0000: const-string v0, "not a string: " // string@006b
+000ae8: 5431 0500                              |0002: iget-object v1, v3, Lcom/example/Opcodes;.lock:Ljava/lang/Object; // field@0005
+000aec: 1d01                                   |0004: monitor-enter v1
+000aee: 2042 1100                              |0005: instance-of v2, v4, Ljava/lang/String; // type@0011
+000af2: 3802 1200                              |0007: if-eqz v2, 0019 // +0012
+000af6: 1f04 1100                              |0009: check-cast v4, Ljava/lang/String; // type@0011
+000afa: 6e10 2600 0400                         |000b: invoke-virtual {v4}, Ljava/lang/String;.trim:()Ljava/lang/String; // method@0026
+000b00: 0c04                                   |000e: move-result-object v4
+000b02: 1e01                                   |000f: monitor-exit v1
+000b04: 6000 0400                              |0010: sget v0, Lcom/example/Opcodes;.counter:I // field@0004
+000b08: d800 0001                              |0012: add-int/lit8 v0, v0, #int 1 // #01
+000b0c: 6700 0400                              |0014: sput v0, Lcom/example/Opcodes;.counter:I // field@0004
+000b10: 1104                                   |0016: return-object v4
+000b12: 0d04                                   |0017: move-exception v4
+000b14: 280f                                   |0018: goto 0027 // +000f
+000b16: 2202 0d00                              |0019: new-instance v2, Ljava/lang/IllegalStateException; // type@000d
+000b1a: 7110 2700 0400                         |001b: invoke-static {v4}, Ljava/lang/String;.valueOf:(Ljava/lang/Object;)Ljava/lang/String; // method@0027
+000b20: 0c04                                   |001e: move-result-object v4
+000b22: 6e20 2200 4000                         |001f: invoke-virtual {v0, v4}, Ljava/lang/String;.concat:(Ljava/lang/String;)Ljava/lang/String; // method@0022
+000b28: 0c04                                   |0022: move-result-object v4
+000b2a: 7020 1e00 4200                         |0023: invoke-direct {v2, v4}, Ljava/lang/IllegalStateException;.<init>:(Ljava/lang/String;)V // method@001e
+000b30: 2702                                   |0026: throw v2
+000b32: 1e01                                   |0027: monitor-exit v1
+000b34: 2704                                   |0028: throw v4
+000b36: 0d04                                   |0029: move-exception v4
+000b38: 2808                                   |002a: goto 0032 // +0008
+000b3a: 0d04                                   |002b: move-exception v4
+000b3c: 2806                                   |002c: goto 0032 // +0006
+000b3e: 1a04 7500                              |002d: const-string v4, "throwable" // string@0075
+000b42: 28e1                                   |002f: goto 0010 // -001f
+000b44: 0d04                                   |0030: move-exception v4
+000b46: 2817                                   |0031: goto 0048 // +0017
+000b48: 6e10 2c00 0400                         |0032: invoke-virtual {v4}, Ljava/lang/Throwable;.getMessage:()Ljava/lang/String; // method@002c
+000b4e: 0c04                                   |0035: move-result-object v4
+000b50: 2200 1200                              |0036: new-instance v0, Ljava/lang/StringBuilder; // type@0012
+000b54: 7010 2800 0000                         |0038: invoke-direct {v0}, Ljava/lang/StringBuilder;.<init>:()V // method@0028
+000b5a: 1a01 4f00                              |003b: const-string v1, "caught " // string@004f
+000b5e: 6e20 2a00 1000                         |003d: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000b64: 6e20 2a00 4000                         |0040: invoke-virtual {v0, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@002a
+000b6a: 6e10 2b00 0000                         |0043: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@002b
+000b70: 0c04                                   |0046: move-result-object v4
+000b72: 28c9                                   |0047: goto 0010 // -0037
+000b74: 6000 0400                              |0048: sget v0, Lcom/example/Opcodes;.counter:I // field@0004
+000b78: d800 0001                              |004a: add-int/lit8 v0, v0, #int 1 // #01
+000b7c: 6700 0400                              |004c: sput v0, Lcom/example/Opcodes;.counter:I // field@0004
+000b80: 2704                                   |004e: throw v4
+      catches       : 5
+        0x0002 - 0x0005
+          Ljava/lang/IllegalStateException; -> 0x002b
+          Ljava/lang/ClassCastException; -> 0x0029
+          <any> -> 0x002d
+        0x0005 - 0x0010
+          <any> -> 0x0017
+        0x0019 - 0x0028
+          <any> -> 0x0017
+        0x0028 - 0x0029
+          Ljava/lang/IllegalStateException; -> 0x002b
+          Ljava/lang/ClassCastException; -> 0x0029
+          <any> -> 0x002d
+        0x002d - 0x0047
+          <any> -> 0x0030
+      positions     :
+      locals        :
+
+    #5              : (in Lcom/example/Opcodes;)
+      name          : 'manyArgs'
+      type          : '(IJDLjava/lang/Object;IIJLjava/lang/String;)I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 15
+      ins           : 12
+      outs          : 11
+      insns size    : 17 16-bit code units
+000828:                                        |[000828] com.example.Opcodes.manyArgs:(IJDLjava/lang/Object;IIJLjava/lang/String;)I
+000838: 770b 1700 0400                         |0000: invoke-static/range {v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14}, Lcom/example/Opcodes;.staticMany:(IJDLjava/lang/Object;IIJLjava/lang/String;)I // method@0017
+00083e: 0a00                                   |0003: move-result v0
+000840: 07e9                                   |0004: move-object v9, v14
+000842: 01a1                                   |0005: move v1, v10
+000844: 014a                                   |0006: move v10, v4
+000846: 0114                                   |0007: move v4, v1
+000848: 04c1                                   |0008: move-wide v1, v12
+00084a: 045c                                   |0009: move-wide v12, v5
+00084c: 0415                                   |000a: move-wide v5, v1
+00084e: 770b 1700 0400                         |000b: invoke-static/range {v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14}, Lcom/example/Opcodes;.staticMany:(IJDLjava/lang/Object;IIJLjava/lang/String;)I // method@0017
+000854: 0a04                                   |000e: move-result v4
+000856: b040                                   |000f: add-int/2addr v0, v4
+000858: 0f00                                   |0010: return v0
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #6              : (in Lcom/example/Opcodes;)
+      name          : 'methodHandles'
+      type          : '()Ljava/lang/Object;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 17
+      ins           : 1
+      outs          : 12
+      insns size    : 54 16-bit code units
+000a58:                                        |[000a58] com.example.Opcodes.methodHandles:()Ljava/lang/Object;
+000a68: 7100 2f00 0000                         |0000: invoke-static {}, Ljava/lang/invoke/MethodHandles;.lookup:()Ljava/lang/invoke/MethodHandles$Lookup; // method@002f
+000a6e: 0c00                                   |0003: move-result-object v0
+000a70: 1c03 1000                              |0004: const-class v3, Ljava/lang/Object; // type@0010
+000a74: 1c07 1100                              |0006: const-class v7, Ljava/lang/String; // type@0011
+000a78: 6201 0900                              |0008: sget-object v1, Ljava/lang/Long;.TYPE:Ljava/lang/Class; // field@0009
+000a7c: 6202 0700                              |000a: sget-object v2, Ljava/lang/Double;.TYPE:Ljava/lang/Class; // field@0007
+000a80: 6204 0800                              |000c: sget-object v4, Ljava/lang/Integer;.TYPE:Ljava/lang/Class; // field@0008
+000a84: 0745                                   |000e: move-object v5, v4
+000a86: 0716                                   |000f: move-object v6, v1
+000a88: 2507 2600 0100                         |0010: filled-new-array/range {v1, v2, v3, v4, v5, v6, v7}, [Ljava/lang/Class; // type@0026
+000a8e: 0c01                                   |0013: move-result-object v1
+000a90: 7130 3000 4401                         |0014: invoke-static {v4, v4, v1}, Ljava/lang/invoke/MethodType;.methodType:(Ljava/lang/Class;Ljava/lang/Class;[Ljava/lang/Class;)Ljava/lang/invoke/MethodType; // method@0030
+000a96: 0c01                                   |0017: move-result-object v1
+000a98: 1c02 0700                              |0018: const-class v2, Lcom/example/Opcodes; // type@0007
+000a9c: 1a03 7200                              |001a: const-string v3, "staticMany" // string@0072
+000aa0: 6e40 2e00 2013                         |001c: invoke-virtual {v0, v2, v3, v1}, Ljava/lang/invoke/MethodHandles$Lookup;.findStatic:(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle; // method@002e
+000aa6: 0c04                                   |001f: move-result-object v4
+000aa8: 160d 0700                              |0020: const-wide/16 v13, #int 7 // #7
+000aac: 1a0f 5600                              |0022: const-string v15, "eight" // string@0056
+000ab0: 1215                                   |0024: const/4 v5, #int 1 // #1
+000ab2: 1606 0200                              |0025: const-wide/16 v6, #int 2 // #2
+000ab6: 1908 0840                              |0027: const-wide/high16 v8, #long 4613937818241073152 // #4008
+000aba: 120a                                   |0029: const/4 v10, #int 0 // #0
+000abc: 125b                                   |002a: const/4 v11, #int 5 // #5
+000abe: 126c                                   |002b: const/4 v12, #int 6 // #6
+000ac0: fb0c 2d00 0400 0700                    |002c: invoke-polymorphic/range {v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15}, Ljava/lang/invoke/MethodHandle;.invokeExact:([Ljava/lang/Object;)Ljava/lang/Object;, (IJDLjava/lang/Object;IIJLjava/lang/String;)I // method@002d, proto@0007
+000ac8: 0a00                                   |0030: move-result v0
+000aca: 7110 1f00 0000                         |0031: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@001f
+000ad0: 0c00                                   |0034: move-result-object v0
+000ad2: 1100                                   |0035: return-object v0
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #7              : (in Lcom/example/Opcodes;)
+      name          : 'packedSwitch'
+      type          : '(I)I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 0
+      insns size    : 32 16-bit code units
+00085c:                                        |[00085c] com.example.Opcodes.packedSwitch:(I)I
+00086c: 1210                                   |0000: const/4 v0, #int 1 // #1
+00086e: 3202 1c00                              |0001: if-eq v2, v0, 001d // +001c
+000872: 1220                                   |0003: const/4 v0, #int 2 // #2
+000874: 3202 1600                              |0004: if-eq v2, v0, 001a // +0016
+000878: 1230                                   |0006: const/4 v0, #int 3 // #3
+00087a: 3202 1000                              |0007: if-eq v2, v0, 0017 // +0010
+00087e: 1240                                   |0009: const/4 v0, #int 4 // #4
+000880: 3202 0a00                              |000a: if-eq v2, v0, 0014 // +000a
+000884: 1250                                   |000c: const/4 v0, #int 5 // #5
+000886: 3202 0400                              |000d: if-eq v2, v0, 0011 // +0004
+00088a: 12f2                                   |000f: const/4 v2, #int -1 // #ff
+00088c: 0f02                                   |0010: return v2
+00088e: 1302 3700                              |0011: const/16 v2, #int 55 // #37
+000892: 0f02                                   |0013: return v2
+000894: 1302 2800                              |0014: const/16 v2, #int 40 // #28
+000898: 0f02                                   |0016: return v2
+00089a: 1302 1e00                              |0017: const/16 v2, #int 30 // #1e
+00089e: 0f02                                   |0019: return v2
+0008a0: 1302 1400                              |001a: const/16 v2, #int 20 // #14
+0008a4: 0f02                                   |001c: return v2
+0008a6: 1302 0a00                              |001d: const/16 v2, #int 10 // #a
+0008aa: 0f02                                   |001f: return v2
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #8              : (in Lcom/example/Opcodes;)
+      name          : 'sparseSwitch'
+      type          : '(I)I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 0
+      insns size    : 27 16-bit code units
+0008ac:                                        |[0008ac] com.example.Opcodes.sparseSwitch:(I)I
+0008bc: 1300 18fc                              |0000: const/16 v0, #int -1000 // #fc18
+0008c0: 3202 1700                              |0002: if-eq v2, v0, 0019 // +0017
+0008c4: 1270                                   |0004: const/4 v0, #int 7 // #7
+0008c6: 3202 1200                              |0005: if-eq v2, v0, 0017 // +0012
+0008ca: 1400 9f86 0100                         |0007: const v0, #float 1.40128e-40 // #0001869f
+0008d0: 3202 0b00                              |000a: if-eq v2, v0, 0015 // +000b
+0008d4: 1400 ffff ff7f                         |000c: const v0, #float nan // #7fffffff
+0008da: 3202 0400                              |000f: if-eq v2, v0, 0013 // +0004
+0008de: 1202                                   |0011: const/4 v2, #int 0 // #0
+0008e0: 0f02                                   |0012: return v2
+0008e2: 1242                                   |0013: const/4 v2, #int 4 // #4
+0008e4: 0f02                                   |0014: return v2
+0008e6: 1232                                   |0015: const/4 v2, #int 3 // #3
+0008e8: 0f02                                   |0016: return v2
+0008ea: 1222                                   |0017: const/4 v2, #int 2 // #2
+0008ec: 0f02                                   |0018: return v2
+0008ee: 1212                                   |0019: const/4 v2, #int 1 // #1
+0008f0: 0f02                                   |001a: return v2
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #9              : (in Lcom/example/Opcodes;)
+      name          : 'stringSwitch'
+      type          : '(Ljava/lang/String;)I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 7
+      ins           : 2
+      outs          : 2
+      insns size    : 80 16-bit code units
+000938:                                        |[000938] com.example.Opcodes.stringSwitch:(Ljava/lang/String;)I
+000948: 1220                                   |0000: const/4 v0, #int 2 // #2
+00094a: 1211                                   |0001: const/4 v1, #int 1 // #1
+00094c: 1202                                   |0002: const/4 v2, #int 0 // #0
+00094e: 6e10 2100 0600                         |0003: invoke-virtual {v6}, Ljava/lang/Object;.getClass:()Ljava/lang/Class; // method@0021
+000954: 12f3                                   |0006: const/4 v3, #int -1 // #ff
+000956: 6e10 2400 0600                         |0007: invoke-virtual {v6}, Ljava/lang/String;.hashCode:()I // method@0024
+00095c: 0a04                                   |000a: move-result v4
+00095e: 2c04 2d00 0000                         |000b: sparse-switch v4, 00000038 // +0000002d
+000964: 2821                                   |000e: goto 002f // +0021
+000966: 1a04 5b00                              |000f: const-string v4, "gamma" // string@005b
+00096a: 6e20 2300 4600                         |0011: invoke-virtual {v6, v4}, Ljava/lang/String;.equals:(Ljava/lang/Object;)Z // method@0023
+000970: 0a06                                   |0014: move-result v6
+000972: 3906 0300                              |0015: if-nez v6, 0018 // +0003
+000976: 2818                                   |0017: goto 002f // +0018
+000978: 0103                                   |0018: move v3, v0
+00097a: 2816                                   |0019: goto 002f // +0016
+00097c: 1a04 4500                              |001a: const-string v4, "alpha" // string@0045
+000980: 6e20 2300 4600                         |001c: invoke-virtual {v6, v4}, Ljava/lang/String;.equals:(Ljava/lang/Object;)Z // method@0023
+000986: 0a06                                   |001f: move-result v6
+000988: 3906 0300                              |0020: if-nez v6, 0023 // +0003
+00098c: 280d                                   |0022: goto 002f // +000d
+00098e: 0113                                   |0023: move v3, v1
+000990: 280b                                   |0024: goto 002f // +000b
+000992: 1a04 4b00                              |0025: const-string v4, "beta" // string@004b
+000996: 6e20 2300 4600                         |0027: invoke-virtual {v6, v4}, Ljava/lang/String;.equals:(Ljava/lang/Object;)Z // method@0023
+00099c: 0a06                                   |002a: move-result v6
+00099e: 3906 0300                              |002b: if-nez v6, 002e // +0003
+0009a2: 2802                                   |002d: goto 002f // +0002
+0009a4: 0123                                   |002e: move v3, v2
+0009a6: 2b03 1700 0000                         |002f: packed-switch v3, 00000046 // +00000017
+0009ac: 0f02                                   |0032: return v2
+0009ae: 1236                                   |0033: const/4 v6, #int 3 // #3
+0009b0: 0f06                                   |0034: return v6
+0009b2: 0f01                                   |0035: return v1
+0009b4: 0f00                                   |0036: return v0
+0009b6: 0000                                   |0037: nop // spacer
+0009b8: 0002 0300 f015 2e00 5eb1 8905 a733 ... |0038: sparse-switch-data (14 units)
+0009d4: 0001 0300 0000 0000 0700 0000 0600 ... |0046: packed-switch-data (10 units)
+      catches       : (none)
+      positions     :
+      locals        :
+
+  source_file_idx   : 50 (SourceFile)
+

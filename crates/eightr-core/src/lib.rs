@@ -1,0 +1,15 @@
+//! The 8R pipeline. Input is a shipped artifact only (dex/APK/AAB). There is never a
+//! mapping file; see DESIGN.md.
+
+pub mod error;
+pub mod input;
+pub mod labels;
+pub mod marker;
+pub mod passes;
+pub mod pipeline;
+pub mod program;
+pub mod report;
+pub mod sources;
+
+pub use error::{Error, Result};
+pub use pipeline::{run, Config, Outcome};
