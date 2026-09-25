@@ -185,7 +185,7 @@ Source detection is positive-evidence only (a D8/R8 marker, or referenced types 
 `Landroidx/compose/runtime/Composer;`). Because R8 also renames library classes, absence of
 evidence is never treated as absence of a source.
 
-### 1.3 Per-source research and proposed rules
+### 1.2 Per-source research and proposed rules
 
 Proposed rules live in `docs/sources/*.md` until implemented. A rule is added to the registry
 (`crates/eightr-rules`) only together with its implementation, runtime precondition checks,
@@ -212,7 +212,7 @@ and a fixture. That keeps "registered" meaning "real".
 `cargo xtask fixtures`, the way R8 is pinned. That's the next infrastructure task after the
 DEX writer.
 
-### 1.2 Scope
+### 1.3 Scope
 What 8R is *not*: it's not a decompiler. 8R emits DEX (plus a mapping and a report). You then
 feed that to jadx, a baksmali-style dumper, or anything else. This keeps scope tight, and it
 means the thing we test is bytecode, which is testable.
