@@ -34,7 +34,10 @@ fn composer_and_restartable_composables_match_ground_truth() {
         let found = eightr_core::compose::find(&om);
         let truth = eightr_core::compose::find(&gm);
         let Some(truth) = truth else {
-            assert!(found.is_none(), "{name}: composer found in a build without Compose");
+            // A D8 build with too few composables to find the composer (the library composables
+            // are only in the R8 build) still references the runtime's Composer.
+            let uses_compose = gm.syms.lookup("Landroidx/compose/runtime/Composer;").is_some();
+            assert!(found.is_none() || uses_compose, "{name}: composer found in a build without Compose");
             continue;
         };
         compose_fixtures += 1;
@@ -201,4 +204,57 @@ fn composable_parameter_roles_match_ground_truth() {
     assert_eq!(d8_changed_found, d8_changed, "D8 $changed recall");
     assert!(d8_defaults_found * 10 >= d8_defaults * 8, "D8 $default recall {d8_defaults_found}/{d8_defaults}");
     assert!(slot_checked >= 20 && bit_checked >= 5 && r8_checked >= 20, "too few checks");
+}
+
+/// Library composables named by key (crates/eightr-core/src/compose_keys.rs) against the
+/// compose_lib mapping: every corroborated (S) identification is right, and the entry-key-only
+/// (D) ones nearly all.
+#[test]
+fn library_composables_by_key_match_mapping() {
+    use eightr_mapping::{Mapping, MemberKind};
+    let dir = root().join("compose_lib/r8");
+    let m = load(&dir.join("classes.dex"));
+    let mapping = Mapping::parse_normalized(&fs::read_to_string(dir.join("mapping.txt")).unwrap()).unwrap();
+    let c = eightr_core::compose::find(&m).unwrap();
+    let found = eightr_core::compose_keys::identify(&m, &c, eightr_core::compose_keys::KeyDb::embedded());
+    let (mut s_ok, mut s_all, mut d_ok, mut d_all) = (0, 0, 0, 0);
+    for f in &found {
+        let (class, rest) = f.method_ref.split_once("->").unwrap();
+        let name = rest.split('(').next().unwrap();
+        let dotted = class.strip_prefix('L').and_then(|x| x.strip_suffix(';')).unwrap().replace('/', ".");
+        let originals: std::collections::BTreeSet<String> = mapping
+            .classes
+            .iter()
+            .filter(|cm| cm.obfuscated == dotted)
+            .flat_map(|cm| cm.outermost_methods())
+            .filter(|(mm, _)| mm.obfuscated == name)
+            .map(|(mm, _)| mm.original_name.clone())
+            .collect();
+        let ok = originals.len() == 1 && originals.contains(&f.name);
+        if f.corroborated {
+            s_all += 1;
+            s_ok += usize::from(ok);
+            assert!(ok, "S key match {} (key {}) named {} but the mapping says {originals:?}", f.method_ref, f.key, f.name);
+        } else {
+            d_all += 1;
+            d_ok += usize::from(ok);
+            if !ok {
+                eprintln!("D key match {} named {} but the mapping says {originals:?}", f.method_ref, f.name);
+            }
+        }
+        let _ = MemberKind::Field;
+    }
+    eprintln!("compose_lib key matches: S {s_ok}/{s_all}, D {d_ok}/{d_all}");
+    assert!(s_all >= 20, "only {s_all} corroborated matches");
+    assert!(d_ok * 100 >= d_all * 95, "D precision {d_ok}/{d_all}");
+    // Version resolution: material3 1.4.0 and compose 1.10.x.
+    let versions = eightr_core::compose_keys::versions(&m, &found, eightr_core::compose_keys::KeyDb::embedded());
+    eprintln!("{versions:?}");
+    let v = |a: &str| versions.iter().find(|x| x.0 == a).map(|x| x.1.clone()).unwrap_or_default();
+    assert_eq!(v("material3"), ["1.4.0"]);
+    assert_eq!(v("foundation"), ["1.10.6"]);
+    // Every artifact's tied set contains the true version (compose 1.10.6).
+    for (a, vs, _, _) in &versions {
+        assert!(vs.iter().any(|x| x == "1.10.6" || (a == "material3" && x == "1.4.0")), "{a}: {vs:?}");
+    }
 }

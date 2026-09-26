@@ -408,7 +408,10 @@ pub fn write(p: &Program, classes: &[usize]) -> Result<Vec<u8>, WriteError> {
             .map(|f| (pools.field(&FieldRef { class: c.ty, name: f.name, ty: f.ty }, s), f))
             .collect();
         statics.sort_by_key(|(i, _)| *i);
-        let Some(last) = statics.iter().rposition(|(_, f)| f.static_value.is_some()) else { continue };
+        // A value equal to the type's default is the same as none: trailing ones are dropped, so
+        // the output doesn't depend on whether the input spelled them out (it must for any field
+        // before a non-default one, and field order follows names).
+        let Some(last) = statics.iter().rposition(|(_, f)| f.static_value.as_ref().is_some_and(|v| *v != default_for(s.get(f.ty)))) else { continue };
         let vals: Vec<Value> = statics[..=last]
             .iter()
             .map(|(_, f)| f.static_value.clone().unwrap_or_else(|| default_for(s.get(f.ty))))

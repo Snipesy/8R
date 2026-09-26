@@ -164,9 +164,28 @@ impl Pass for Lateinit {
                 }
             }
         }
+        // Fields R8 widened to Object when merging classes (reads cast straight away): such a
+        // field may hold several original fields, one per merged class, and the mapping keeps one
+        // name. Refused.
+        let mut widened: std::collections::BTreeSet<(String, String)> = std::collections::BTreeSet::new();
+        for c in &p.model.classes {
+            for m in &c.methods {
+                let Some(body) = &m.code else { continue };
+                for w in body.insns.windows(2) {
+                    if let (Op::InstanceGet { dst, field, .. } | Op::StaticGet { dst, field, .. }, Op::CheckCast { reg, .. }) = (&w[0].op, &w[1].op) {
+                        if dst == reg && p.str(field.ty) == "Ljava/lang/Object;" {
+                            widened.insert((p.str(field.class).to_string(), p.str(field.name).to_string()));
+                        }
+                    }
+                }
+            }
+        }
         let mut findings = Vec::new();
         let mut labels = Vec::new();
         for ((class, name, ty), mut names) in proposals {
+            if widened.contains(&(class.clone(), name.clone())) {
+                continue;
+            }
             names.sort();
             names.dedup();
             let Some(cid) = p.find(&class) else { continue };

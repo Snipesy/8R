@@ -19,6 +19,16 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "compose_lib": {
+    "Body": 0,
+    "ClassName": 6,
+    "Lines": 0,
+    "MemberName": 5717,
+    "Package": 6,
+    "ParamNames": 0,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "compose_shapes": {
     "Body": 0,
     "ClassName": 1,
@@ -253,7 +263,7 @@
     "Body": 0,
     "ClassName": 2,
     "Lines": 0,
-    "MemberName": 1397,
+    "MemberName": 1394,
     "Package": 2,
     "ParamNames": 0,
     "Signature": 0,

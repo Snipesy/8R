@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "inlined_occurrences": 83318,
-    "recall": 0.027,
-    "touched": 2278
+    "inlined_occurrences": 159918,
+    "recall": 0.02,
+    "touched": 3256
   },
   "discarded-getclass": {
-    "hints": 1853,
-    "precision": 0.682
+    "hints": 2946,
+    "precision": 0.698
   },
   "discarded-getclass@r8-8": {
     "base_rate": 0.518,
@@ -15,14 +15,15 @@
     "precision": 0.83
   },
   "discarded-getclass@r8-9": {
-    "base_rate": 0.521,
-    "hints": 1718,
-    "lift": 1.287,
-    "precision": 0.671
+    "base_rate": 0.527,
+    "hints": 2811,
+    "lift": 1.311,
+    "precision": 0.691
   },
   "fixtures": [
     "compose_basic",
     "compose_basic_r94",
+    "compose_lib",
     "compose_shapes",
     "compose_shapes_k21",
     "compose_witness",
@@ -49,10 +50,10 @@
     "sigdb_app"
   ],
   "idiom:areEqual": {
-    "hints": 384,
-    "occurrences": 402,
-    "precision": 0.893,
-    "recall": 0.853
+    "hints": 511,
+    "occurrences": 604,
+    "precision": 0.898,
+    "recall": 0.765
   },
   "idiom:areEqual@r8-8": {
     "base_rate": 0.518,
@@ -61,15 +62,15 @@
     "precision": 0.843
   },
   "idiom:areEqual@r8-9": {
-    "base_rate": 0.521,
-    "hints": 333,
-    "lift": 1.73,
-    "precision": 0.901
+    "base_rate": 0.527,
+    "hints": 460,
+    "lift": 1.716,
+    "precision": 0.904
   },
   "idiom:collectionSizeOrDefault": {
-    "hints": 22,
+    "hints": 24,
     "occurrences": 24,
-    "precision": 0.409,
+    "precision": 0.375,
     "recall": 0.583
   },
   "idiom:collectionSizeOrDefault@r8-8": {
@@ -79,14 +80,14 @@
     "precision": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-9": {
-    "base_rate": 0.521,
-    "hints": 20,
-    "lift": 0.768,
-    "precision": 0.4
+    "base_rate": 0.527,
+    "hints": 22,
+    "lift": 0.69,
+    "precision": 0.364
   },
   "inlined-instance-call": {
-    "hints": 686,
-    "precision": 0.727
+    "hints": 1085,
+    "precision": 0.738
   },
   "inlined-instance-call@r8-8": {
     "base_rate": 0.518,
@@ -95,14 +96,14 @@
     "precision": 0.903
   },
   "inlined-instance-call@r8-9": {
-    "base_rate": 0.521,
-    "hints": 624,
-    "lift": 1.363,
-    "precision": 0.71
+    "base_rate": 0.527,
+    "hints": 1023,
+    "lift": 1.382,
+    "precision": 0.728
   },
   "param-null-check": {
-    "hints": 641,
-    "precision": 0.264
+    "hints": 769,
+    "precision": 0.268
   },
   "param-null-check@r8-8": {
     "base_rate": 0.518,
@@ -111,9 +112,9 @@
     "precision": 0.0
   },
   "param-null-check@r8-9": {
-    "base_rate": 0.521,
-    "hints": 640,
-    "lift": 0.507,
-    "precision": 0.264
+    "base_rate": 0.527,
+    "hints": 768,
+    "lift": 0.509,
+    "precision": 0.268
   }
 }

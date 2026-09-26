@@ -521,6 +521,26 @@ Classification is by role, so it does not care about R8 argument reordering. It 
   another composer method of their shape (`nextSlotForCache` / `updateValue`). Where R8 inlined the wrapper
   everywhere, the callers reach the inner method (`compose_witness2`: `updateValue`), which is refused.
 
+**Implemented (M4, `compose_keys.rs`, `passes/compose_libkey.rs`, `cargo xtask compose-keys`).** `compose/lib-key`
+(S, corroborated) and `compose/lib-key-hint` (D, entry key only):
+- **DB** (`sigdb/compose-keys.ckdb`, 54 KB, embedded):
+  - Built from the 9 Compose artifacts and material3, last patch of every minor (`fixtures/compose-keys.conf`, 76 AARs).
+  - Holds each restartable composable's entry key and the survivable inner keys of its body (replace, movable and
+    reusable groups, lambda keys), with version sets.
+- **Match:**
+  - The method's entry key maps to exactly one function.
+  - An order-free shape check passes.
+  - Corroboration by a second key in the method or in a class it instantiates makes it S.
+  - Only static or private methods; names never collide.
+  - The method gets the name and `@eightr.Original(name = "owner.name(desc)", via = "compose key K (artifact)")`.
+  - The host class is never renamed after the owner.
+- **Versions:** per artifact, the versions whose key sets have the most keys present in the app (counts, not recall:
+  R8 drops unreached lambdas' keys). Every tied version is reported in `report.libraries`.
+- **Grading:**
+  - Fixture `compose_lib` (material3 1.4.0 and Compose 1.10.6, R8 9.4): 44/44 S and 49/49 D names correct against
+    the mapping; versions exact where the keys differ.
+  - Gretio: 191 library composables (97 S, 94 D); Compose 1.12.x and material3 1.4.0.
+
 **Priorities (value per effort on R8 9.4 apps, compose-app §3; matches PLAN-compose-sigdb M1/M2/M4).** (1) `compose/detect`
 plus naming the runtime API by call shape (startRestartGroup, endRestartGroup, shouldExecute/getSkipping, skipToGroupEnd,
 replace/movable groups, rememberedValue/updateRememberedValue, changed*, updateChangedFlags, the updateScope field,

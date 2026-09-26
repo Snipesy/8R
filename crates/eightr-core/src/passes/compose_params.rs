@@ -40,6 +40,9 @@ impl Pass for ComposeParams {
         let all = crate::composables::composables(model, &c, &roles);
         let m = &mut cx.program.model;
         let int = |v: i64| Value::Int(v as i32);
+        // Restart lambda method → keys of the composables it restarts (a merged lambda class may
+        // restart several).
+        let mut scopes: std::collections::BTreeMap<(usize, usize), std::collections::BTreeSet<i32>> = std::collections::BTreeMap::new();
         for comp in &all {
             let mut names: Vec<(usize, String)> = Vec::new();
             if let Some(j) = comp.composer {
@@ -73,7 +76,7 @@ impl Pass for ComposeParams {
             }
             annotate(m, comp.class, comp.method, COMPOSABLE, elements);
             for &(ci, mi) in &comp.restart_methods {
-                annotate(m, ci, mi, RESTART_SCOPE, vec![("key", Value::Int(comp.key))]);
+                scopes.entry((ci, mi)).or_default().insert(comp.key);
             }
 
             // Debug-info names, where the input has none.
@@ -96,6 +99,13 @@ impl Pass for ComposeParams {
                 let value = names.iter().map(|(j, n)| format!("p{j}={n}")).collect::<Vec<_>>().join(",");
                 cx.labels.record_value(item, Attribute::ParamNames, COMPOSE_SYNTHETIC_PARAMS, None, Some(value))?;
             }
+        }
+        for ((ci, mi), keys) in scopes {
+            let value = match keys.len() {
+                1 => ("key", Value::Int(*keys.iter().next().unwrap())),
+                _ => ("keys", Value::Array(keys.into_iter().map(Value::Int).collect())),
+            };
+            annotate(m, ci, mi, RESTART_SCOPE, vec![value]);
         }
         Ok(())
     }

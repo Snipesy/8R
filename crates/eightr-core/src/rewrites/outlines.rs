@@ -151,27 +151,32 @@ fn is_library(p: &Model, desc: &str) -> bool {
     !base.starts_with('L') || p.find(base).is_none()
 }
 
-fn classify(p: &Model, body: &Body) -> Option<Kind> {
+/// `sites_throw`: every call site throws the result (`throw f(msg)`).
+fn classify(_p: &Model, body: &Body, sites_throw: bool) -> Option<Kind> {
     if !body.tries.is_empty() || body.insns.is_empty() {
         return None;
     }
     let last = &body.insns.last()?.op;
+    // R8 ≥ 9 may also return the built exception for the call site to throw (`throw f(msg)`):
+    // a throw outline too, once every call site is checked to throw the result.
+    let returns_new = |src: &eightr_ir::op::Reg| {
+        body.insns.iter().rev().skip(1).find(|i| i.op.def().is_some_and(|(r, _)| r == *src)).is_some_and(|i| matches!(i.op, Op::NewInstance { .. }))
+    };
     let kind = match last {
+        Op::Return { src, .. } if sites_throw && returns_new(src) => Kind::Throw,
         Op::Return { .. } | Op::ReturnVoid => Kind::Classic,
         Op::Throw { .. } => Kind::Throw,
         _ => return None,
     };
-    let (mut work, mut calls, mut news, mut app) = (0, 0, 0, false);
+    let (mut work, mut calls, mut news) = (0, 0, 0);
     for (k, insn) in body.insns.iter().enumerate() {
         let is_last = k + 1 == body.insns.len();
         match &insn.op {
-            Op::Invoke { method, .. } => {
-                app |= !is_library(p, p.syms.get(method.class));
+            Op::Invoke { .. } => {
                 work += 1;
                 calls += 1;
             }
-            Op::NewInstance { ty, .. } => {
-                app |= !is_library(p, p.syms.get(*ty));
+            Op::NewInstance { .. } => {
                 work += 1;
                 news += 1;
             }
@@ -185,14 +190,39 @@ fn classify(p: &Model, body: &Body) -> Option<Kind> {
     // A throw outline throws the exception it builds: the thrown register's (straight-line)
     // last definition is a `new-instance`.
     let throws_new = || {
-        let Some(Op::Throw { src }) = body.insns.last().map(|i| &i.op) else { return false };
+        let (Some(Op::Throw { src }) | Some(Op::Return { src, .. })) = body.insns.last().map(|i| &i.op) else { return false };
         body.insns.iter().rev().skip(1).find(|i| i.op.def().is_some_and(|(r, _)| r == *src)).is_some_and(|i| matches!(i.op, Op::NewInstance { .. }))
     };
     let ok = match kind {
-        Kind::Classic => work >= 3 && calls >= 1 && !app,
+        // Program calls are checked by the caller (`app_calls`).
+        Kind::Classic => work >= 3 && calls >= 1,
         Kind::Throw => news >= 1 && work >= 2 && throws_new(),
     };
     ok.then_some(kind)
+}
+
+/// Whether `body` calls or instantiates program classes (Object methods aside: R8's outliner
+/// counts `x.hashCode()` as a library call on any type).
+fn app_calls(p: &Model, body: &Body) -> bool {
+    body.insns.iter().any(|i| match &i.op {
+        Op::Invoke { method, .. } => {
+            let object_method = matches!((p.syms.get(method.name), p.syms.get(method.proto)), ("hashCode", "()I") | ("equals", "(Ljava/lang/Object;)Z") | ("toString", "()Ljava/lang/String;"));
+            !is_library(p, p.syms.get(method.class)) && !object_method
+        }
+        Op::NewInstance { ty, .. } => !is_library(p, p.syms.get(*ty)),
+        _ => false,
+    })
+}
+
+/// The lowest `min-api` among the input's D8/R8 build markers (`~~R8{"min-api":24,...}`).
+fn min_api(p: &Model) -> Option<u32> {
+    p.retained_strings
+        .iter()
+        .filter_map(|m| {
+            let rest = &m[m.find("\"min-api\":")? + "\"min-api\":".len()..];
+            rest.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
+        })
+        .min()
 }
 
 fn package(desc: &str) -> &str {
@@ -264,6 +294,10 @@ impl Rewrite for OutlineInline {
             }
         }
         let subclassed: std::collections::BTreeSet<&str> = p.classes.iter().filter_map(|c| c.superclass).map(|t| p.syms.get(t)).collect();
+        // R8 ≥ 9 also outlines calls of program methods. Below min-api 24, D8/R8 move default and
+        // static interface methods into companion classes whose methods look the same; the build
+        // marker's min-api rules them out.
+        let companions_impossible = min_api(p).is_some_and(|a| a >= 24);
         // Candidate outlines: key → (class, method, kind).
         let mut outlines: BTreeMap<Key, (usize, usize, Kind)> = BTreeMap::new();
         for (ci, c) in p.classes.iter().enumerate() {
@@ -280,7 +314,16 @@ impl Rewrite for OutlineInline {
                 if calls < 2 || escaping.contains(&k) {
                     continue;
                 }
-                if let Some(kind) = classify(p, body) {
+                // Every call site throws the result: a throw outline returning its exception.
+                let thrown = |&(sci, smi, at): &(usize, usize, u32)| {
+                    let insns = p.classes[sci].methods[smi].code.as_ref().map_or(&[][..], |b| &b.insns[..]);
+                    let at = at as usize;
+                    matches!((insns.get(at + 1).map(|i| &i.op), insns.get(at + 2).map(|i| &i.op)), (Some(Op::MoveResult { dst, .. }), Some(Op::Throw { src })) if dst == src)
+                };
+                if let Some(kind) = classify(p, body, sites[&k].iter().all(thrown)) {
+                    if kind == Kind::Classic && app_calls(p, body) && !companions_impossible {
+                        continue;
+                    }
                     outlines.insert(k, (ci, mi, kind));
                 }
             }
@@ -649,7 +692,7 @@ mod tests {
             Op::Binop { op: BinOp::Xor, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(1) },
             Op::Return { width: Width::Single, src: 0 },
         ]);
-        assert_eq!(classify(&p, &arith), None);
+        assert_eq!(classify(&p, &arith, false), None);
         let ctor = mref(&mut p, "Ljava/lang/Object;", "<init>", "()V");
         let obj = p.syms.intern("Ljava/lang/Object;");
         let api_outline = body(1, 0, vec![
@@ -657,9 +700,9 @@ mod tests {
             Op::Invoke { kind: InvokeKind::Direct, method: ctor, args: vec![0] },
             Op::Return { width: Width::Object, src: 0 },
         ]);
-        assert_eq!(classify(&p, &api_outline), None);
+        assert_eq!(classify(&p, &api_outline, false), None);
         let ob = outline_body(&mut p);
-        assert_eq!(classify(&p, &ob), Some(Kind::Classic));
+        assert_eq!(classify(&p, &ob, false), Some(Kind::Classic));
     }
 
     /// A throw outline that builds its message with a classic outline: both are inlined,

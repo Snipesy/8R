@@ -107,6 +107,8 @@ pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
 pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
 pub const ENUM_UNBOXING_UTILITY: &str = "r8/enum-unboxing-utility";
 pub const REBOX_ENUM: &str = "r8/rebox-enum";
+pub const COMPOSE_LIB_KEY: &str = "compose/lib-key";
+pub const COMPOSE_LIB_KEY_HINT: &str = "compose/lib-key-hint";
 pub const COMPOSE_RUNTIME_API: &str = "compose/runtime-api";
 pub const COMPOSE_SINGLETONS: &str = "compose/singletons";
 pub const COMPOSE_SYNTHETIC_PARAMS: &str = "compose/synthetic-params";
@@ -116,6 +118,31 @@ pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
 
 /// All registered rules, sorted by id.
 pub static REGISTRY: &[Rule] = &[
+    Rule {
+        id: COMPOSE_LIB_KEY,
+        source: Source::Compose,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "Name a library composable by its durable group key: the method whose startRestartGroup key is in the Compose key DB for exactly one function, corroborated by a second key of that function.",
+        preconditions: &[
+            "K is the constant of the method's entry startRestartGroup call (compose::find), |K| >= 2^20, and the DB maps K to exactly one library function.",
+            "Order-free shape: at most the function's parameters (+1 for a receiver R8 made a parameter), reference-type parameters likewise, at least one int ($changed).",
+            "Corroboration: another key of that function (replace/movable/reusable group or lambda key) occurs as a constant in the method or in a class it instantiates. Two independent 32-bit key hashes agreeing by chance on one method is negligible.",
+            "Only static or private methods (no override group), and no other method of the class already has the name and proto; the host class is never renamed after the owner.",
+        ],
+        fallback: Some(COMPOSE_LIB_KEY_HINT),
+        fixtures: &["compose_lib"],
+    },
+    Rule {
+        id: COMPOSE_LIB_KEY_HINT,
+        source: Source::Compose,
+        class: Class::Deterministic,
+        attributes: &[A::MemberName],
+        summary: "compose/lib-key without corroboration: the entry key alone names the library composable (expected false positives ~2e-4 per app).",
+        preconditions: &["As compose/lib-key, minus the second key."],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["compose_lib"],
+    },
     Rule {
         id: COMPOSE_RUNTIME_API,
         source: Source::Compose,
