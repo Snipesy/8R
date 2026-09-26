@@ -1,8 +1,9 @@
 //! `compose/runtime-api` (S): names of the Compose runtime's `Composer` members, from the roles
 //! the compiler plugin's calls give them (`crate::compose::roles`): `startRestartGroup`,
-//! `endRestartGroup`, `shouldExecute`, `skipToGroupEnd`, `rememberedValue`,
-//! `updateRememberedValue`, `changed`. The plugin emits exactly these calls in these shapes, so a
-//! member playing the role in (almost) every composable is that member.
+//! `endRestartGroup`, `shouldExecute` / `getSkipping`, `skipToGroupEnd`, `rememberedValue`,
+//! `updateRememberedValue`, `changed`, `changedInstance`, and the static `updateChangedFlags`.
+//! The plugin emits exactly these calls in these shapes, so a member playing the role in (almost)
+//! every composable is that member.
 
 use eightr_rules::{Attribute, Source, COMPOSE_RUNTIME_API};
 
@@ -26,11 +27,10 @@ impl Pass for ComposeApi {
         let Some(c) = crate::compose::find(&p.model) else { return Ok(()) };
         let roles = crate::compose::roles(&p.model, &c);
         let Some(ci) = p.find(&c.class) else { return Ok(()) };
-        // The composer and its program supertypes/subtypes: an override group renames together.
-        let related: Vec<ClassId> = p
-            .class_ids()
-            .filter(|&id| id == ci || related(p, id, ci) || related(p, ci, id))
-            .collect();
+        // The override group renames together: the composer, its program supertypes, and every
+        // subtype of those (siblings implementing the same interface included).
+        let roots: Vec<ClassId> = p.class_ids().filter(|&id| id == ci || related(p, ci, id)).collect();
+        let related: Vec<ClassId> = p.class_ids().filter(|&id| roots.contains(&id) || roots.iter().any(|&r| related(p, id, r))).collect();
         let mut labels = Vec::new();
         for role in &roles.composer {
             for &id in &related {
