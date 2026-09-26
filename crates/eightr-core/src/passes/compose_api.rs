@@ -50,12 +50,25 @@ impl Pass for ComposeApi {
         for (item, name) in labels {
             cx.labels.record_value(item, Attribute::MemberName, COMPOSE_RUNTIME_API, None, Some(name.to_string()))?;
         }
-        // ComposableSingletons fields, when the compiler era names them lambda$K.
-        if roles.composer.iter().any(|r| r.name == "shouldExecute") {
-            for (class, index, key) in crate::compose::singletons(&p.model, &c) {
-                let item = ItemId::Field { class: ClassId(class as u32), index: index as u32 };
-                cx.labels.record_value(item, Attribute::MemberName, COMPOSE_SINGLETONS, None, Some(format!("lambda${key}")))?;
-            }
+        // ComposableSingletons fields: `lambda$K` from Kotlin 2.1.20, `lambda-N` before. No
+        // program-wide fact proves the compiler of each module (the runtime's own singletons and
+        // the app's may differ), so the name is D, recorded but not applied; the field is
+        // annotated with its key (`@eightr.ComposableSingleton(key = K)`).
+        let singletons = crate::compose::singletons(&p.model, &c);
+        for &(class, index, key) in &singletons {
+            let item = ItemId::Field { class: ClassId(class as u32), index: index as u32 };
+            cx.labels.record_value(item, Attribute::MemberName, COMPOSE_SINGLETONS, None, Some(format!("lambda${key}")))?;
+        }
+        let m = &mut cx.program.model;
+        let ty = m.syms.intern(super::compose_params::COMPOSABLE_SINGLETON);
+        let key_name = m.syms.intern("key");
+        for (class, index, key) in singletons {
+            let f = &mut m.classes[class].fields[index];
+            f.annotations.retain(|a| a.annotation.ty != ty);
+            f.annotations.push(eightr_ir::value::Annotation {
+                visibility: eightr_ir::value::Visibility::Build,
+                annotation: eightr_ir::value::EncodedAnnotation { ty, elements: vec![(key_name, eightr_ir::value::Value::Int(key))] },
+            });
         }
         Ok(())
     }

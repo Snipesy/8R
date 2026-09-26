@@ -351,6 +351,21 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
         if ranked.len() > 1 && *n < 4 * ranked[1].1 {
             continue; // not a clear winner
         }
+        // rememberedValue / updateRememberedValue are thin wrappers over nextSlotForCache /
+        // updateValue; where R8 inlined the wrapper everywhere, the callers reach the inner
+        // method instead. The winner must itself call another composer method of its shape.
+        let wraps = |proto: &str| {
+            let Some(k) = p.find(&c.class) else { return false };
+            let Some(body) = p.classes[k].methods.iter().find(|x| s.get(x.name) == m.0 && s.get(x.proto) == m.1).and_then(|x| x.code.as_ref()) else {
+                return false;
+            };
+            body.insns.iter().any(|x| matches!(&x.op, Op::Invoke { method, .. } if s.get(method.class) == c.class && s.get(method.proto) == proto && s.get(method.name) != m.0))
+        };
+        match role {
+            "rememberedValue" if !wraps("()Ljava/lang/Object;") => continue,
+            "updateRememberedValue" if !wraps("(Ljava/lang/Object;)V") => continue,
+            _ => {}
+        }
         winners.push(Role { method: m.clone(), name: role });
     }
     let taken: BTreeSet<(String, String)> = winners.iter().map(|r| r.method.clone()).collect();

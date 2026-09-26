@@ -366,9 +366,25 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
             }
         }
 
-        // Default bindings of a candidate: bit → the param whose value it selects.
-        let bindings_of = |tests: &[(usize, u32)]| -> Vec<(usize, u32)> {
+        let changed_regs: BTreeSet<Reg> = comp.changed.iter().map(|&j| regs[j]).collect();
+        // Whether `x` (at `i`) ORs one slot's "static" bits `0b110 << 3s` into a `$changed`-derived
+        // value: the compiler's `if ($default & (1<<i)) $dirty |= 6 << 3s`.
+        let dirty_tie = |i: usize, x: &Op| -> bool {
+            let Op::Binop { op: BinOp::Or, ty: NumType::Int, a, b: rhs, .. } = x else { return false };
+            let (v, other) = match rhs {
+                Operand::Lit(v) => (Some(*v), *a),
+                Operand::Reg(q) => match const_at(b, &rd, i, *q) {
+                    Some(v) => (Some(v), *a),
+                    None => (const_at(b, &rd, i, *a), *q),
+                },
+            };
+            v.is_some_and(|v| (0..10).any(|sl| v == 6 << (3 * sl))) && derives_from(b, &rd, i, other, &changed_regs)
+        };
+        // Default bindings of a candidate (bit → the param whose value it selects), and whether a
+        // bit's default arm feeds the dirty bits (what makes the int a `$default`).
+        let bindings_of = |tests: &[(usize, u32)]| -> (Vec<(usize, u32)>, bool) {
             let mut found: Vec<(usize, u32)> = Vec::new();
+            let mut tied = false;
             for &(i, bit) in tests {
                 // Every zero test of the `and` result (the dirty-bits test, then the selection).
                 let Op::Binop { dst, .. } = b.insns[i].op else { continue };
@@ -392,6 +408,26 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
                     let arm = reachable(b, start, &joined);
                     let arm_defs: BTreeSet<usize> =
                         rd.defs.iter().enumerate().filter(|(_, d)| matches!(d.site, DefSite::Insn(k) if arm.contains(&(k as usize)))).map(|(d, _)| d).collect();
+                    tied |= arm.iter().any(|&k| dirty_tie(k, &b.insns[k].op));
+                    // Or it guards the param's `changed(p)` whose result goes into the dirty bits
+                    // (`$default & bit == 0 && changed(p) ? 4<<3s : 2<<3s`, for defaults that
+                    // call composables). `remember(key)` calls `changed` too, but never ORs the
+                    // result into a `$changed`-derived value.
+                    let from_default = reachable(b, start, &BTreeSet::new());
+                    let other = reachable(b, other_start, &from_default);
+                    let changed_call = other.iter().any(|&k| {
+                        matches!(&b.insns[k].op, Op::Invoke { method, .. } if s.get(method.class) == c.class && changed_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
+                    });
+                    // The OR happens in an arm or right where they join, not later in the body.
+                    let join = joined.intersection(&from_default).next().copied().unwrap_or(usize::MAX);
+                    let at_join = (join..join.saturating_add(3)).filter(|k| joined.contains(k));
+                    let dirty_or = arm.iter().chain(&other).copied().chain(at_join).any(|k| match &b.insns[k].op {
+                        Op::Binop { op: BinOp::Or, ty: NumType::Int, a, b: Operand::Reg(q), .. } => {
+                            derives_from(b, &rd, k, *a, &changed_regs) || derives_from(b, &rd, k, *q, &changed_regs)
+                        }
+                        _ => false,
+                    });
+                    tied |= changed_call && dirty_or;
                     // Phis: a later read reached by an arm def and by a def carrying param `j`.
                     for u in rd.uses.iter().flatten() {
                         for (_, defs) in u {
@@ -410,7 +446,7 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
                     found.push((*selected.iter().next().unwrap(), bit));
                 }
             }
-            found
+            (found, tied)
         };
 
         let mut top_default_bit: Option<u32> = None;
@@ -418,8 +454,10 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
             if role(j) || other_use.contains(&j) || ptypes.get(j) != Some(&"I") {
                 continue;
             }
-            let bound = bindings_of(tests);
-            if bound.is_empty() {
+            // A real int bit-tested to pick a value looks the same; only `$default` also feeds the
+            // dirty bits (review witness: `flags and 1 != 0`).
+            let (bound, tied) = bindings_of(tests);
+            if !tied {
                 continue;
             }
             comp.defaults.push(j);
@@ -437,8 +475,14 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
         comp.default_bits.sort();
         comp.default_bits.dedup();
 
+        // The skip check: masks after it belong to the body, e.g. to a non-restartable callee R8
+        // inlined whose own `$changed` derives from ours (review witness Outer3).
+        let skip_calls: BTreeSet<(String, String)> =
+            roles.composer.iter().filter(|r| r.name == "shouldExecute" || r.name == "getSkipping").map(|r| r.method.clone()).collect();
+        let skip_at = b.insns.iter().position(|x| {
+            matches!(&x.op, Op::Invoke { method, .. } if s.get(method.class) == c.class && skip_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
+        });
         // Slot bindings: changed(p) → `? 4<<3s : 2<<3s`.
-        let changed_regs: BTreeSet<Reg> = comp.changed.iter().map(|&j| regs[j]).collect();
         let mut slots: Vec<(usize, usize, u32)> = Vec::new();
         let mut top_slot: Option<u32> = None;
         for (i, x) in b.insns.iter().enumerate() {
@@ -467,7 +511,7 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
                         slots.push((j, q, *sl));
                     }
                 }
-                Op::Binop { op: BinOp::And, ty: NumType::Int, a, b: rhs, .. } if !changed_regs.is_empty() => {
+                Op::Binop { op: BinOp::And, ty: NumType::Int, a, b: rhs, .. } if !changed_regs.is_empty() && skip_at.is_some_and(|k| i < k) => {
                     let (v, r) = match rhs {
                         Operand::Lit(v) => (Some(*v), *a),
                         Operand::Reg(q) => match const_at(b, &rd, i, *q) {

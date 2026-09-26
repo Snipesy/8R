@@ -135,16 +135,16 @@ pub static REGISTRY: &[Rule] = &[
     Rule {
         id: COMPOSE_SINGLETONS,
         source: Source::Compose,
-        class: Class::Solved,
+        class: Class::Deterministic,
         attributes: &[A::MemberName],
-        summary: "Name ComposableSingletons fields lambda$K: static fields a <clinit> sets to new ComposableLambdaImpl(K, false, block).",
+        summary: "ComposableSingletons fields (static fields a <clinit> sets to new ComposableLambdaImpl(K, false, block)): records lambda$K (the name from Kotlin 2.1.20; lambda-N before) and annotates the field @eightr.ComposableSingleton(key = K).",
         preconditions: &[
             "The lambda class is found by behavior: a method opens the composer's startRestartGroup keyed by an int field of its class, which a constructor stores from its first parameter.",
             "The <clinit> stores the instance built with a constant K straight into the field; K is stored into no other field.",
-            "The compiler era names these fields lambda$K (>= 2.1.20): proven by the shouldExecute skip check (>= 2.2 by default); refused in the getSkipping era, whose older compilers named them lambda-N.",
+            "D, not S: no program-wide fact proves each module's compiler (shouldExecute exists from 2.1.0 with PausableComposition, whose singletons are still lambda-N), so the name is recorded, not applied.",
         ],
         fallback: Some(STRUCTURAL_NAME),
-        fixtures: &["compose_shapes", "compose_shapes_k21", "compose_witness", "compose_basic", "compose_basic_r94"],
+        fixtures: &["compose_shapes", "compose_witness2_k2110p", "compose_basic", "compose_basic_r94"],
     },
     Rule {
         id: COMPOSE_SYNTHETIC_PARAMS,
