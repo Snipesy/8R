@@ -89,6 +89,14 @@ structural.
 This invariant is a property test (§6.4). It is what keeps unaccounted choices out of the
 pipeline.
 
+**Documented exception (semantic safety wins):** a member whose name equals a string
+constant in its declaring class may be looked up by name (serializer and protobuf-style
+tables), so it keeps its name (`reflect::pins`). For names at low positions in R8's generator
+sequence (like `b`), "kept for reflection" and "generated, coincidentally equal to a string" are
+indistinguishable, so the pin can depend on R8's choice in the coincidental case. The α test
+therefore doesn't permute names that equal string constants. Determinism (output is a pure
+function of the input) is unaffected.
+
 It applies to the **final** output, after naming (§5.5). The identity labels used during
 passes are not α-invariant for names (renaming the input renames them), which is expected:
 identity is a placeholder until the naming stage replaces every non-S name with a structural D

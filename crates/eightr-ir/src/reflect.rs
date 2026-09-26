@@ -200,3 +200,62 @@ impl Pins {
         self.classes.contains(desc)
     }
 }
+
+/// Every name that must not change, from all name-observation evidence in the program:
+/// * reflective lookup sites that can't be rewritten (see [`Pins::of`]);
+/// * members whose name appears as a string constant in their declaring class's code or
+///   static values: such tables are how serializers and protobuf-style runtimes look fields
+///   up by name (library-agnostic; costs only a rename, never behavior);
+/// * `native` methods and their classes: native code binds to them by name (JNI).
+pub fn pins(p: &Program) -> Pins {
+    let mut pins = Pins::of(&sites(p));
+    let s = &p.syms;
+    for c in &p.classes {
+        let owner = s.get(c.ty).to_string();
+        let mut strings: BTreeSet<&str> = BTreeSet::new();
+        for m in &c.methods {
+            for insn in m.code.iter().flat_map(|b| &b.insns) {
+                if let Op::ConstString { value, .. } = &insn.op {
+                    strings.insert(s.get(*value));
+                }
+            }
+        }
+        for f in &c.fields {
+            collect_value_strings(f.static_value.as_ref(), s, &mut strings);
+        }
+        for f in &c.fields {
+            let n = s.get(f.name);
+            if strings.contains(n) {
+                pins.fields.insert((Some(owner.clone()), n.to_string()));
+            }
+        }
+        let mut has_native = false;
+        for m in &c.methods {
+            let n = s.get(m.name);
+            if m.access & eightr_dex::class::access::NATIVE != 0 {
+                has_native = true;
+                pins.methods.insert((Some(owner.clone()), n.to_string()));
+            } else if strings.contains(n) {
+                pins.methods.insert((Some(owner.clone()), n.to_string()));
+            }
+        }
+        if has_native {
+            pins.classes.insert(owner);
+        }
+    }
+    pins
+}
+
+fn collect_value_strings<'a>(v: Option<&crate::value::Value>, s: &'a crate::Interner, out: &mut BTreeSet<&'a str>) {
+    match v {
+        Some(crate::value::Value::String(x)) => {
+            out.insert(s.get(*x));
+        }
+        Some(crate::value::Value::Array(a)) => {
+            for x in a {
+                collect_value_strings(Some(x), s, out);
+            }
+        }
+        _ => {}
+    }
+}

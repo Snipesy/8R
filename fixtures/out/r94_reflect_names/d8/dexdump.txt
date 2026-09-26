@@ -1,0 +1,309 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/reflect/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/reflect/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+0003b8:                                        |[0003b8] com.example.reflect.Main.<init>:()V
+0003c8: 7010 0a00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000a
+0003ce: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=48
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/reflect/Main;
+
+    #1              : (in Lcom/example/reflect/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 9
+      ins           : 1
+      outs          : 5
+      insns size    : 59 16-bit code units
+0003d0:                                        |[0003d0] com.example.reflect.Main.main:([Ljava/lang/String;)V
+0003e0: 2180                                   |0000: array-length v0, v8
+0003e2: 6201 0700                              |0001: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+0003e6: 2202 0400                              |0003: new-instance v2, Lcom/example/reflect/Msg; // type@0004
+0003ea: 2203 0d00                              |0005: new-instance v3, Ljava/lang/StringBuilder; // type@000d
+0003ee: 7010 0c00 0300                         |0007: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@000c
+0003f4: 1a04 3000                              |000a: const-string v4, "s" // string@0030
+0003f8: 6e20 1000 4300                         |000c: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0010
+0003fe: 0c03                                   |000f: move-result-object v3
+000400: 6e20 0e00 0300                         |0010: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@000e
+000406: 0c03                                   |0013: move-result-object v3
+000408: 6e10 1100 0300                         |0014: invoke-virtual {v3}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0011
+00040e: 0c03                                   |0017: move-result-object v3
+000410: 1604 0700                              |0018: const-wide/16 v4, #int 7 // #7
+000414: 8106                                   |001a: int-to-long v6, v0
+000416: bb46                                   |001b: add-long/2addr v6, v4
+000418: 7057 0300 0263                         |001c: invoke-direct {v2, v0, v3, v6, v7}, Lcom/example/reflect/Msg;.<init>:(ILjava/lang/String;J)V // method@0003
+00041e: 6203 0000                              |001f: sget-object v3, Lcom/example/reflect/Msg;.FIELDS:[Ljava/lang/String; // field@0000
+000422: 7120 0700 3200                         |0021: invoke-static {v2, v3}, Lcom/example/reflect/Reader;.dump:(Ljava/lang/Object;[Ljava/lang/String;)Ljava/lang/String; // method@0007
+000428: 0c02                                   |0024: move-result-object v2
+00042a: 6e20 0800 2100                         |0025: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0008
+000430: 6201 0700                              |0028: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+000434: 2202 0500                              |002a: new-instance v2, Lcom/example/reflect/Pair; // type@0005
+000438: d803 0003                              |002c: add-int/lit8 v3, v0, #int 3 // #03
+00043c: 7020 0500 3200                         |002e: invoke-direct {v2, v3}, Lcom/example/reflect/Pair;.<init>:(I)V // method@0005
+000442: 6203 0400                              |0031: sget-object v3, Lcom/example/reflect/Pair;.FIELDS:[Ljava/lang/String; // field@0004
+000446: 7120 0700 3200                         |0033: invoke-static {v2, v3}, Lcom/example/reflect/Reader;.dump:(Ljava/lang/Object;[Ljava/lang/String;)Ljava/lang/String; // method@0007
+00044c: 0c02                                   |0036: move-result-object v2
+00044e: 6e20 0800 2100                         |0037: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0008
+000454: 0e00                                   |003a: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=50
+        0x0001 line=51
+        0x0028 line=52
+        0x003a line=53
+      locals        :
+        0x0001 - 0x003b reg=0 n I
+        0x0000 - 0x003b reg=8 args [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 24 (Main.java)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/reflect/Msg;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/reflect/Msg;)
+      name          : 'FIELDS'
+      type          : '[Ljava/lang/String;'
+      access        : 0x0018 (STATIC FINAL)
+  Instance fields   -
+    #0              : (in Lcom/example/reflect/Msg;)
+      name          : 'zze'
+      type          : 'I'
+      access        : 0x0000 ()
+    #1              : (in Lcom/example/reflect/Msg;)
+      name          : 'zzf'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0000 ()
+    #2              : (in Lcom/example/reflect/Msg;)
+      name          : 'zzg'
+      type          : 'J'
+      access        : 0x0000 ()
+  Direct methods    -
+    #0              : (in Lcom/example/reflect/Msg;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 13 16-bit code units
+000458:                                        |[000458] com.example.reflect.Msg.<clinit>:()V
+000468: 1a00 3700                              |0000: const-string v0, "zzf" // string@0037
+00046c: 1a01 3800                              |0002: const-string v1, "zzg" // string@0038
+000470: 1a02 3600                              |0004: const-string v2, "zze" // string@0036
+000474: 2430 1200 0201                         |0006: filled-new-array {v2, v0, v1}, [Ljava/lang/String; // type@0012
+00047a: 0c00                                   |0009: move-result-object v0
+00047c: 6900 0000                              |000a: sput-object v0, Lcom/example/reflect/Msg;.FIELDS:[Ljava/lang/String; // field@0000
+000480: 0e00                                   |000c: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=14
+      locals        :
+
+    #1              : (in Lcom/example/reflect/Msg;)
+      name          : '<init>'
+      type          : '(ILjava/lang/String;J)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 5
+      outs          : 1
+      insns size    : 10 16-bit code units
+000484:                                        |[000484] com.example.reflect.Msg.<init>:(ILjava/lang/String;J)V
+000494: 7010 0a00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000a
+00049a: 5901 0100                              |0003: iput v1, v0, Lcom/example/reflect/Msg;.zze:I // field@0001
+00049e: 5b02 0200                              |0005: iput-object v2, v0, Lcom/example/reflect/Msg;.zzf:Ljava/lang/String; // field@0002
+0004a2: 5a03 0300                              |0007: iput-wide v3, v0, Lcom/example/reflect/Msg;.zzg:J // field@0003
+0004a6: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=16
+        0x0003 line=17
+        0x0005 line=18
+        0x0007 line=19
+        0x0009 line=20
+      locals        :
+        0x0000 - 0x000a reg=0 this Lcom/example/reflect/Msg;
+        0x0000 - 0x000a reg=1 a I
+        0x0000 - 0x000a reg=2 b Ljava/lang/String;
+        0x0000 - 0x000a reg=3 c J
+
+  Virtual methods   -
+  source_file_idx   : 24 (Main.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/reflect/Pair;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/reflect/Pair;)
+      name          : 'FIELDS'
+      type          : '[Ljava/lang/String;'
+      access        : 0x0018 (STATIC FINAL)
+  Instance fields   -
+    #0              : (in Lcom/example/reflect/Pair;)
+      name          : 'b'
+      type          : 'I'
+      access        : 0x0000 ()
+    #1              : (in Lcom/example/reflect/Pair;)
+      name          : 'c'
+      type          : 'I'
+      access        : 0x0000 ()
+  Direct methods    -
+    #0              : (in Lcom/example/reflect/Pair;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 0
+      outs          : 2
+      insns size    : 11 16-bit code units
+0004a8:                                        |[0004a8] com.example.reflect.Pair.<clinit>:()V
+0004b8: 1a00 2300                              |0000: const-string v0, "b" // string@0023
+0004bc: 1a01 2400                              |0002: const-string v1, "c" // string@0024
+0004c0: 2420 1200 1000                         |0004: filled-new-array {v0, v1}, [Ljava/lang/String; // type@0012
+0004c6: 0c00                                   |0007: move-result-object v0
+0004c8: 6900 0400                              |0008: sput-object v0, Lcom/example/reflect/Pair;.FIELDS:[Ljava/lang/String; // field@0004
+0004cc: 0e00                                   |000a: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=28
+      locals        :
+
+    #1              : (in Lcom/example/reflect/Pair;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 10 16-bit code units
+0004d0:                                        |[0004d0] com.example.reflect.Pair.<init>:(I)V
+0004e0: 7010 0a00 0100                         |0000: invoke-direct {v1}, Ljava/lang/Object;.<init>:()V // method@000a
+0004e6: 5912 0500                              |0003: iput v2, v1, Lcom/example/reflect/Pair;.b:I // field@0005
+0004ea: da00 0202                              |0005: mul-int/lit8 v0, v2, #int 2 // #02
+0004ee: 5910 0600                              |0007: iput v0, v1, Lcom/example/reflect/Pair;.c:I // field@0006
+0004f2: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=30
+        0x0003 line=31
+        0x0005 line=32
+        0x0009 line=33
+      locals        :
+        0x0000 - 0x000a reg=1 this Lcom/example/reflect/Pair;
+        0x0000 - 0x000a reg=2 x I
+
+  Virtual methods   -
+  source_file_idx   : 24 (Main.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/reflect/Reader;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/reflect/Reader;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+000570:                                        |[000570] com.example.reflect.Reader.<init>:()V
+000580: 7010 0a00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000a
+000586: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=36
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/reflect/Reader;
+
+    #1              : (in Lcom/example/reflect/Reader;)
+      name          : 'dump'
+      type          : '(Ljava/lang/Object;[Ljava/lang/String;)Ljava/lang/String;'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 9
+      ins           : 2
+      outs          : 2
+      insns size    : 54 16-bit code units
+0004f4:                                        |[0004f4] com.example.reflect.Reader.dump:(Ljava/lang/Object;[Ljava/lang/String;)Ljava/lang/String;
+000504: 2200 0d00                              |0000: new-instance v0, Ljava/lang/StringBuilder; // type@000d
+000508: 7010 0c00 0000                         |0002: invoke-direct {v0}, Ljava/lang/StringBuilder;.<init>:()V // method@000c
+00050e: 2181                                   |0005: array-length v1, v8
+000510: 1202                                   |0006: const/4 v2, #int 0 // #0
+000512: 3512 2a00                              |0007: if-ge v2, v1, 0031 // +002a
+000516: 4603 0802                              |0009: aget-object v3, v8, v2
+00051a: 6e10 0b00 0700                         |000b: invoke-virtual {v7}, Ljava/lang/Object;.getClass:()Ljava/lang/Class; // method@000b
+000520: 0c04                                   |000e: move-result-object v4
+000522: 6e20 0900 3400                         |000f: invoke-virtual {v4, v3}, Ljava/lang/Class;.getDeclaredField:(Ljava/lang/String;)Ljava/lang/reflect/Field; // method@0009
+000528: 0c04                                   |0012: move-result-object v4
+00052a: 1215                                   |0013: const/4 v5, #int 1 // #1
+00052c: 6e20 1300 5400                         |0014: invoke-virtual {v4, v5}, Ljava/lang/reflect/Field;.setAccessible:(Z)V // method@0013
+000532: 6e20 1000 3000                         |0017: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0010
+000538: 0c05                                   |001a: move-result-object v5
+00053a: 1306 3d00                              |001b: const/16 v6, #int 61 // #3d
+00053e: 6e20 0d00 6500                         |001d: invoke-virtual {v5, v6}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@000d
+000544: 0c05                                   |0020: move-result-object v5
+000546: 6e20 1200 7400                         |0021: invoke-virtual {v4, v7}, Ljava/lang/reflect/Field;.get:(Ljava/lang/Object;)Ljava/lang/Object; // method@0012
+00054c: 0c06                                   |0024: move-result-object v6
+00054e: 6e20 0f00 6500                         |0025: invoke-virtual {v5, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/Object;)Ljava/lang/StringBuilder; // method@000f
+000554: 0c05                                   |0028: move-result-object v5
+000556: 1306 3b00                              |0029: const/16 v6, #int 59 // #3b
+00055a: 6e20 0d00 6500                         |002b: invoke-virtual {v5, v6}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@000d
+000560: d802 0201                              |002e: add-int/lit8 v2, v2, #int 1 // #01
+000564: 28d7                                   |0030: goto 0007 // -0029
+000566: 6e10 1100 0000                         |0031: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0011
+00056c: 0c01                                   |0034: move-result-object v1
+00056e: 1101                                   |0035: return-object v1
+      catches       : (none)
+      positions     :
+        0x0000 line=38
+        0x0005 line=39
+        0x000b line=40
+        0x0013 line=41
+        0x0017 line=42
+        0x002e line=39
+        0x0031 line=44
+      locals        :
+        0x000b - 0x002e reg=3 n Ljava/lang/String;
+        0x0013 - 0x002e reg=4 f Ljava/lang/reflect/Field;
+        0x0005 - 0x0036 reg=0 sb Ljava/lang/StringBuilder;
+        0x0000 - 0x0036 reg=7 o Ljava/lang/Object;
+        0x0000 - 0x0036 reg=8 names [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 24 (Main.java)
+

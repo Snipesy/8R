@@ -182,6 +182,7 @@ pub static REGISTRY: &[Rule] = &[
             "Class: the part after the last '$' (R8 names inner classes <outer>$<gen>) is not maybe-minified; no R8/D8 synthetic marker; not a j$ (desugared library) class; not a trailing-digit name inside a repackaging target (collision suffix, Rep -> Rep1).",
             "Package: the class name is kept and the package is not a possible repackaging target (root, all-generator-shaped segments, or the package holding the most maybe-minified classes).",
             "Member: <init>/<clinit>, or not maybe-minified, not synthetic, and not a fresh name$N.",
+            "Field: or its position in R8's member-name sequence is beyond what the class's field-naming state can reach (fields of the class and all program supertypes, plus slack): R8 names fields from the start of the sequence, so such a name was kept, not generated.",
         ],
         fallback: Some(IDENTITY),
         fixtures: &["hello", "shapes", "opcodes", "names_stress"],

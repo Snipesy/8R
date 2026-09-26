@@ -71,6 +71,27 @@ pub fn may_be_minified(name: &str, bound: usize) -> bool {
         && !NEVER_GENERATED.contains(&name)
 }
 
+/// Position of `name` in R8's member-name sequence (mixed case: first character from
+/// `[a-zA-Z]`, the rest from `[0-9a-zA-Z]`, little-endian; `a` = 1). `None` if R8's generator
+/// can't produce it at all.
+pub fn generator_index(name: &str) -> Option<u64> {
+    const FIRST: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const REST: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let b = name.as_bytes();
+    let head = *b.first()?;
+    let first = FIRST.iter().position(|&c| c == head)? as u64;
+    let mut n: u64 = 0;
+    for &c in b[1..].iter().rev() {
+        let d = REST.iter().position(|&x| x == c)? as u64;
+        n = n.checked_mul(62)?.checked_add(d + 1)?;
+    }
+    n.checked_mul(52)?.checked_add(first + 1)
+}
+
+/// Slack for field names R8 may have skipped in a class's naming state beyond the fields we
+/// can see (short library field names in supertypes, reserved words).
+const FIELD_SLACK: u64 = 64;
+
 fn is_synthetic(name: &str) -> bool {
     SYNTHETIC_MARKERS.iter().any(|m| name.contains(m))
 }
@@ -132,6 +153,34 @@ impl Pass for KeptName {
         };
         let targets = repackaging_targets(cx.program, &bounds);
 
+        // Fields visible to each class's field-naming state: its own and every program
+        // supertype's. R8 names a class's fields from the start of its sequence, skipping only
+        // names used in that state, so a minified field can't be further along the sequence
+        // than this count (plus slack).
+        let field_capacity: Vec<u64> = {
+            let p = &*cx.program;
+            p.class_ids()
+                .map(|id| {
+                    let mut seen = BTreeSet::new();
+                    let mut stack = vec![id];
+                    let mut n = 0u64;
+                    while let Some(c) = stack.pop() {
+                        if !seen.insert(c) {
+                            continue;
+                        }
+                        let k = p.class(c);
+                        n += k.fields.len() as u64;
+                        for t in k.superclass.iter().chain(&k.interfaces) {
+                            if let Some(sid) = p.find(p.str(*t)) {
+                                stack.push(sid);
+                            }
+                        }
+                    }
+                    n + FIELD_SLACK
+                })
+                .collect()
+        };
+
         let mut labels: Vec<(ItemId, Attribute)> = Vec::new();
         for id in cx.program.class_ids() {
             let p = &*cx.program;
@@ -161,8 +210,16 @@ impl Pass for KeptName {
                         || name == "<clinit>"
                         || (!may_be_minified(name, bounds.member) && !is_synthetic(name) && !is_fresh(name)))
             };
+            // A generator-shaped field name further along the sequence than this class's field
+            // naming state can reach wasn't generated: it was kept (e.g. names pre-obfuscated
+            // by a library vendor, or kept for reflection).
+            let beyond_capacity = |name: &str| {
+                !class_synthetic
+                    && !is_synthetic(name)
+                    && generator_index(name).is_some_and(|i| i > field_capacity[id.0 as usize])
+            };
             for (index, f) in class.fields.iter().enumerate() {
-                if member_kept(p.str(f.name)) {
+                if member_kept(p.str(f.name)) || beyond_capacity(p.str(f.name)) {
                     labels.push((ItemId::Field { class: id, index: index as u32 }, Attribute::MemberName));
                 }
             }
@@ -207,6 +264,19 @@ mod tests {
         for n in [1, 26, 27, 962, 963, 34_658, 34_659, 1_000_000] {
             assert_eq!(length_bound(n), number_to_identifier(n).len(), "n={n}");
         }
+    }
+
+    #[test]
+    fn generator_index_matches_r8_sequence() {
+        assert_eq!(generator_index("a"), Some(1));
+        assert_eq!(generator_index("z"), Some(26));
+        assert_eq!(generator_index("A"), Some(27));
+        assert_eq!(generator_index("Z"), Some(52));
+        assert_eq!(generator_index("a0"), Some(53));
+        assert_eq!(generator_index("b0"), Some(54));
+        assert_eq!(generator_index("zze"), Some(((15 * 62 + 36) * 52) + 26));
+        assert_eq!(generator_index("0a"), None);
+        assert_eq!(generator_index("a_b"), None);
     }
 
     #[test]
