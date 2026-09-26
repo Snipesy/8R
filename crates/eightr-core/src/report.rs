@@ -30,6 +30,14 @@ pub struct Report {
     /// Libraries in the app and their versions, with the evidence for each.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub libraries: Vec<LibraryVersion>,
+    /// kotlinx.serialization descriptors (serial names, element names), when verbose; always
+    /// counted in `serialization_descriptors`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub serialization: Vec<SerialDescriptor>,
+    pub serialization_descriptors: u64,
+    /// Room entity classes named by the schema validation messages (original FQNs).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub room_entities: Vec<String>,
     /// Compose: restartable composables and what their synthetic parameters prove.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compose: Option<crate::composables::ComposeSummary>,
@@ -120,4 +128,13 @@ pub struct LibraryVersion {
     pub versions: Vec<String>,
     /// What says so, e.g. `compose keys 112/151` or `META-INF/x.version`.
     pub evidence: String,
+}
+
+/// A kotlinx.serialization descriptor: the serializer class (input name), the serial name, the
+/// element names in order.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct SerialDescriptor {
+    pub serializer: String,
+    pub serial_name: String,
+    pub elements: Vec<String>,
 }
