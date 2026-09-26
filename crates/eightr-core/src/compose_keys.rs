@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::compose::Composer;
 
-const MAGIC: &[u8; 8] = b"8RCKDB01";
+const MAGIC: &[u8; 8] = b"8RCKDB02";
 /// The DB shipped with 8R.
 const EMBEDDED: &[u8] = include_bytes!("../../../sigdb/compose-keys.ckdb");
 /// Keys below this magnitude are too likely to be ordinary constants.
@@ -41,7 +41,7 @@ pub struct Entry {
     /// The entry (restart group) key.
     pub key: i32,
     pub function: u32,
-    pub versions: u32,
+    pub versions: u64,
     /// Other survivable keys of the body: replace/movable/reusable groups, lambda keys.
     pub inner: Vec<i32>,
 }
@@ -64,6 +64,7 @@ impl KeyDb {
 
     pub fn embedded() -> &'static KeyDb {
         static DB: std::sync::OnceLock<KeyDb> = std::sync::OnceLock::new();
+        // A DB that doesn't decode is a build error of 8R itself (tests decode it).
         DB.get_or_init(|| KeyDb::decode(EMBEDDED).unwrap_or_default())
     }
 }
@@ -154,6 +155,16 @@ pub fn identify(p: &Model, c: &Composer, db: &KeyDb) -> Vec<LibComposable> {
     for e in &db.entries {
         by_key.entry(e.key).or_default().push(e);
     }
+    // Which functions each key occurs in (entry or inner). Keys of inline library functions
+    // (`remember`, `Box`, layouts) are copied into many callers: only a key of one function
+    // corroborates it.
+    let mut owners: BTreeMap<i32, BTreeSet<u32>> = BTreeMap::new();
+    for e in &db.entries {
+        owners.entry(e.key).or_default().insert(e.function);
+        for &k in &e.inner {
+            owners.entry(k).or_default().insert(e.function);
+        }
+    }
     let mut out = Vec::new();
     for &(ci, mi, key) in &c.restartable {
         if key.unsigned_abs() < MIN_KEY as u32 {
@@ -161,7 +172,10 @@ pub fn identify(p: &Model, c: &Composer, db: &KeyDb) -> Vec<LibComposable> {
         }
         let Some(entries) = by_key.get(&key) else { continue };
         let fns: BTreeSet<u32> = entries.iter().map(|e| e.function).collect();
-        let [f] = fns.iter().copied().collect::<Vec<_>>()[..] else { continue };
+        // Several functions for one key: only when they are one name (the same function moved
+        // or re-declared across versions: another owner or descriptor) does the key name it.
+        let names: BTreeSet<&str> = fns.iter().map(|&f| db.functions[f as usize].2.as_str()).collect();
+        let (Some(&f), 1) = (fns.iter().next(), names.len()) else { continue };
         let (artifact, owner, name, desc) = &db.functions[f as usize];
         let m = &p.classes[ci].methods[mi];
         let Some(b) = &m.code else { continue };
@@ -172,7 +186,12 @@ pub fn identify(p: &Model, c: &Composer, db: &KeyDb) -> Vec<LibComposable> {
             continue;
         }
         // Corroboration: another key of the function in the method or in what it instantiates.
-        let inner: BTreeSet<i32> = entries.iter().filter(|e| e.function == f).flat_map(|e| e.inner.iter().copied()).collect();
+        let inner: BTreeSet<i32> = entries
+            .iter()
+            .filter(|e| fns.contains(&e.function))
+            .flat_map(|e| e.inner.iter().copied())
+            .filter(|k| owners.get(k).is_some_and(|o| o.is_subset(&fns)))
+            .collect();
         let mut seen: BTreeSet<i32> = consts(b);
         for x in &b.insns {
             if let Op::NewInstance { ty, .. } = &x.op {
@@ -232,7 +251,7 @@ pub fn versions(p: &Model, found: &[LibComposable], db: &KeyDb) -> Vec<(String, 
             let mut keys: BTreeSet<i32> = BTreeSet::new();
             for e in &db.entries {
                 let (a, o, n, d) = &db.functions[e.function as usize];
-                if *a as usize == ai && e.versions & (1 << vi) != 0 && fns.contains(&(o.clone(), n.clone(), d.clone())) {
+                if *a as usize == ai && e.versions & (1u64 << vi) != 0 && fns.contains(&(o.clone(), n.clone(), d.clone())) {
                     keys.insert(e.key);
                     keys.extend(&e.inner);
                 }

@@ -111,7 +111,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let enums = crate::passes::enum_unboxing::recover_enums(&model, &model.classes);
     let (inline_hints, inlining) = crate::inline_hints::collect(&model);
     let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
-    let mut program = Program { model };
+    let mut program = Program { model, class_hints: Default::default() };
     let name_stats = name_stats(&dexes, &program);
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
 
@@ -172,10 +172,13 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
         summary.library_composables_s = libs.iter().filter(|l| l.corroborated).count() as u64;
         summary.library_composables_d = libs.len() as u64 - summary.library_composables_s;
         for (library, versions, covered, total) in crate::compose_keys::versions(&program.model, &libs, db) {
+            // The newest version the DB knows, with keys missing: possibly a newer release.
+            let newest = db.artifacts.iter().find(|a| a.0 == library).and_then(|a| a.1.last());
+            let newer = covered < total && newest.is_some_and(|n| versions.contains(n));
             report.libraries.push(crate::report::LibraryVersion {
                 library: format!("androidx.compose:{library}"),
                 versions,
-                evidence: format!("compose keys {covered}/{total}"),
+                evidence: format!("compose keys {covered}/{total}{}", if newer { " (newest in the DB: may be newer)" } else { "" }),
             });
         }
         report.compose = Some(summary);
@@ -206,7 +209,11 @@ fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {
     }
     let packages: std::collections::BTreeSet<&str> =
         program.class_ids().map(|id| crate::program::package_of(program.descriptor(id))).collect();
-    NameStats { type_descriptors: types.len() as u64, member_names: members.len() as u64, packages: packages.len() as u64 }
+    // Only names R8's generator could have produced count toward how many it produced: 8R's own
+    // structural names (unique program-wide, where R8 reuses `a`, `b`, ... per class) and other
+    // non-generator names would move the bound, so a re-run would see real short names as minified.
+    let generated = members.iter().filter(|n| crate::passes::kept_name::may_be_minified(n, usize::MAX)).count();
+    NameStats { type_descriptors: types.len() as u64, member_names: generated as u64, packages: packages.len() as u64 }
 }
 
 fn collect_markers(dexes: &[(String, Dex)]) -> Vec<Marker> {

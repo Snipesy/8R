@@ -860,6 +860,31 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   fixtures' inlined occurrences (mapping ranges, not call sites): the baseline any future
   un-inlining work is measured from. Gretio: 13.4k discarded `getClass()` (plus 4.7k parameter
   null checks), 3.8k inlined instance calls, 1.5k `areEqual`; 92% of line tables pc-encoded.
+- **Compose (M0–M4; docs/sources/compose.md "Implemented"):**
+  - The Composer is found structurally.
+  - Its members are named by the plugin's call shapes (`compose/runtime-api`, S, with body proofs; both compiler
+    eras).
+  - App composables' synthetic parameters: debug names, `@eightr.Composable` / `@eightr.RestartScope`, slot and
+    default bindings, removed-parameter bounds (`compose/synthetic-params`, D).
+  - ComposableSingletons `lambda$K` (D).
+  - Library composables by durable group key (`compose/lib-key` S when a key unique to the function
+    corroborates, `-hint` D), from a key DB built from 76 AARs (`cargo xtask compose-keys`).
+  - Gretio: 552 restartables, 191 library composables (97 S), Compose 1.12 / material3 1.4.
+- **Library signature DB and matcher (M3/M5, docs/research/sigdb.md):**
+  - `cargo xtask sigdb` runs each version in `fixtures/sigdb.conf` through R8 alone.
+  - It normalizes the result with 8R's rewrites, fingerprints it with names erased (stable = platform classes
+    only), and keys it by original owner/name/proto (`sigdb/*.sigdb`, embedded).
+  - `sigdb::matcher`: exact `all`/string hashes, class seeds, then call-graph, class-proto and mutual-best
+    propagation, conflict-free per round.
+  - `r8/sigdb-method-name` (D) names methods outside override groups, with `@eightr.Original`; voted classes
+    get the library simple name as their structural hint.
+  - On `sigdb_app` (same versions): 93% precise, 70% recall (`tests/sigdb.rs`, ratcheted).
+- **Library versions (M6):** `report.libraries` from `META-INF/*.version`, root `*.properties`, `name/x.y.z`
+  strings, registrar id/version pairs, and the Compose key version sets. Gretio: 176 entries.
+- **Idempotence:** 8R on its own output is byte-identical, fixtures and Gretio alike.
+  - Rewrites run to a fixpoint.
+  - The kept-name bound counts only generator-shaped names.
+  - The dex writer lays out annotations and static values canonically.
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every

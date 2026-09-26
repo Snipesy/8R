@@ -22,6 +22,9 @@ pub enum ItemId {
 #[derive(Debug, Clone)]
 pub struct Program {
     pub model: model::Program,
+    /// Readable hints for structural class names (`{hint}_{hash}`) from D evidence, e.g. the
+    /// library class a sigdb match points to.
+    pub class_hints: std::collections::BTreeMap<ClassId, String>,
 }
 
 /// `Lcom/example/Main$Inner;` → `com/example`

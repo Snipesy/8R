@@ -3,3 +3,4 @@
 
 pub mod db;
 pub mod print;
+pub mod matcher;

@@ -40,20 +40,53 @@ impl Pass for ComposeLibKey {
                 targets.entry((f.class, f.name.clone(), s.get(m.proto).to_string())).or_default().push(k);
             }
         }
+        // A method with the name and proto declared up the supertype chain: a rename could make
+        // an invoke resolve to this one (a private instance method) or hide it (a static).
+        let declared_above = |ci: usize, name: &str, proto: eightr_ir::sym::Sym| {
+            let mut stack: Vec<usize> = model.classes[ci].superclass.iter().chain(&model.classes[ci].interfaces).filter_map(|t| model.find(s.get(*t))).collect();
+            let mut seen = std::collections::BTreeSet::new();
+            while let Some(k) = stack.pop() {
+                if !seen.insert(k) {
+                    continue;
+                }
+                if model.classes[k].methods.iter().any(|o| s.get(o.name) == name && o.proto == proto) {
+                    return true;
+                }
+                stack.extend(model.classes[k].superclass.iter().chain(&model.classes[k].interfaces).filter_map(|t| model.find(s.get(*t))));
+            }
+            false
+        };
         let mut notes = Vec::new();
         for ((class, _, _), ks) in targets {
             let [k] = ks[..] else { continue };
             let f = &found[k];
-            // Another method of the class already has the name and proto.
             let m = &model.classes[class].methods[f.method];
-            if model.classes[class].methods.iter().enumerate().any(|(i, o)| i != f.method && s.get(o.name) == f.name && o.proto == m.proto) {
+            let item = ItemId::Method { class: ClassId(class as u32), index: f.method as u32 };
+            let owner = f.owner.strip_prefix('L').and_then(|o| o.strip_suffix(';')).unwrap_or(&f.owner).replace('/', ".");
+            let note = (class, f.method, format!("{owner}.{}{}", f.name, f.descriptor), format!("compose key {} ({})", f.key, f.artifact));
+            let labelled = cx.labels.get(item, Attribute::MemberName).is_some();
+            // Already called that (an earlier 8R run, or kept): provenance only; never over an
+            // existing (S or recovered) name.
+            let same = s.get(m.name) == f.name;
+            if same {
+                notes.push(note.clone());
+                if labelled {
+                    continue;
+                }
+            } else if labelled {
                 continue;
             }
-            let item = ItemId::Method { class: ClassId(class as u32), index: f.method as u32 };
+            // Another method of the class, or above it, already has the name and proto.
+            if model.classes[class].methods.iter().enumerate().any(|(i, o)| i != f.method && s.get(o.name) == f.name && o.proto == m.proto)
+                || declared_above(class, &f.name, m.proto)
+            {
+                continue;
+            }
             let rule = if f.corroborated { COMPOSE_LIB_KEY } else { COMPOSE_LIB_KEY_HINT };
             cx.labels.record_value(item, Attribute::MemberName, rule, None, Some(f.name.clone()))?;
-            let owner = f.owner.strip_prefix('L').and_then(|o| o.strip_suffix(';')).unwrap_or(&f.owner).replace('/', ".");
-            notes.push((class, f.method, format!("{owner}.{}{}", f.name, f.descriptor), format!("compose key {} ({})", f.key, f.artifact)));
+            if !same {
+                notes.push(note);
+            }
         }
         let m = &mut cx.program.model;
         let (ty, name, via) = (m.syms.intern(ORIGINAL), m.syms.intern("name"), m.syms.intern("via"));

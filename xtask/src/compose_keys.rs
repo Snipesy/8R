@@ -19,7 +19,7 @@ pub fn compose_keys() -> Result<(), String> {
     let mut db = KeyDb::default();
     // (artifact, function key) → function index; (function, key, inner) → versions.
     let mut fns: BTreeMap<(u32, String, String, String), u32> = BTreeMap::new();
-    let mut entries: BTreeMap<(u32, i32, Vec<i32>), u32> = BTreeMap::new();
+    let mut entries: BTreeMap<(u32, i32, Vec<i32>), u64> = BTreeMap::new();
     for line in conf.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let w: Vec<&str> = line.split_whitespace().collect();
         let [artifact, version, sha256, url] = w[..] else { return Err(format!("bad compose-keys.conf line: {line}")) };
@@ -60,7 +60,10 @@ pub fn compose_keys() -> Result<(), String> {
             }
         };
         db.artifacts[ai].1.push(version.to_string());
-        let bit = 1u32 << (db.artifacts[ai].1.len() - 1);
+        if db.artifacts[ai].1.len() > 64 {
+            return Err(format!("{artifact}: more than 64 versions"));
+        }
+        let bit = 1u64 << (db.artifacts[ai].1.len() - 1);
         let found = eightr_core::compose_keys::extract(&model);
         eprintln!("compose-keys {artifact} {version}: {} restartable composables", found.len());
         for (owner, n, desc, key, inner) in found {

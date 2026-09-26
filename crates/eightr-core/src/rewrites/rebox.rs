@@ -643,15 +643,22 @@ impl Rewrite for Rebox {
                 p.classes[ci].methods[mi].code = Some(new);
             }
         }
-        for &e in &order {
+        // An enum whose every method edit failed to apply is referenced nowhere: no class, no
+        // record (a re-run would otherwise create it again).
+        let mut kept = Vec::new();
+        for (&e, class) in order.iter().zip(new_classes) {
+            if done[e] == 0 {
+                continue;
+            }
             let d = p.syms.get(enums[e].as_ref().expect("created above").ty).to_string();
             records.push(RewriteRecord {
                 rule: REBOX_ENUM,
                 item: d,
                 detail: format!("re-boxed in {} method(s) ({} constants: {})", done[e], recovered[e].constants.len(), recovered[e].constants.join(", ")),
             });
+            kept.push(class);
         }
-        p.classes.extend(new_classes);
+        p.classes.extend(kept);
         Ok(())
     }
 }

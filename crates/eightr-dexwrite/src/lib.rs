@@ -280,7 +280,11 @@ pub fn write(p: &Program, classes: &[usize]) -> Result<Vec<u8>, WriteError> {
     let mut item_offs: BTreeMap<Vec<u8>, u32> = BTreeMap::new();
     let mut item_count = 0;
     for set in &all_sets {
-        for a in set.iter() {
+        // In type order, like the set's entries: the layout mustn't depend on the order the
+        // annotations happen to be listed in.
+        let mut ordered: Vec<&Annotation> = set.iter().collect();
+        ordered.sort_by_key(|a| pools.ty(s.get(a.annotation.ty)));
+        for a in ordered {
             let bytes = annotation_bytes(a);
             if !item_offs.contains_key(&bytes) {
                 item_offs.insert(bytes.clone(), b.pos());
