@@ -148,6 +148,15 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     if config.verbose_labels {
         report.inline_hints = inline_hints;
     }
+    if let Some(c) = crate::compose::find(&program.model) {
+        let all = crate::composables::composables(&program.model, &c, &crate::compose::roles(&program.model, &c));
+        let mut summary = crate::composables::summary(&all);
+        summary.singleton_fields = crate::compose::singletons(&program.model, &c).len() as u64;
+        report.compose = Some(summary);
+        if config.verbose_labels {
+            report.composables = all;
+        }
+    }
     Ok(Outcome { program, labels, report, renaming, annotate_hints: !config.no_hint_annotations })
 }
 
@@ -195,7 +204,7 @@ fn attributes(program: &Program, item: ItemId) -> &'static [Attribute] {
         ItemId::Field { .. } => &[MemberName, Signature],
         ItemId::Method { class, index } => {
             if program.class(class).methods[index as usize].code.is_some() {
-                &[MemberName, Signature, Body, Lines]
+                &[MemberName, Signature, Body, Lines, ParamNames]
             } else {
                 &[MemberName, Signature]
             }
@@ -270,6 +279,8 @@ fn build_report(
         enums: Vec::new(),
         inlining: Default::default(),
         inline_hints: Vec::new(),
+        compose: None,
+        composables: Vec::new(),
         summary,
         labels: entries,
     }

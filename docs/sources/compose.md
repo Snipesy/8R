@@ -483,6 +483,35 @@ Classification is by role, so it does not care about R8 argument reordering. It 
 | `compose/live-literals` | S | `liveLiteral("<Type>$<path>", v)` strings or `@LiveLiteralInfo`/`@LiveLiteralFileInfo` present | durable paths (§1.5 grammar) name functions, callees, arg indices and the file path. Rare in release builds. |
 | `compose/group-offset` | N (reported only; not needed for libraries, whose inner keys the DB holds verbatim) | `KEY_fn` known **and** the function's source length `L` known (from sourceInfo offsets) | for an inner key `k` and each discriminator `c∈{none,2,3}`: `H=(k−c)·31⁻¹ mod 2³²`, `d=H−961·KEY_fn mod 2³²`; candidates `{(a,d−31a) : 0≤a≤d−31a≤L}`, ordered by `a`. Exhaustive by construction. [exp] gave 1–4 candidates per group with `L`=232. If `L` is unknown the set is unbounded, so the rule is identity. Low value. |
 
+**Implemented (M2, `composables.rs`, `passes/compose_params.rs`, `compose.rs::singletons`).**
+- `compose/synthetic-params` (D; the `$composer` role S) covers `synthetic-param-names`, `composable-marker`,
+  `param-slot`, `default-args` and `original-arity-bound` as one annotative rule:
+  - `$composer` = the `startRestartGroup` receiver parameter.
+  - `$changed` = parameters fed by `updateChangedFlags` at every restart-lambda call back (named `$changed`,
+    `$changed1`, … in residual order: D).
+  - `$default` = an int parameter used only in single-bit tests, one of which selects a parameter's value
+    (a phi: a later read reached both by a def made only on the default arm, i.e. the region reachable from it
+    without entering what the other arm reaches, and by the parameter). Captures by the restart lambda are
+    neutral uses.
+  - Slot bindings from `changed(p) ? 4<<3s : 2<<3s` (the `$changed` int from the preceding mask test), default
+    bindings from the phi, both kept only when unambiguous.
+  - Slot bound `max(10·(c−1)+1 for c ≥ 2, top mask slot + 1, top default bit + 1)`, and the count of
+    provably removed parameters.
+  - Output: debug-info parameter names (only where the input has none), `@eightr.Composable(key, composer,
+    changed, defaults, bindings, slotsAtLeast, removedAtLeast)` (build visibility), and
+    `@eightr.RestartScope(key)` on the restart lambda. Report: `compose` summary, per-composable detail with
+    `verbose_labels`.
+  - Graded (tests/compose.rs) against the D8 twins' parameter names: `$changed` 100/100, `$default` 44/46,
+    0 wrong roles, every slot/default binding exact. R8 builds are checked against the D8 twin with the same
+    key: counts, bounds, types at bound positions.
+  - Gretio: 552/552 restart lambdas, 596 `$changed`, 76 `$default`, 964 slot and 132 default bindings,
+    104 composables with provably removed params.
+- `compose/singletons` (S): `lambda$K` field names.
+  - `ComposableLambdaImpl` is found by behaviour: a method opens the composer's `startRestartGroup` keyed by an
+    own int field that a constructor stores from its first parameter.
+  - Named only when `shouldExecute` proves the ≥2.2 era. Refused in the `getSkipping` era, so Gretio's
+    150 fields stay unnamed.
+
 **Priorities (value per effort on R8 9.4 apps, compose-app §3; matches PLAN-compose-sigdb M1/M2/M4).** (1) `compose/detect`
 plus naming the runtime API by call shape (startRestartGroup, endRestartGroup, shouldExecute/getSkipping, skipToGroupEnd,
 replace/movable groups, rememberedValue/updateRememberedValue, changed*, updateChangedFlags, the updateScope field,

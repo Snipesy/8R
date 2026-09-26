@@ -75,6 +75,8 @@ pub enum Attribute {
     Body,
     Lines,
     SourceFile,
+    /// Parameter names (debug info).
+    ParamNames,
 }
 
 #[derive(Debug)]
@@ -106,6 +108,8 @@ pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
 pub const ENUM_UNBOXING_UTILITY: &str = "r8/enum-unboxing-utility";
 pub const REBOX_ENUM: &str = "r8/rebox-enum";
 pub const COMPOSE_RUNTIME_API: &str = "compose/runtime-api";
+pub const COMPOSE_SINGLETONS: &str = "compose/singletons";
+pub const COMPOSE_SYNTHETIC_PARAMS: &str = "compose/synthetic-params";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
@@ -129,10 +133,39 @@ pub static REGISTRY: &[Rule] = &[
         fixtures: &["compose_shapes", "compose_shapes_k21", "compose_witness", "compose_witness_k21", "compose_basic", "compose_basic_r94"],
     },
     Rule {
+        id: COMPOSE_SINGLETONS,
+        source: Source::Compose,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "Name ComposableSingletons fields lambda$K: static fields a <clinit> sets to new ComposableLambdaImpl(K, false, block).",
+        preconditions: &[
+            "The lambda class is found by behavior: a method opens the composer's startRestartGroup keyed by an int field of its class, which a constructor stores from its first parameter.",
+            "The <clinit> stores the instance built with a constant K straight into the field; K is stored into no other field.",
+            "The compiler era names these fields lambda$K (>= 2.1.20): proven by the shouldExecute skip check (>= 2.2 by default); refused in the getSkipping era, whose older compilers named them lambda-N.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["compose_shapes", "compose_shapes_k21", "compose_witness", "compose_basic", "compose_basic_r94"],
+    },
+    Rule {
+        id: COMPOSE_SYNTHETIC_PARAMS,
+        source: Source::Compose,
+        class: Class::Deterministic,
+        attributes: &[A::ParamNames],
+        summary: "Name a restartable composable's synthetic parameters ($composer, $changed[K], $default[K]) in debug info, and record its key, roles, parameter bindings and slot bound in a build annotation (@eightr.Composable); its restart lambda gets @eightr.RestartScope.",
+        preconditions: &[
+            "The composable opens with the composer's startRestartGroup(K) on a parameter: that parameter is $composer (S).",
+            "$changed: the parameters receiving updateChangedFlags(..) results at every restart-lambda call back (role S; the index K follows residual order, D: R8 may drop a constant $changedK).",
+            "$default: an int parameter used only in single-bit tests (captures aside), one of which selects between another parameter's value and a default (a phi). D.",
+            "Bindings kept only when unambiguous (one per parameter, one per slot or bit). Nothing changes code.",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["compose_shapes", "compose_shapes_k21", "compose_witness", "compose_witness_k21", "compose_basic", "compose_basic_r94"],
+    },
+    Rule {
         id: IDENTITY,
         source: Source::Core,
         class: Class::Deterministic,
-        attributes: &[A::Package, A::ClassName, A::MemberName, A::Signature, A::Body, A::Lines, A::SourceFile],
+        attributes: &[A::Package, A::ClassName, A::MemberName, A::Signature, A::Body, A::Lines, A::SourceFile, A::ParamNames],
         summary: "Leave the attribute exactly as the input has it. The default for anything no other rule touched.",
         preconditions: &[],
         fallback: None,
