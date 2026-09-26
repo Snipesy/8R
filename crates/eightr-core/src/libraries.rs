@@ -76,8 +76,8 @@ pub fn from_code(p: &Model) -> Vec<LibraryVersion> {
                         consts.insert(*dst, v.to_string());
                         continue;
                     }
-                    // (library id, version) passed to one call.
-                    Op::Invoke { args, .. } => {
+                    // (library id, version) passed to one static call (a registrar's factory).
+                    Op::Invoke { kind: eightr_ir::op::InvokeKind::Static, args, .. } => {
                         let strs: Vec<&String> = args.iter().filter_map(|r| consts.get(r)).collect();
                         if let [id, ver] = strs[..] {
                             let slug = id.len() <= 60

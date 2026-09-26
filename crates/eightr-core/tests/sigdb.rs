@@ -97,13 +97,22 @@ fn matcher_precision_recall_on_sigdb_app() {
     let dbs = eightr_core::sigdb::matcher::embedded();
     let matches = eightr_core::sigdb::matcher::match_program(&model, dbs);
     let desc = |dotted: &str| format!("L{};", dotted.replace('.', "/"));
-    // (residual class, residual name) → original (owner, name), when unambiguous.
-    let truth = |class: &str, name: &str| -> Option<(String, String)> {
+    // (residual class, name, proto) → original (owner, name), when unambiguous. R8 gives
+    // overloads one residual name: the residual signature (or the parameter count) separates them.
+    let truth = |class: &str, name: &str, proto: &str| -> Option<(String, String)> {
         let cm = mapping.classes.iter().find(|c| desc(&c.obfuscated) == class)?;
+        let arity = eightr_ir::types::parse_proto(proto).map_or(usize::MAX, |(ps, _)| ps.len());
         let cands: std::collections::BTreeSet<(String, String)> = cm
             .outermost_methods()
             .into_iter()
             .filter(|(m, md)| m.obfuscated == name && !md.iter().any(|x| x.parsed == Metadata::Synthesized))
+            .filter(|(m, md)| match md.iter().find_map(|x| match &x.parsed {
+                Metadata::ResidualSignature(s) => Some(s.clone()),
+                _ => None,
+            }) {
+                Some(r) => r == proto,
+                None => m.params.len() == arity,
+            })
             .map(|(m, _)| (desc(m.original_owner.as_deref().unwrap_or(&cm.original)), m.original_name.clone()))
             .collect();
         let _ = MemberKind::Field;
@@ -112,13 +121,17 @@ fn matcher_precision_recall_on_sigdb_app() {
     let db_classes: std::collections::BTreeSet<&str> = dbs.iter().flat_map(|d| d.classes.iter().map(String::as_str)).collect();
     let mut per: std::collections::BTreeMap<&str, (usize, usize)> = std::collections::BTreeMap::new();
     let mut matched_truth = 0;
+    // Constructors aren't renamed: graded neither in precision nor in recall.
     for m in &matches.methods {
         let c = &model.classes[m.class];
-        let (cd, mn) = (model.syms.get(c.ty), model.syms.get(c.methods[m.method].name));
+        let (cd, mn, mp) = (model.syms.get(c.ty), model.syms.get(c.methods[m.method].name), model.syms.get(c.methods[m.method].proto));
+        if mn.starts_with('<') {
+            continue;
+        }
         let db = &dbs[m.key.0 as usize];
         let (kc, kn, _) = &db.methods[m.key.1 as usize];
         let got = (db.classes[*kc as usize].clone(), kn.clone());
-        let Some(t) = truth(cd, mn) else { continue };
+        let Some(t) = truth(cd, mn, mp) else { continue };
         let e = per.entry(m.via).or_default();
         e.1 += 1;
         if t == got {
@@ -138,13 +151,13 @@ fn matcher_precision_recall_on_sigdb_app() {
             if n == "<init>" || n == "<clinit>" {
                 continue;
             }
-            if truth(cd, n).is_some_and(|(o, _)| db_classes.contains(o.as_str())) {
+            if truth(cd, n, model.syms.get(m.proto)).is_some_and(|(o, _)| db_classes.contains(o.as_str())) {
                 total += 1;
             }
         }
     }
     let (ok, all): (usize, usize) = per.values().fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
     eprintln!("sigdb matcher: {per:?}; precision {ok}/{all}, recall {matched_truth}/{total}; {} class pairs", matches.classes.len());
-    assert!(all > 0 && ok * 100 >= all * 92, "precision {ok}/{all}");
-    assert!(matched_truth * 100 >= total * 68, "recall {matched_truth}/{total}");
+    assert!(all > 0 && ok * 100 >= all * 93, "precision {ok}/{all}");
+    assert!(matched_truth * 100 >= total * 57, "recall {matched_truth}/{total}");
 }

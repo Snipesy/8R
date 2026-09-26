@@ -25,6 +25,7 @@ impl Pass for Sigdb {
 
     fn run(&self, cx: &mut Context) -> Result<()> {
         let dbs = crate::sigdb::matcher::embedded();
+        let pins = eightr_ir::reflect::pins(&cx.program.model);
         let matches = crate::sigdb::matcher::match_program(&cx.program.model, dbs);
         let p = &cx.program.model;
         let s = &p.syms;
@@ -96,6 +97,10 @@ impl Pass for Sigdb {
             if !(direct || lone_virtual) {
                 continue;
             }
+            let owner = s.get(p.classes[m.class].ty);
+            if pins.method(owner, name) || crate::naming::is_platform_class(owner) {
+                continue;
+            }
             let item = ItemId::Method { class: ClassId(m.class as u32), index: m.method as u32 };
             let labelled = cx.labels.get(item, Attribute::MemberName).is_some();
             // Already called that (kept by R8, or named by an earlier 8R run): provenance, and
@@ -113,15 +118,65 @@ impl Pass for Sigdb {
 
             targets.entry((m.class, new, proto.to_string())).or_default().push(k);
         }
-        let mut labels = Vec::new();
+        // Renames that stand alone: the new name and proto nowhere in the class or up its
+        // supertypes, under their *final* names (another rename here may give a supertype's
+        // method the same name: two renames must not create an override). Conflicts are dropped
+        // until none remain.
+        // A name that occurs as a string constant in the class would read as a reflective lookup
+        // of the member next time (pinned): not a D name to give.
+        let class_strings = |ci: usize| -> std::collections::BTreeSet<&str> {
+            p.classes[ci]
+                .methods
+                .iter()
+                .flat_map(|m| m.code.iter().flat_map(|b| &b.insns))
+                .filter_map(|x| match &x.op {
+                    eightr_ir::op::Op::ConstString { value, .. } => Some(s.get(*value)),
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut accepted: BTreeMap<(usize, usize), (String, String, usize)> = BTreeMap::new();
         for ((class, new, proto), ks) in targets {
-            let [k] = ks[..] else { continue };
-            let m = &matches.methods[k];
-            if p.classes[class].methods.iter().enumerate().any(|(i, o)| i != m.method && s.get(o.name) == new && s.get(o.proto) == proto) {
-                continue;
+            if let [k] = ks[..] {
+                // Nor a name reflection pins in the class (e.g. a lookup of "get" on an unknown
+                // owner): the next run would take it for pinned.
+                if !class_strings(class).contains(new.as_str()) && !pins.method(s.get(p.classes[class].ty), &new) {
+                    accepted.insert((class, matches.methods[k].method), (new, proto, k));
+                }
             }
-            labels.push((ItemId::Method { class: ClassId(class as u32), index: m.method as u32 }, new));
-            notes.push(note(m));
+        }
+        loop {
+            let final_name = |ci: usize, mi: usize| -> String { accepted.get(&(ci, mi)).map_or_else(|| s.get(p.classes[ci].methods[mi].name).to_string(), |x| x.0.clone()) };
+            let supers = |ci: usize| -> Vec<usize> {
+                let mut out = Vec::new();
+                let mut stack: Vec<usize> = p.classes[ci].superclass.iter().chain(&p.classes[ci].interfaces).filter_map(|t| p.find(s.get(*t))).collect();
+                while let Some(k) = stack.pop() {
+                    if !out.contains(&k) {
+                        out.push(k);
+                        stack.extend(p.classes[k].superclass.iter().chain(&p.classes[k].interfaces).filter_map(|t| p.find(s.get(*t))));
+                    }
+                }
+                out
+            };
+            let conflicts: Vec<(usize, usize)> = accepted
+                .iter()
+                .filter(|(&(ci, mi), (new, proto, _))| {
+                    let same = |k: usize, j: usize| (k, j) != (ci, mi) && final_name(k, j) == *new && s.get(p.classes[k].methods[j].proto) == proto;
+                    (0..p.classes[ci].methods.len()).any(|j| same(ci, j)) || supers(ci).into_iter().any(|k| (0..p.classes[k].methods.len()).any(|j| same(k, j)))
+                })
+                .map(|(&key, _)| key)
+                .collect();
+            if conflicts.is_empty() {
+                break;
+            }
+            for key in conflicts {
+                accepted.remove(&key);
+            }
+        }
+        let mut labels = Vec::new();
+        for ((class, method), (new, _, k)) in accepted {
+            labels.push((ItemId::Method { class: ClassId(class as u32), index: method as u32 }, new));
+            notes.push(note(&matches.methods[k]));
         }
         for (item, name) in labels.into_iter().chain(same) {
             cx.labels.record_value(item, Attribute::MemberName, SIGDB_METHOD_NAME, None, Some(name))?;
