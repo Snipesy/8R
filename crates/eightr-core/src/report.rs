@@ -22,6 +22,11 @@ pub struct Report {
     /// Enums R8 unboxed: original names and constants recovered from what survives.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub enums: Vec<crate::passes::enum_unboxing::RecoveredEnum>,
+    /// Evidence of inlining (hints by kind; D·id: nothing is un-inlined).
+    pub inlining: crate::inline_hints::InliningSummary,
+    /// Every inlining hint, when `Config::verbose_labels` is set.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub inline_hints: Vec<crate::inline_hints::InlineHint>,
     /// Every non-identity label, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<LabelEntry>,
