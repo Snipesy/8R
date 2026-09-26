@@ -89,6 +89,21 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     })?;
     // 8R's own annotations from a previous run are not part of the program.
     crate::inline_hints::strip(&mut model);
+    // Compose, found structurally (its class names don't survive R8).
+    let mut sources = sources;
+    if let Some(c) = crate::compose::find(&model) {
+        let ev = format!("structural Composer: {} restartable composables open with its group call", c.restartable.len());
+        match sources.iter_mut().find(|d| d.source == eightr_rules::Source::Compose) {
+            Some(d) => {
+                d.evidence.push(ev);
+                d.evidence.sort();
+            }
+            None => {
+                sources.push(crate::sources::DetectedSource { source: eightr_rules::Source::Compose, evidence: vec![ev] });
+                sources.sort_by_key(|d| d.source);
+            }
+        }
+    }
     // Evidence about the input (the re-boxing rewrite consumes what it's recovered from).
     let enums = crate::passes::enum_unboxing::recover_enums(&model, &model.classes);
     let (inline_hints, inlining) = crate::inline_hints::collect(&model);

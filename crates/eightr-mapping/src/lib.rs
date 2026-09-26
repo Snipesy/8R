@@ -145,7 +145,7 @@ impl ClassMapping {
     }
 
     /// Method entries that describe residual methods themselves, i.e. the outermost frame of
-    /// each inline stack. R8 writes a stack as consecutive lines sharing a minified range,
+    /// each inline stack (skipping R8's synthesized same-name wrapper frames). R8 writes a stack as consecutive lines sharing a minified range,
     /// innermost first, so the last line of each run is the outermost frame. Entries without
     /// a range stand alone.
     pub fn outermost_methods(&self) -> Vec<(&MethodMapping, &[MetadataLine])> {
@@ -157,7 +157,15 @@ impl ClassMapping {
                     next.obfuscated == m.obfuscated && next.minified_range == m.minified_range
                 });
             if !continues {
-                out.push((m, md));
+                // R8 ≥ 9 wraps a method it moved or bridged in a synthesized frame of the same
+                // name (`int Big.hashCode():0` around the real `int hashCode()`): the method is
+                // the frame inside it.
+                let wrapper = md.iter().any(|x| x.parsed == Metadata::Synthesized)
+                    && i > 0
+                    && all.get(i - 1).is_some_and(|(prev, _)| {
+                        prev.obfuscated == m.obfuscated && prev.minified_range == m.minified_range && prev.original_name == m.original_name
+                    });
+                out.push(if wrapper { all[i - 1] } else { (m, md) });
             }
         }
         out
@@ -222,6 +230,13 @@ pub struct HeaderInfo {
 impl Mapping {
     pub fn parse(text: &str) -> Result<Mapping, ParseError> {
         parse::parse(text)
+    }
+
+    /// Parses and normalizes R8 ≥ 9's quirks (package-relative names in synthesized frames;
+    /// `residualsignature` written only on a method's first range). For consumers of the
+    /// mapping's meaning; `parse` keeps the text exactly.
+    pub fn parse_normalized(text: &str) -> Result<Mapping, ParseError> {
+        parse::parse_normalized(text)
     }
 
     pub fn header(&self) -> HeaderInfo {

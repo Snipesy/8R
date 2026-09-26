@@ -11,6 +11,7 @@ pub mod passes;
 pub mod pipeline;
 pub mod program;
 pub mod report;
+pub mod compose;
 pub mod inline_hints;
 pub mod rewrites;
 pub mod sources;
