@@ -179,13 +179,12 @@ fn solved_names_match_held_back_mapping() {
                     let meth = &class.methods[index as usize];
                     let (meth_name, meth_proto) = (p.str(meth.name), p.str(meth.proto));
                     let claimed = label.value.as_deref().unwrap_or(meth_name);
-                    // Residual entries for this method: same obfuscated name, same class, and a
-                    // signature matching the dex proto (or its residualsignature).
+                    // Residual entries for this method: same obfuscated name, in this class (its
+                    // own or moved here), and a signature matching the dex proto (or its residualsignature).
                     let matches: Vec<_> = cm
                         .outermost_methods()
                         .into_iter()
                         .filter(|(m, md)| {
-                            let own = m.original_owner.as_deref().is_none_or(|o| o == cm.original);
                             let sig = format!(
                                 "({}){}",
                                 m.params.iter().map(|t| java_to_descriptor(t)).collect::<String>(),
@@ -197,8 +196,9 @@ fn solved_names_match_held_back_mapping() {
                             });
                             // Mapping signatures use original types; a residualsignature entry
                             // (when present) is in residual types.
+                            // A method R8 moved here (another original owner) keeps its
+                            // original name too.
                             m.obfuscated == meth_name
-                                && own
                                 && match residual {
                                     Some(r) => r == meth_proto,
                                     None => sig == original_proto(meth_proto, &mapping, &by_obf),
@@ -449,8 +449,8 @@ fn ends_in_throw(model: &eightr_ir::model::Program, class: &str, name: &str) -> 
 
 /// Merged-class detection (`r8/split-merged-class`) against the mapping: every split class must
 /// hold a `$r8$classId` field per the mapping (precision), and most of those must be split
-/// (recall; the rest are refused on purpose: abstract merged classes, class literals of the
-/// group, constructors that store the id twice).
+/// (recall, over classes without program subclasses; the rest are refused on purpose: abstract
+/// merged classes, class literals of the group, constructors that store the id twice).
 #[test]
 fn merged_class_detection_matches_mapping() {
     let (mut truth_total, mut found, mut checked) = (0, 0, 0);
@@ -475,6 +475,12 @@ fn merged_class_detection_matches_mapping() {
             assert!(truth.contains(*s) || named, "{fixture}: {s} was split but R8 didn't merge into it");
             checked += 1;
         }
+        // Recall leaves out classes with a program subclass: never split (a subclass would
+        // inherit the dispatching methods), by design.
+        let input = run(&load(&fixture, "r8"), &Config { no_rewrites: true, ..Default::default() }).unwrap();
+        let m = &input.program.model;
+        let subclassed: std::collections::BTreeSet<&str> = m.classes.iter().filter_map(|c| c.superclass).map(|t| m.syms.get(t)).collect();
+        let truth: Vec<&String> = truth.iter().filter(|t| !subclassed.contains(t.as_str())).collect();
         truth_total += truth.len();
         found += truth.iter().filter(|t| split.contains(t.as_str())).count();
     }

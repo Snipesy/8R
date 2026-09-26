@@ -8,6 +8,7 @@
 //! lib = kxs-core                                 # library from fixtures/toolchain.conf
 //! plugin = kotlinx-serialization                 # kotlinc plugin (kotlinx-serialization, compose)
 //! plugin_option = <plugin id>:<key>=<value>        # kotlinc -P plugin:<...> option
+//! kotlinc = kotlinc-2.1.21                         # another pinned kotlinc (default: kotlinc)
 //! ```
 //!
 //! Libraries are program input to R8 (shrunk into the app, as in a real build) together with
@@ -137,11 +138,13 @@ struct Conf {
     r8: Option<String>,
     /// Take sources from another fixture's directory (for twins built with another R8).
     sources: Option<String>,
+    /// Pinned kotlinc artifact (default `kotlinc`), for twins built with another compiler.
+    kotlinc: Option<String>,
 }
 
 fn parse_conf(path: &Path) -> Result<Conf> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), plugin_options: Vec::new(), r8: None, sources: None };
+    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), plugin_options: Vec::new(), r8: None, sources: None, kotlinc: None };
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let (k, v) = line.split_once('=').ok_or_else(|| format!("bad line in {}: {line}", path.display()))?;
         match k.trim() {
@@ -152,6 +155,7 @@ fn parse_conf(path: &Path) -> Result<Conf> {
             "plugin_option" => conf.plugin_options.push(v.trim().to_string()),
             "r8" => conf.r8 = Some(v.trim().to_string()),
             "sources" => conf.sources = Some(v.trim().to_string()),
+            "kotlinc" => conf.kotlinc = Some(v.trim().to_string()),
             // Entry point for the execution-equivalence tests; not used by the build.
             "main" => {}
             other => return Err(format!("unknown key {other} in {}", path.display())),
@@ -256,9 +260,9 @@ fn prepare_lib(name: &str, tc: &BTreeMap<String, Artifact>) -> Result<Lib> {
 }
 
 /// Unpacks the pinned kotlinc distribution; returns its root (containing bin/ and lib/).
-fn kotlinc_home(tc: &BTreeMap<String, Artifact>) -> Result<PathBuf> {
-    let zip = fetch("kotlinc", tc)?;
-    let dir = cache_dir().join(format!("kotlinc-{}", &tc["kotlinc"].sha256[..12]));
+fn kotlinc_home(tc: &BTreeMap<String, Artifact>, name: &str) -> Result<PathBuf> {
+    let zip = fetch(name, tc)?;
+    let dir = cache_dir().join(format!("kotlinc-{}", &tc[name].sha256[..12]));
     if !dir.join("kotlinc/bin/kotlinc").exists() {
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         run(Command::new("unzip").args(["-q", "-o"]).arg(&zip).arg("-d").arg(&dir))?;
@@ -318,7 +322,7 @@ fn fixtures(only: &[String]) -> Result<()> {
         files_with_ext(&src, "kt", &mut kt_sources)?;
         let mut tool_versions = String::new();
         if !kt_sources.is_empty() {
-            let home = kotlinc_home(&tc)?;
+            let home = kotlinc_home(&tc, conf.kotlinc.as_deref().unwrap_or("kotlinc"))?;
             libs.insert(0, Lib { jar: home.join("lib/kotlin-stdlib.jar"), rules: Vec::new() });
             let lib_jars: Vec<PathBuf> = libs.iter().map(|l| l.jar.clone()).collect();
             let mut cmd = Command::new(home.join("bin/kotlinc"));

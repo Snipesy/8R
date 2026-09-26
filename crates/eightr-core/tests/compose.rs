@@ -45,7 +45,6 @@ fn composer_and_restartable_composables_match_ground_truth() {
         let (fk, tk) = (keys(&found), keys(&truth));
         assert!(fk.is_subset(&tk), "{name}: keys not in the D8 build: {:?}", fk.difference(&tk).collect::<Vec<_>>());
         // D8 keys present anywhere as constants in the R8 build must be found.
-        let text = fs::read(&r8).unwrap();
         let r8_consts: std::collections::BTreeSet<i32> = om
             .classes
             .iter()
@@ -57,9 +56,26 @@ fn composer_and_restartable_composables_match_ground_truth() {
                 _ => None,
             })
             .collect();
-        let _ = text;
         let missed: Vec<&i32> = tk.iter().filter(|k| r8_consts.contains(k) && !fk.contains(k)).collect();
         assert!(missed.is_empty(), "{name}: restartable composables not found: keys {missed:?}");
+
+        // Roles: in the D8 build every role names a method already called that; in the R8 build
+        // (graded against the mapping by oracle.rs) the core roles are all found.
+        let truth_roles = eightr_core::compose::roles(&gm, &truth);
+        for r in &truth_roles.composer {
+            assert_eq!(r.method.0, r.name, "{name}: D8 role {r:?}");
+        }
+        assert_eq!(truth_roles.update_changed_flags.as_ref().map(|m| m.1.as_str()), Some("updateChangedFlags"), "{name}: D8");
+        let roles = eightr_core::compose::roles(&om, &found);
+        let named: std::collections::BTreeSet<&str> = roles.composer.iter().map(|r| r.name).collect();
+        for core in ["startRestartGroup", "endRestartGroup", "skipToGroupEnd", "changed"] {
+            assert!(named.contains(core), "{name}: role {core} not found in the R8 build ({named:?})");
+        }
+        // The skip check of the compiler era that built the D8 twin.
+        let era: Vec<&str> = truth_roles.composer.iter().map(|r| r.name).filter(|n| matches!(*n, "shouldExecute" | "getSkipping")).collect();
+        assert_eq!(era.len(), 1, "{name}: D8 skip check {era:?}");
+        assert!(named.contains(era[0]), "{name}: {} not found in the R8 build ({named:?})", era[0]);
+        assert!(roles.update_changed_flags.is_some(), "{name}: updateChangedFlags not found in the R8 build");
     }
     assert!(compose_fixtures >= 3, "only {compose_fixtures} Compose fixtures");
 }

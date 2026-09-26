@@ -3,7 +3,7 @@
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 557,
+    "MemberName": 623,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
@@ -12,17 +12,35 @@
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 550,
+    "MemberName": 624,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "compose_shapes": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 617,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "compose_shapes_k21": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 662,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
   },
   "dontobfuscate": {
     "Body": 0,
-    "ClassName": 3,
+    "ClassName": 5,
     "Lines": 0,
-    "MemberName": 3,
-    "Package": 3,
+    "MemberName": 5,
+    "Package": 5,
     "Signature": 0,
     "SourceFile": 0
   },
@@ -57,7 +75,7 @@
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 523,
+    "MemberName": 613,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
@@ -66,7 +84,7 @@
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 522,
+    "MemberName": 608,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
@@ -89,7 +107,25 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "r94_desugar": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 5,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "r94_enum": {
+    "Body": 0,
+    "ClassName": 2,
+    "Lines": 0,
+    "MemberName": 13,
+    "Package": 2,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "r94_enum_probe": {
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
@@ -98,11 +134,20 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "r94_enum_rebox": {
+    "Body": 0,
+    "ClassName": 2,
+    "Lines": 0,
+    "MemberName": 14,
+    "Package": 2,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "r94_merging": {
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 9,
+    "MemberName": 32,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
@@ -116,11 +161,20 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "r94_reflect_names": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 8,
+    "Package": 0,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "shapes": {
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
-    "MemberName": 3,
+    "MemberName": 5,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
