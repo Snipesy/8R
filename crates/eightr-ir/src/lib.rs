@@ -14,6 +14,7 @@ pub mod lift;
 pub mod model;
 pub mod op;
 pub mod print;
+pub mod reflect;
 pub mod rename;
 mod resolve;
 pub mod sym;

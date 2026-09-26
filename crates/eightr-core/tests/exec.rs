@@ -177,6 +177,10 @@ fn outputs_behave_like_inputs() {
                 continue;
             }
             assert!(!base.stdout.is_empty(), "[{}] {fixture}: baseline printed nothing", backend.name());
+            // A fixture whose own output varies between runs (timing, identity hashes) can't be
+            // compared; fail loudly so the fixture gets fixed.
+            let again = backend.run(std::slice::from_ref(&input), &main, &work.join("base2"));
+            assert!(again.stdout == base.stdout, "[{}] {fixture}: fixture output is nondeterministic\n{}\n---\n{}", backend.name(), base.stdout, again.stdout);
             for no_rewrites in [true, false] {
                 let out = eightr_output(&input, no_rewrites);
                 let got = backend.run(&out, &main, &work.join("out"));

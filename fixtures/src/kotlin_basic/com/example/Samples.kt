@@ -48,7 +48,7 @@ fun describe(c: Color): String = when (c) { Color.RED -> "r"; Color.GREEN -> "g"
 fun parse(s: String): Int = when (s) { "alpha" -> 1; "beta" -> 2; "gamma" -> 3; else -> 0 }
 fun area(s: Shape): Double = when (s) { is Shape.Circle -> s.r * s.r; Shape.Square -> 1.0 }
 
-inline fun <T> measure(block: () -> T): T { val t = System.nanoTime(); val r = block(); println(System.nanoTime() - t); return r }
+inline fun <T> measure(block: () -> T): T { val t = System.nanoTime(); val r = block(); println(System.nanoTime() >= t); return r }
 fun useInline(xs: List<Int>): Int = measure { xs.map { it * 2 }.sum() }
 
 fun lambdas(xs: List<String>): List<() -> Int> = xs.map { s -> { s.length } }

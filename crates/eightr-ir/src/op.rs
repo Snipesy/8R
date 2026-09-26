@@ -315,4 +315,121 @@ impl Op {
             _ => None,
         }
     }
+
+    /// Rewrites every register operand through `f` (uses and defs alike).
+    pub fn map_regs(&mut self, f: &mut impl FnMut(Reg) -> Reg) {
+        use Op::*;
+        match self {
+            Nop | ReturnVoid | Goto { .. } => {}
+            Move { dst, src, .. } | ArrayLength { dst, array: src } | Unop { dst, src, .. } => {
+                *dst = f(*dst);
+                *src = f(*src);
+            }
+            MoveResult { dst, .. } | MoveException { dst } | Const { dst, .. } | ConstString { dst, .. }
+            | ConstClass { dst, .. } | ConstMethodHandle { dst, .. } | ConstMethodType { dst, .. }
+            | NewInstance { dst, .. } | StaticGet { dst, .. } => *dst = f(*dst),
+            Return { src, .. } | Throw { src } | Switch { src, .. } | StaticPut { src, .. } => *src = f(*src),
+            MonitorEnter { obj } | MonitorExit { obj } => *obj = f(*obj),
+            CheckCast { reg, .. } => *reg = f(*reg),
+            InstanceOf { dst, obj, .. } | InstanceGet { dst, obj, .. } => {
+                *dst = f(*dst);
+                *obj = f(*obj);
+            }
+            InstancePut { src, obj, .. } => {
+                *src = f(*src);
+                *obj = f(*obj);
+            }
+            NewArray { dst, size, .. } => {
+                *dst = f(*dst);
+                *size = f(*size);
+            }
+            FilledNewArray { args, .. } | Invoke { args, .. } | InvokePolymorphic { args, .. } | InvokeCustom { args, .. } => {
+                for a in args.iter_mut() {
+                    *a = f(*a);
+                }
+            }
+            FillArrayData { array, .. } => *array = f(*array),
+            Cmp { dst, a, b, .. } => {
+                *dst = f(*dst);
+                *a = f(*a);
+                *b = f(*b);
+            }
+            If { a, b, .. } => {
+                *a = f(*a);
+                *b = f(*b);
+            }
+            IfZ { a, .. } => *a = f(*a),
+            ArrayGet { dst, array, index, .. } => {
+                *dst = f(*dst);
+                *array = f(*array);
+                *index = f(*index);
+            }
+            ArrayPut { src, array, index, .. } => {
+                *src = f(*src);
+                *array = f(*array);
+                *index = f(*index);
+            }
+            Binop { dst, a, b, .. } => {
+                *dst = f(*dst);
+                *a = f(*a);
+                if let Operand::Reg(r) = b {
+                    *r = f(*r);
+                }
+            }
+        }
+    }
+
+    /// Rewrites every branch target (instruction index) through `f`.
+    pub fn map_targets(&mut self, f: &mut impl FnMut(u32) -> u32) {
+        match self {
+            Op::Goto { target } | Op::If { target, .. } | Op::IfZ { target, .. } => *target = f(*target),
+            Op::Switch { cases, .. } => {
+                for (_, t) in cases.iter_mut() {
+                    *t = f(*t);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Whether some Dalvik encoding accepts this op's registers (mirrors the writer's format
+    /// choices). Rewrites that move registers must keep every op encodable or refuse.
+    pub fn encodable(&self) -> bool {
+        use Op::*;
+        let f4 = |r: &Reg| *r < 16;
+        let f8 = |r: &Reg| *r < 256;
+        let invoke_ok = |args: &[Reg]| {
+            (args.len() <= 5 && args.iter().all(f4))
+                || (args.len() <= 255 && args.windows(2).all(|w| w[1] == w[0].wrapping_add(1)))
+        };
+        match self {
+            Nop | ReturnVoid | Goto { .. } | Move { .. } => true,
+            MoveResult { dst, .. } | MoveException { dst } | Const { dst, .. } | ConstString { dst, .. }
+            | ConstClass { dst, .. } | ConstMethodHandle { dst, .. } | ConstMethodType { dst, .. }
+            | NewInstance { dst, .. } | StaticGet { dst, .. } => f8(dst),
+            Return { src, .. } | Throw { src } | Switch { src, .. } | StaticPut { src, .. } | FillArrayData { array: src, .. } => f8(src),
+            MonitorEnter { obj } | MonitorExit { obj } => f8(obj),
+            CheckCast { reg, .. } => f8(reg),
+            IfZ { a, .. } => f8(a),
+            InstanceOf { dst, obj, .. } | InstanceGet { dst, obj, .. } => f4(dst) && f4(obj),
+            InstancePut { src, obj, .. } => f4(src) && f4(obj),
+            ArrayLength { dst, array } => f4(dst) && f4(array),
+            NewArray { dst, size, .. } => f4(dst) && f4(size),
+            If { a, b, .. } => f4(a) && f4(b),
+            Unop { dst, src, .. } => f4(dst) && f4(src),
+            Cmp { dst, a, b, .. } => f8(dst) && f8(a) && f8(b),
+            ArrayGet { dst, array, index, .. } => f8(dst) && f8(array) && f8(index),
+            ArrayPut { src, array, index, .. } => f8(src) && f8(array) && f8(index),
+            FilledNewArray { args, .. } | Invoke { args, .. } | InvokePolymorphic { args, .. } | InvokeCustom { args, .. } => {
+                invoke_ok(args)
+            }
+            Binop { dst, a, b: Operand::Reg(b), .. } => (dst == a && f4(dst) && f4(b)) || (f8(dst) && f8(a) && f8(b)),
+            Binop { op, dst, a, b: Operand::Lit(l), .. } => {
+                let lit8 = (-128..=127).contains(l) && f8(dst) && f8(a);
+                let lit16_op = !matches!(op, BinOp::Shl | BinOp::Shr | BinOp::Ushr);
+                let lit16 = lit16_op && (-32768..=32767).contains(l) && f4(dst) && f4(a);
+                lit8 || lit16
+            }
+        }
+    }
 }
