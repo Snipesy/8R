@@ -3,6 +3,7 @@
 //! dropped here and chosen again by the writer.
 
 use crate::sym::Sym;
+use crate::value::{CallSite, MethodHandleRef};
 
 pub type Reg = u16;
 
@@ -179,8 +180,7 @@ pub enum Op {
     Const { dst: Reg, value: Const },
     ConstString { dst: Reg, value: Sym },
     ConstClass { dst: Reg, ty: Sym },
-    /// Resolved method handle, rendered as text (`invoke-static@Lfoo;->bar()V`).
-    ConstMethodHandle { dst: Reg, handle: Sym },
+    ConstMethodHandle { dst: Reg, handle: MethodHandleRef },
     ConstMethodType { dst: Reg, proto: Sym },
     MonitorEnter { obj: Reg },
     MonitorExit { obj: Reg },
@@ -206,8 +206,7 @@ pub enum Op {
     StaticPut { kind: MemKind, src: Reg, field: FieldRef },
     Invoke { kind: InvokeKind, method: MethodRef, args: Vec<Reg> },
     InvokePolymorphic { method: MethodRef, proto: Sym, args: Vec<Reg> },
-    /// `name` and `proto` come from the call site; `bootstrap` is the rendered handle.
-    InvokeCustom { name: Sym, proto: Sym, bootstrap: Sym, args: Vec<Reg> },
+    InvokeCustom { call_site: Box<CallSite>, args: Vec<Reg> },
     Unop { op: UnOp, dst: Reg, src: Reg },
     Binop { op: BinOp, ty: NumType, dst: Reg, a: Reg, b: Operand },
 }

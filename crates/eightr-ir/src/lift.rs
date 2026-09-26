@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 use eightr_dex::code::CodeItem;
 use eightr_dex::debug::LocalEvent;
 use eightr_dex::insn::{Decoded, Instruction, Payload};
-use eightr_dex::value::EncodedValue;
 use eightr_dex::{Dex, DexError, ErrorKind, Result};
 
 use crate::op::*;
+use crate::resolve::Resolver;
 use crate::sym::{Interner, Sym};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,9 +41,9 @@ pub struct Local {
     pub name: Option<Sym>,
     pub ty: Option<Sym>,
     pub signature: Option<Sym>,
-    /// pc range `[start, end)` where the variable is live.
-    pub start_pc: u32,
-    pub end_pc: u32,
+    /// Instruction index range `[start, end)` where the variable is live.
+    pub start: u32,
+    pub end: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,8 +57,6 @@ pub struct Body {
     pub positions: Vec<(u32, i64)>,
     pub locals: Vec<Local>,
     pub parameter_names: Vec<Option<Sym>>,
-    /// Code length in code units (for closing debug ranges).
-    pub code_units: u32,
 }
 
 impl Body {
@@ -69,48 +67,26 @@ impl Body {
 }
 
 struct Lifter<'a, 'd> {
-    dex: &'a Dex<'d>,
-    syms: &'a mut Interner,
+    r: Resolver<'a, 'd>,
     base: usize,
+}
+
+impl<'a, 'd> std::ops::Deref for Lifter<'a, 'd> {
+    type Target = Resolver<'a, 'd>;
+    fn deref(&self) -> &Self::Target {
+        &self.r
+    }
+}
+
+impl std::ops::DerefMut for Lifter<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.r
+    }
 }
 
 impl Lifter<'_, '_> {
     fn err(&self, pc: u32, what: &'static str) -> DexError {
         DexError::new(self.base + pc as usize * 2, ErrorKind::Malformed(what))
-    }
-    fn string(&mut self, idx: u32) -> Result<Sym> {
-        let s = self.dex.string(idx)?;
-        Ok(self.syms.intern(&s))
-    }
-    fn ty(&mut self, idx: u32) -> Result<Sym> {
-        let s = self.dex.type_descriptor(idx)?;
-        Ok(self.syms.intern(&s))
-    }
-    fn proto(&mut self, idx: u32) -> Result<Sym> {
-        let s = self.dex.proto_descriptor(idx)?;
-        Ok(self.syms.intern(&s))
-    }
-    fn field(&mut self, idx: u32) -> Result<FieldRef> {
-        let f = self.dex.field_id(idx)?;
-        Ok(FieldRef { class: self.ty(f.class_idx.into())?, name: self.string(f.name_idx)?, ty: self.ty(f.type_idx.into())? })
-    }
-    fn method(&mut self, idx: u32) -> Result<MethodRef> {
-        let m = self.dex.method_id(idx)?;
-        Ok(MethodRef { class: self.ty(m.class_idx.into())?, name: self.string(m.name_idx)?, proto: self.proto(m.proto_idx.into())? })
-    }
-    fn method_handle(&mut self, idx: u32) -> Result<Sym> {
-        const KINDS: [&str; 9] = [
-            "static-put", "static-get", "instance-put", "instance-get", "invoke-static",
-            "invoke-instance", "invoke-constructor", "invoke-direct", "invoke-interface",
-        ];
-        let h = self.dex.method_handle(idx)?;
-        let kind = KINDS.get(h.kind as usize).copied().unwrap_or("unknown");
-        let member = if h.kind <= 3 {
-            self.dex.field_ref(h.field_or_method_idx.into())?
-        } else {
-            self.dex.method_ref(h.field_or_method_idx.into())?
-        };
-        Ok(self.syms.intern(&format!("{kind}@{member}")))
     }
 }
 
@@ -126,7 +102,7 @@ impl PcMap {
 pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
     let decoded = code.decode()?;
     let base = code.off as usize + 16;
-    let mut lx = Lifter { dex, syms, base };
+    let mut lx = Lifter { r: Resolver { dex, syms }, base };
 
     // pc → instruction index (payloads are not instructions).
     let mut pc_map = vec![u32::MAX; code.insns.len() + 1];
@@ -187,14 +163,15 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
             parameter_names.push(n.map(|i| lx.string(i)).transpose()?);
         }
         let code_units = code.insns.len() as u32;
+        // Replay in pc space, then convert to instruction indices.
         // reg → (currently open local, last closed local for DBG_RESTART_LOCAL)
         let mut open: BTreeMap<u32, Local> = BTreeMap::new();
         let mut last: BTreeMap<u32, Local> = BTreeMap::new();
         let close = |open: &mut BTreeMap<u32, Local>, last: &mut BTreeMap<u32, Local>, reg: u32, addr: u32, out: &mut Vec<Local>| {
             if let Some(mut l) = open.remove(&reg) {
-                l.end_pc = addr;
+                l.end = addr;
                 last.insert(reg, l.clone());
-                if l.end_pc > l.start_pc {
+                if l.end > l.start {
                     out.push(l);
                 }
             }
@@ -208,8 +185,8 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
                         name: name.map(|i| lx.string(i)).transpose()?,
                         ty: ty.map(|i| lx.ty(i)).transpose()?,
                         signature: sig.map(|i| lx.string(i)).transpose()?,
-                        start_pc: addr,
-                        end_pc: code_units,
+                        start: addr,
+                        end: code_units,
                     };
                     open.insert(reg, local);
                 }
@@ -217,8 +194,8 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
                 LocalEvent::Restart { addr, reg } => {
                     close(&mut open, &mut last, reg, addr, &mut locals);
                     if let Some(mut l) = last.get(&reg).cloned() {
-                        l.start_pc = addr;
-                        l.end_pc = code_units;
+                        l.start = addr;
+                        l.end = code_units;
                         open.insert(reg, l);
                     }
                 }
@@ -227,7 +204,16 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
         for reg in open.keys().copied().collect::<Vec<_>>() {
             close(&mut open, &mut last, reg, code_units, &mut locals);
         }
-        locals.sort_by_key(|l| (l.start_pc, l.reg, l.end_pc));
+        // pc → instruction index: first instruction at or after the pc.
+        let to_idx = |pc: u32| -> u32 {
+            insns.iter().position(|x| x.pc >= pc).map(|p| p as u32).unwrap_or(insns.len() as u32)
+        };
+        for l in &mut locals {
+            l.start = to_idx(l.start);
+            l.end = to_idx(l.end);
+        }
+        locals.retain(|l| l.end > l.start);
+        locals.sort_by_key(|l| (l.start, l.reg, l.end));
     }
 
     Ok(Body {
@@ -239,7 +225,6 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
         positions,
         locals,
         parameter_names,
-        code_units: code.insns.len() as u32,
     })
 }
 
@@ -388,16 +373,7 @@ fn lift_insn(lx: &mut Lifter, i: &Instruction, pcs: &PcMap, payloads: &BTreeMap<
             proto: lx.proto(i.index2.unwrap_or(0))?,
             args: r,
         },
-        0xfc | 0xfd => {
-            let site = lx.dex.call_site(idx)?;
-            let (Some(EncodedValue::MethodHandle(h)), Some(EncodedValue::String(name)), Some(EncodedValue::MethodType(proto))) =
-                (site.first(), site.get(1), site.get(2))
-            else {
-                return Err(lx.err(i.pc, "malformed call site"));
-            };
-            let (h, name, proto) = (*h, *name, *proto);
-            Op::InvokeCustom { name: lx.string(name)?, proto: lx.proto(proto)?, bootstrap: lx.method_handle(h)?, args: r }
-        }
+        0xfc | 0xfd => Op::InvokeCustom { call_site: Box::new(lx.call_site(idx)?), args: r },
         0xfe => Op::ConstMethodHandle { dst: reg(0), handle: lx.method_handle(idx)? },
         0xff => Op::ConstMethodType { dst: reg(0), proto: lx.proto(idx)? },
         _ => return Err(lx.err(i.pc, "unused opcode")),

@@ -13,7 +13,7 @@ use eightr_rules::{Attribute, Source, KEPT_NAME};
 
 use super::{Context, Pass};
 use crate::error::Result;
-use crate::program::{ItemId, Program};
+use crate::program::{package_of, simple_name_of, ItemId, Program};
 
 pub struct KeptName;
 
@@ -98,12 +98,13 @@ struct Bounds {
 fn repackaging_targets(program: &Program, bounds: &Bounds) -> BTreeSet<String> {
     let mut targets = BTreeSet::from([String::new()]);
     let mut minified_per_pkg: BTreeMap<&str, u64> = BTreeMap::new();
-    for c in &program.classes {
-        let pkg = c.package();
+    for id in program.class_ids() {
+        let desc = program.descriptor(id);
+        let pkg = package_of(desc);
         if !pkg.is_empty() && pkg.split('/').all(|seg| may_be_minified(seg, bounds.package) && seg.bytes().all(|b| !b.is_ascii_uppercase())) {
             targets.insert(pkg.to_string());
         }
-        if may_be_minified(tail(c.simple_name()), bounds.class) {
+        if may_be_minified(tail(simple_name_of(desc)), bounds.class) {
             *minified_per_pkg.entry(pkg).or_default() += 1;
         }
     }
@@ -133,14 +134,16 @@ impl Pass for KeptName {
 
         let mut labels: Vec<(ItemId, Attribute)> = Vec::new();
         for id in cx.program.class_ids() {
-            let class = cx.program.class(id);
+            let p = &*cx.program;
+            let class = p.class(id);
+            let desc = p.descriptor(id);
             let item = ItemId::Class { class: id };
-            let simple = class.simple_name();
+            let simple = simple_name_of(desc);
             let t = tail(simple);
-            let in_target = targets.contains(class.package());
+            let in_target = targets.contains(package_of(desc));
             let class_kept = !may_be_minified(t, bounds.class)
                 && !is_synthetic(simple)
-                && !class.descriptor.starts_with("Lj$/")
+                && !desc.starts_with("Lj$/")
                 // A kept name moved into a repackaging target gets a numeric suffix on
                 // collision (`Rep` → `Rep1`), so a trailing digit there isn't proof.
                 && !(in_target && t.ends_with(|c: char| c.is_ascii_digit()));
@@ -159,12 +162,12 @@ impl Pass for KeptName {
                         || (!may_be_minified(name, bounds.member) && !is_synthetic(name) && !is_fresh(name)))
             };
             for (index, f) in class.fields.iter().enumerate() {
-                if member_kept(&f.name) {
+                if member_kept(p.str(f.name)) {
                     labels.push((ItemId::Field { class: id, index: index as u32 }, Attribute::MemberName));
                 }
             }
             for (index, m) in class.methods.iter().enumerate() {
-                if member_kept(&m.name) {
+                if member_kept(p.str(m.name)) {
                     labels.push((ItemId::Method { class: id, index: index as u32 }, Attribute::MemberName));
                 }
             }

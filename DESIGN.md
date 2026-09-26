@@ -766,3 +766,16 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   report determinism under input reordering; an S-coverage ratchet (`fixtures/metrics.json`).
 - `xtask fixtures`: javac → D8 (ground truth) / R8 (+mapping) / dexdump for each fixture,
   with tool versions recorded in `BUILD.txt`.
+- `eightr-ir`: semantic ops, CFG with exceptional edges, dominators, verifier-style type
+  inference, reaching definitions; the whole-program **model** (`model::Program`: classes,
+  members, code, annotations, static values, retained marker strings) and a consistent
+  **renamer** (`rename::Renaming`: descriptors, protos, member refs, generic signatures,
+  `InnerClass` names).
+- `eightr-dexwrite`: canonical DEX writer (sorted pools, branch relaxation, payloads, debug
+  info, annotations, multidex split). Tests: exact round trip of every fixture, byte
+  idempotence, independence from model order, and acceptance by AOSP `dexdump` and D8.
+- **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
+  the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
+  program across dex files, and requires the pipeline's output to be *equivariant*: every
+  label, mapped back through the inverse renaming, is identical. Verified to fail on a
+  deliberately name-dependent rule.

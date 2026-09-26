@@ -202,7 +202,7 @@ fn inferred_types_agree_with_debug_locals() {
             let Some(ty) = local.ty else { continue };
             let desc = syms.get(ty);
             for (i, insn) in m.body.insns.iter().enumerate() {
-                if insn.pc < local.start_pc || insn.pc >= local.end_pc {
+                if (i as u32) < local.start || (i as u32) >= local.end {
                     continue;
                 }
                 let Some(state) = &states[i] else { continue };

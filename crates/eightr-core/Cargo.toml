@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 eightr-dex.workspace = true
 eightr-ir.workspace = true
+eightr-dexwrite.workspace = true
 eightr-rules.workspace = true
 serde.workspace = true
 serde_json.workspace = true

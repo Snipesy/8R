@@ -11,6 +11,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 eightr-dex = { path = "crates/eightr-dex" }
 eightr-ir = { path = "crates/eightr-ir" }
+eightr-dexwrite = { path = "crates/eightr-dexwrite" }
 eightr-mapping = { path = "crates/eightr-mapping" }
 eightr-rules = { path = "crates/eightr-rules" }
 eightr-core = { path = "crates/eightr-core" }
