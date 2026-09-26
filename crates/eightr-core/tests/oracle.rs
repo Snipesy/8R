@@ -540,51 +540,47 @@ fn enum_unboxing_evidence_matches_ground_truth() {
 }
 
 /// Phase 4: every inlining-hint kind graded against the mappings' inline frames (the ground
-/// truth for "code here came from an inlined callee"). Precision: a hint's instruction lies in
-/// inlined code (for an idiom: code inlined from that very function). Recall (idioms): the
-/// function's inlined occurrences covered by a hint. Ratcheted in fixtures/inlining-metrics.json
-/// (`EIGHTR_UPDATE_METRICS=1` records): precision and recall must not drop.
+/// truth for "code here came from an inlined callee"), ratcheted in
+/// fixtures/inlining-metrics.json (`EIGHTR_UPDATE_METRICS=1` records):
+/// * precision (per hint): its instruction (or the next two) lies in inlined code; for an idiom,
+///   in code inlined from that very function. Reported with the base rate (the same test on
+///   every instruction) and the lift over it, per kind and per R8 version;
+/// * recall (idioms only): the function's inlined occurrences (inner frames) a hint covers;
+/// * coverage: all inlined occurrences any hint touches — the baseline for un-inlining work.
+///
+/// Precision, lift, recall and coverage must not drop; the fixture set must not change.
 #[test]
 fn inlining_hints_precision_recall() {
-    use eightr_core::inline_hints::{body_hints, line_of, ARE_EQUAL, COLLECTION_SIZE_OR_DEFAULT, DISCARDED_GETCLASS, INLINED_INSTANCE_CALL};
+    use eightr_core::inline_hints::{body_hints, line_of, ARE_EQUAL, COLLECTION_SIZE_OR_DEFAULT, DISCARDED_GETCLASS, INLINED_INSTANCE_CALL, PARAM_NULL_CHECK};
+    type Occ = (String, String, u32, u32, String); // class, method, range, original name
     let idioms = [(ARE_EQUAL, "areEqual"), (COLLECTION_SIZE_OR_DEFAULT, "collectionSizeOrDefault")];
-    // kind → [tp, fp, fn]
-    let mut stats: BTreeMap<&str, [u64; 3]> = BTreeMap::new();
+    let mut prec: BTreeMap<String, [u64; 2]> = BTreeMap::new(); // key → [tp, fp]
+    let mut base: BTreeMap<String, [u64; 2]> = BTreeMap::new(); // version → [inlined, all] instructions
+    let mut recall: BTreeMap<&str, [u64; 2]> = BTreeMap::new(); // idiom → [covered, total]
+    let mut coverage = [0u64; 2];
+    let mut graded: Vec<String> = Vec::new();
     for fixture in fixture_names() {
         let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
+        graded.push(fixture.clone());
         let mapping = Mapping::parse(&text).unwrap();
+        let version = text.lines().find_map(|l| l.strip_prefix("# compiler_version: ")).map_or("?", |v| if v.starts_with("9.") { "9" } else { "8" }).to_string();
         let by_obf = mapping.by_obfuscated();
         let bytes = fs::read(fixtures_root().join(&fixture).join("r8/classes.dex")).unwrap();
         let dex = eightr_dex::Dex::parse(&bytes).unwrap();
         let model = eightr_ir::model::Program::load(&[&dex]).unwrap();
-        // Idiom occurrences: (class, method, minified range) whose inline stack has the function.
-        let mut occurrences: BTreeMap<&str, std::collections::BTreeSet<(String, String, u32, u32)>> = BTreeMap::new();
+        // Inlined occurrences: every entry of an inline stack but its last (outermost) one.
+        let mut inlined: std::collections::BTreeSet<Occ> = std::collections::BTreeSet::new();
         for cm in &mapping.classes {
-            for (m, _) in cm.methods() {
-                for (kind, func) in idioms {
-                    if m.original_name == func {
-                        if let Some((a, b)) = m.minified_range {
-                            occurrences.entry(kind).or_default().insert((cm.obfuscated.clone(), m.obfuscated.clone(), a, b));
-                        }
-                    }
+            let all: Vec<_> = cm.methods().collect();
+            for (k, (m, _)) in all.iter().enumerate() {
+                let Some((a, b)) = m.minified_range else { continue };
+                let continues = all.get(k + 1).is_some_and(|(n, _)| n.obfuscated == m.obfuscated && n.minified_range == m.minified_range);
+                if continues {
+                    inlined.insert((cm.obfuscated.clone(), m.obfuscated.clone(), a, b, m.original_name.clone()));
                 }
             }
         }
-        let mut covered: BTreeMap<&str, std::collections::BTreeSet<(String, String, u32, u32)>> = BTreeMap::new();
-        // Every inlined occurrence (an inner frame: its range is shared with an outer one).
-        let mut inlined: std::collections::BTreeSet<(String, String, u32, u32, String)> = std::collections::BTreeSet::new();
-        for cm in &mapping.classes {
-            let outer: std::collections::BTreeSet<(String, u32, u32, String)> =
-                cm.outermost_methods().iter().filter_map(|(m, _)| m.minified_range.map(|(a, b)| (m.obfuscated.clone(), a, b, m.original_name.clone()))).collect();
-            for (m, _) in cm.methods() {
-                if let Some((a, b)) = m.minified_range {
-                    if !outer.contains(&(m.obfuscated.clone(), a, b, m.original_name.clone())) {
-                        inlined.insert((cm.obfuscated.clone(), m.obfuscated.clone(), a, b, m.original_name.clone()));
-                    }
-                }
-            }
-        }
-        let mut hinted: std::collections::BTreeSet<(String, String, u32, u32, String)> = std::collections::BTreeSet::new();
+        let mut touched: std::collections::BTreeSet<Occ> = std::collections::BTreeSet::new();
         for c in &model.classes {
             let cls = dotted(model.syms.get(c.ty));
             let Some(&ci) = by_obf.get(cls.as_str()) else { continue };
@@ -593,51 +589,61 @@ fn inlining_hints_precision_recall() {
                 let Some(body) = &m.code else { continue };
                 let name = model.syms.get(m.name);
                 let frames_at = |i: u32| line_of(body, i).map(|l| cm.frames(name, l)).unwrap_or_default();
+                let in_inlined = |i: u32| (i..i + 3).any(|j| frames_at(j).len() >= 2);
+                let b = base.entry(version.clone()).or_default();
+                for i in 0..body.insns.len() as u32 {
+                    b[0] += u64::from(in_inlined(i));
+                    b[1] += 1;
+                }
                 for (i, kind) in body_hints(&model, body) {
                     if let Some(l) = line_of(body, i) {
                         for o in inlined.iter().filter(|o| o.0 == cm.obfuscated && o.1 == name && o.2 <= l + 2 && l <= o.3) {
-                            hinted.insert(o.clone());
+                            touched.insert(o.clone());
                         }
                     }
                     let tp = match kind {
-                        DISCARDED_GETCLASS | INLINED_INSTANCE_CALL => (i..i + 3).any(|j| frames_at(j).len() >= 2),
+                        DISCARDED_GETCLASS | INLINED_INSTANCE_CALL | PARAM_NULL_CHECK => in_inlined(i),
                         _ => {
                             let func = idioms.iter().find(|x| x.0 == kind).unwrap().1;
-                            let hit = (i.saturating_sub(4)..i + 8).any(|j| frames_at(j).iter().any(|f| f.method == func));
-                            if hit {
-                                if let Some(l) = line_of(body, i) {
-                                    for o in occurrences.get(kind).into_iter().flatten() {
-                                        if o.0 == cm.obfuscated && o.1 == name && o.2 <= l + 8 && l <= o.3 + 4 {
-                                            covered.entry(kind).or_default().insert(o.clone());
-                                        }
-                                    }
-                                }
-                            }
-                            hit
+                            (i.saturating_sub(4)..i + 8).any(|j| { let f = frames_at(j); f.len() >= 2 && f[..f.len() - 1].iter().any(|x| x.method == func) })
                         }
                     };
-                    stats.entry(kind).or_default()[usize::from(!tp)] += 1;
+                    for key in [kind.to_string(), format!("{kind}@r8-{version}")] {
+                        prec.entry(key).or_default()[usize::from(!tp)] += 1;
+                    }
                 }
             }
         }
-        // Coverage: inlined occurrences any hint touches (the honest recall of all hints).
-        let cov = stats.entry("coverage").or_default();
-        cov[0] += hinted.len() as u64;
-        cov[2] += (inlined.len() - hinted.len()) as u64;
-        for (kind, _) in idioms {
-            let total = occurrences.get(kind).map_or(0, |s| s.len());
-            let found = covered.get(kind).map_or(0, |s| s.len());
-            stats.entry(kind).or_default()[2] += (total - found.min(total)) as u64;
+        coverage[0] += touched.len() as u64;
+        coverage[1] += inlined.len() as u64;
+        for (kind, func) in idioms {
+            let occ: Vec<&Occ> = inlined.iter().filter(|o| o.4 == func).collect();
+            let r = recall.entry(kind).or_default();
+            r[0] += occ.iter().filter(|o| touched.contains(**o) && prec.contains_key(kind)).count() as u64;
+            r[1] += occ.len() as u64;
         }
     }
-    let got: BTreeMap<String, serde_json::Value> = stats
-        .iter()
-        .map(|(k, [tp, fp, fn_])| {
-            let precision = if tp + fp == 0 { 1.0 } else { *tp as f64 / (tp + fp) as f64 };
-            let recall = if tp + fn_ == 0 { 1.0 } else { *tp as f64 / (tp + fn_) as f64 };
-            (k.to_string(), serde_json::json!({ "tp": tp, "fp": fp, "fn": fn_, "precision": (precision * 1000.0).round() / 1000.0, "recall": (recall * 1000.0).round() / 1000.0 }))
-        })
-        .collect();
+    let round = |x: f64| (x * 1000.0).round() / 1000.0;
+    let mut got: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    for (k, [tp, fp]) in &prec {
+        let version = k.split("@r8-").nth(1).map(str::to_string);
+        let precision = *tp as f64 / (tp + fp).max(1) as f64;
+        let mut v = serde_json::json!({ "hints": tp + fp, "precision": round(precision) });
+        if let Some(ver) = version {
+            let [hit, all] = base[&ver];
+            let rate = hit as f64 / all.max(1) as f64;
+            v["base_rate"] = serde_json::json!(round(rate));
+            v["lift"] = serde_json::json!(round(precision / rate.max(1e-9)));
+        }
+        got.insert(k.clone(), v);
+    }
+    for (k, [covered, total]) in &recall {
+        let entry = got.entry(k.to_string()).or_insert_with(|| serde_json::json!({}));
+        entry["recall"] = serde_json::json!(round(*covered as f64 / (*total).max(1) as f64));
+        entry["occurrences"] = serde_json::json!(total);
+    }
+    got.insert("coverage".into(), serde_json::json!({ "touched": coverage[0], "inlined_occurrences": coverage[1], "recall": round(coverage[0] as f64 / coverage[1].max(1) as f64) }));
+    got.insert("fixtures".into(), serde_json::json!(graded));
     eprintln!("inlining hints: {}", serde_json::to_string_pretty(&got).unwrap());
     let path = fixtures_root().join("../inlining-metrics.json");
     if std::env::var_os("EIGHTR_UPDATE_METRICS").is_some() || !path.exists() {
@@ -645,11 +651,16 @@ fn inlining_hints_precision_recall() {
         return;
     }
     let old: BTreeMap<String, serde_json::Value> = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(old.get("fixtures"), got.get("fixtures"), "graded fixture set changed (EIGHTR_UPDATE_METRICS=1 to accept)");
+    for k in got.keys() {
+        assert!(old.contains_key(k), "{k}: not in {} yet (EIGHTR_UPDATE_METRICS=1 to record)", path.display());
+    }
     for (k, v) in &old {
-        let now = got.get(k).unwrap_or_else(|| panic!("hint kind {k} disappeared"));
-        for metric in ["precision", "recall"] {
-            let (was, is) = (v[metric].as_f64().unwrap(), now[metric].as_f64().unwrap());
-            assert!(is + 1e-9 >= was, "{k}: {metric} dropped from {was} to {is} (EIGHTR_UPDATE_METRICS=1 to accept)");
+        let now = got.get(k).unwrap_or_else(|| panic!("{k} disappeared"));
+        for metric in ["precision", "lift", "recall"] {
+            if let (Some(was), Some(is)) = (v.get(metric).and_then(|x| x.as_f64()), now.get(metric).and_then(|x| x.as_f64())) {
+                assert!(is + 1e-9 >= was, "{k}: {metric} dropped from {was} to {is} (EIGHTR_UPDATE_METRICS=1 to accept)");
+            }
         }
     }
 }

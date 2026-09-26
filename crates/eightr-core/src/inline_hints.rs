@@ -5,6 +5,8 @@
 //! * `discarded-getclass`: `x.getClass()` whose result is unused — R8's null check of the
 //!   receiver of an inlined instance call (or `Objects.requireNonNull` / Kotlin's null checks,
 //!   which R8 rewrites to the same thing: ambiguous, so a hint);
+//! * `param-null-check`: such a check on a parameter in the method's prologue: its own
+//!   argument check, not inlining (kept apart so it doesn't dilute the other kinds);
 //! * `inlined-instance-call`: a discarded `getClass()` whose receiver the next instructions use
 //!   (a field or a call on it): the inlined callee's body;
 //! * `idiom:areEqual`: Kotlin's `Intrinsics.areEqual(a, b)` (`a == b`), inlined as an `equals`;
@@ -24,8 +26,10 @@ use serde::Serialize;
 pub struct InlineHint {
     /// `Lclass;->name(proto)` in input names.
     pub method: String,
-    /// Instruction index in the input body (lines are looked up from it).
+    /// Instruction index in the input body.
     pub insn: u32,
+    /// Its pc (code units) in the input method, as dex tools and mappings show it.
+    pub pc: u32,
     pub kind: &'static str,
 }
 
@@ -43,6 +47,7 @@ pub struct InliningSummary {
 
 pub const DISCARDED_GETCLASS: &str = "discarded-getclass";
 pub const INLINED_INSTANCE_CALL: &str = "inlined-instance-call";
+pub const PARAM_NULL_CHECK: &str = "param-null-check";
 pub const ARE_EQUAL: &str = "idiom:areEqual";
 pub const COLLECTION_SIZE_OR_DEFAULT: &str = "idiom:collectionSizeOrDefault";
 
@@ -56,6 +61,15 @@ pub fn body_hints(p: &Model, body: &Body) -> Vec<(u32, &'static str)> {
             Op::Invoke { kind: InvokeKind::Virtual, method, args } if s.get(method.name) == "getClass" && s.get(method.proto) == "()Ljava/lang/Class;" => {
                 let used = matches!(body.insns.get(i + 1).map(|x| &x.op), Some(Op::MoveResult { .. }));
                 if !used && args.len() == 1 {
+                    // In the prologue (only parameter null checks before it) on a parameter: the
+                    // method's own argument check (Kotlin's checkNotNullParameter, rewritten).
+                    let first_param = body.registers - body.ins;
+                    let prologue = args[0] >= first_param
+                        && body.insns[..i].iter().all(|y| matches!(&y.op, Op::Invoke { method, args, .. } if s.get(method.name) == "getClass" && args.first().is_some_and(|r| *r >= first_param)));
+                    if prologue {
+                        out.push((i as u32, PARAM_NULL_CHECK));
+                        continue;
+                    }
                     out.push((i as u32, DISCARDED_GETCLASS));
                     // The receiver then used by the inlined body (a field or a call on it).
                     let x = args[0];
@@ -97,16 +111,20 @@ pub fn body_hints(p: &Model, body: &Body) -> Vec<(u32, &'static str)> {
 
 /// A compacted line table: lines are exactly 1..n in order.
 pub fn is_compacted(body: &Body) -> bool {
-    !body.positions.is_empty() && body.positions.iter().enumerate().all(|(k, (_, line))| *line == k as i64 + 1)
+    body.positions.len() >= 2 && body.positions.iter().enumerate().all(|(k, (_, line))| *line == k as i64 + 1)
 }
 
 /// Lines are the instructions' pcs + 1.
 pub fn is_pc_encoded(body: &Body) -> bool {
-    !body.positions.is_empty() && body.positions.iter().all(|(i, line)| body.insns.get(*i as usize).is_some_and(|x| i64::from(x.pc) + 1 == *line))
+    body.positions.len() >= 2 && !is_compacted(body) && body.positions.iter().all(|(i, line)| body.insns.get(*i as usize).is_some_and(|x| i64::from(x.pc) + 1 == *line))
 }
 
 /// The line of instruction `i` (the last position at or before it).
 pub fn line_of(body: &Body, i: u32) -> Option<u32> {
+    if body.positions.is_empty() {
+        // No debug info: the runtime (and R8's mapping) uses the pc as the line.
+        return body.insns.get(i as usize).map(|x| x.pc);
+    }
     body.positions.iter().rev().find(|(k, _)| *k <= i).and_then(|(_, l)| u32::try_from(*l).ok())
 }
 
@@ -123,7 +141,8 @@ pub fn collect(p: &Model) -> (Vec<InlineHint>, InliningSummary) {
             }
             for (insn, kind) in body_hints(p, b) {
                 *summary.hints.entry(kind).or_default() += 1;
-                hints.push(InlineHint { method: format!("{}->{}{}", p.syms.get(c.ty), p.syms.get(m.name), p.syms.get(m.proto)), insn, kind });
+                let pc = b.insns[insn as usize].pc;
+                hints.push(InlineHint { method: format!("{}->{}{}", p.syms.get(c.ty), p.syms.get(m.name), p.syms.get(m.proto)), insn, pc, kind });
             }
         }
     }
@@ -149,6 +168,7 @@ pub fn annotate(p: &mut Model) {
     fn element(kind: &'static str) -> &'static str {
         match kind {
             DISCARDED_GETCLASS => "nullChecks",
+            PARAM_NULL_CHECK => "paramNullChecks",
             INLINED_INSTANCE_CALL => "inlinedInstanceCalls",
             ARE_EQUAL => "areEqual",
             COLLECTION_SIZE_OR_DEFAULT => "collectionSizeOrDefault",

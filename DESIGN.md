@@ -844,17 +844,22 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   e.ordinal() + 1. Fixtures `r94_enum`, `r94_enum_rebox` run identically on ART. Gretio:
   `SVG$Unit`, `SVG$GradientSpread`, `StorageHelper$TokenType` (+1 unnamed) re-boxed.
 - **Inlining (Phase 4, D·id, report only):** nothing is un-inlined. `report.inlining` counts
-  hints (`eightr_core::inline_hints`; the per-hint list with verbose labels) and line tables
-  that carry no original lines (compacted 1..n, or R8's pc encoding). Every hint kind is graded
-  against the fixture mappings' inline frames by a permanent harness
-  (`tests/oracle.rs::inlining_hints_precision_recall`, ratcheted in
-  `fixtures/inlining-metrics.json`): `idiom:areEqual` (an `Object.equals` call: Kotlin's
-  `a == b`) 0.91 precision / 0.88 recall; `inlined-instance-call` (a discarded `getClass()`
-  whose receiver the next instructions use) 0.80; `discarded-getclass` 0.70 (also R8's
-  rewritten null checks); `idiom:collectionSizeOrDefault` 0.80 / 0.33. All hints together
-  touch 3.2% of the fixtures' inlined occurrences: the measured ceiling any future
-  un-inlining work starts from. Gretio: 18068 discarded `getClass()`, 4853 inlined instance
-  calls, 1535 `areEqual`; 95% of line tables pc-encoded.
+  hints (`eightr_core::inline_hints`; the per-hint list, with input method and pc, with verbose
+  labels) and line tables carrying no original lines (compacted 1..n, or R8's pc encoding);
+  methods with hints also get a build-time `@eightr.Inlined(...)` annotation with the counts,
+  so decompilers show them. Every kind is graded against the fixture mappings' inline frames
+  by a permanent harness (`tests/oracle.rs::inlining_hints_precision_recall`, ratcheted in
+  `fixtures/inlining-metrics.json`, per kind and per R8 version, with the base rate: any
+  instruction lies within two of inlined code ~52% of the time, so read precision as lift):
+  `inlined-instance-call` (a discarded `getClass()` whose receiver the next instructions use)
+  0.87; `discarded-getclass` 0.78 (includes R8's rewritten null checks); `idiom:areEqual` (an
+  `Object.equals` call: Kotlin's `a == b`) 0.85 precision / 0.87 recall;
+  `idiom:collectionSizeOrDefault` 0.40 / 0.30 (weak: R8 usually leaves a bare `size()`);
+  `param-null-check` (a method's own prologue argument checks) 0.30 — below the base rate, as
+  expected: kept apart so it doesn't dilute the others. All hints together touch 3.4% of the
+  fixtures' inlined occurrences (mapping ranges, not call sites): the baseline any future
+  un-inlining work is measured from. Gretio: 13.4k discarded `getClass()` (plus 4.7k parameter
+  null checks), 3.8k inlined instance calls, 1.5k `areEqual`; 92% of line tables pc-encoded.
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every
