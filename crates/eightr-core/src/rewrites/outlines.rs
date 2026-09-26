@@ -107,8 +107,11 @@ fn escaping_refs(p: &Model) -> std::collections::BTreeSet<Key> {
 /// `copyInto`) share the shape of an outline but never live in a synthetic class; inlining
 /// them would be correct but less readable.
 ///
-/// A static call initializes the holder and its superclasses, so none may have a `<clinit>`.
-/// A holder with program subclasses is skipped: its statics could be referenced through them.
+/// A static call initializes the holder and its superclasses, so none may have a `<clinit>`
+/// with an observable effect: only one that fills the class's own static fields with constants
+/// and constant arrays (R8 also puts outlines in e.g. an enum-unboxing utility holding such a
+/// table). A holder with program subclasses is skipped: its statics could be referenced through
+/// them.
 fn is_outline_holder(p: &Model, ci: usize, subclassed: &std::collections::BTreeSet<&str>) -> bool {
     let c = &p.classes[ci];
     if c.access & access::SYNTHETIC == 0 || c.access & access::INTERFACE != 0 || subclassed.contains(p.syms.get(c.ty)) {
@@ -118,13 +121,28 @@ fn is_outline_holder(p: &Model, ci: usize, subclassed: &std::collections::BTreeS
     let mut depth = 0;
     while let Some(i) = cur {
         let k = &p.classes[i];
-        if k.methods.iter().any(|m| p.syms.get(m.name) == "<clinit>") || depth > 64 {
+        let impure = k.methods.iter().any(|m| p.syms.get(m.name) == "<clinit>" && !m.code.as_ref().is_some_and(|b| pure_clinit(p, k.ty, b)));
+        if impure || depth > 64 {
             return false;
         }
         cur = k.superclass.and_then(|s| p.find(p.syms.get(s)));
         depth += 1;
     }
     true
+}
+
+/// A class initializer whose only effect is storing constants and constant arrays into the
+/// class's own static fields: running it early, late or not at all is unobservable.
+fn pure_clinit(p: &Model, owner: eightr_ir::sym::Sym, body: &Body) -> bool {
+    body.tries.is_empty()
+        && body.insns.iter().all(|x| match &x.op {
+            Op::Const { .. } | Op::ConstString { .. } | Op::Move { .. } | Op::FillArrayData { .. } | Op::ReturnVoid | Op::Nop => true,
+            // Constant sizes only (a negative size would throw).
+            Op::NewArray { size, .. } => body.insns.iter().any(|y| matches!(y.op, Op::Const { dst, value: eightr_ir::op::Const::Narrow(k) } if dst == *size && k >= 0)),
+            Op::StaticPut { field, .. } => field.class == owner,
+            _ => false,
+        })
+        && p.syms.get(owner).starts_with('L')
 }
 
 /// Not defined in the program (arrays by their element type).
@@ -596,7 +614,16 @@ mod tests {
     #[test]
     fn superclass_initializer_blocks_inlining() {
         let mut p = Model::default();
-        let clinit = meth(&mut p, "<clinit>", "()V", access::STATIC | access::CONSTRUCTOR, Some(body(0, 0, vec![Op::ReturnVoid])));
+        // An initializer with an observable effect (a pure one, filling its own statics with
+        // constants, would not block).
+        let gc = mref(&mut p, "Ljava/lang/System;", "gc", "()V");
+        let clinit = meth(
+            &mut p,
+            "<clinit>",
+            "()V",
+            access::STATIC | access::CONSTRUCTOR,
+            Some(body(0, 0, vec![Op::Invoke { kind: InvokeKind::Static, method: gc, args: vec![] }, Op::ReturnVoid])),
+        );
         let base = class(&mut p, "LBase;", access::PUBLIC, vec![clinit]);
         let o = mref(&mut p, "LH;", "o", "(II)I");
         let ob = outline_body(&mut p);
