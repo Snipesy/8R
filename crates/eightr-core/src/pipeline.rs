@@ -89,8 +89,9 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
 
     let mut labels = Labels::default();
+    let mut enums = Vec::new();
     for pass in passes::all() {
-        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings })?;
+        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings, enums: &mut enums })?;
     }
 
     let naming = crate::naming::name(&program, &mut labels, &mut findings)?;
@@ -118,7 +119,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     }
     findings.sort();
     findings.dedup();
-    let report = build_report(&program, &labels, summaries, markers, sources, findings, rewrites, config);
+    let mut report = build_report(&program, &labels, summaries, markers, sources, findings, rewrites, config);
+    report.enums = enums;
     Ok(Outcome { program, labels, report, renaming })
 }
 
@@ -238,6 +240,7 @@ fn build_report(
         findings,
         rules: Report::rule_usage(&applications),
         rewrites,
+        enums: Vec::new(),
         summary,
         labels: entries,
     }

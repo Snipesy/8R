@@ -19,6 +19,9 @@ pub struct Report {
     /// Structural rewrites performed (outlines inlined back, classes split, ...).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rewrites: Vec<crate::rewrites::RewriteRecord>,
+    /// Enums R8 unboxed: original names and constants recovered from what survives.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub enums: Vec<crate::passes::enum_unboxing::RecoveredEnum>,
     /// Every non-identity label, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<LabelEntry>,
