@@ -151,7 +151,7 @@ pub static REGISTRY: &[Rule] = &[
         summary: "Name the Compose runtime's Composer members by the roles the compiler plugin's calls give them (startRestartGroup, endRestartGroup, shouldExecute / getSkipping, skipToGroupEnd, rememberedValue, updateRememberedValue, changed, changedInstance) and updateChangedFlags.",
         preconditions: &[
             "The Composer is found structurally: the class whose (I)C method is the constant-key entry call of the most methods (>= 5, 3x the runner-up).",
-            "Each role is played by one method in most composables showing it (4x the runner-up): the composable's first skip check, shouldExecute (ZI)Z skipping when false or getSkipping ()Z skipping when true (dropped when (ZI)Z votes exist), with the skip path's first composer ()V call as skipToGroupEnd; rememberedValue compared then updateRememberedValue(Object); the null-tested object result as endRestartGroup.",
+            "Each role is played by one method in most composables showing it (4x the runner-up): the composable's skip check (a skip-shaped call no other one leads to), shouldExecute (ZI)Z or (IZ)Z skipping when false, or getSkipping ()Z skipping when true, with the skip path's first composer ()V call, followed by the end-group call, as skipToGroupEnd; rememberedValue compared then updateRememberedValue(Object), each a wrapper calling another composer method of its shape; the null-tested object result as endRestartGroup.",
             "changed: every (prim)Z composer method whose result is branched on, other roles' winners excluded; (Object)Z candidates named by body (equals-like call: changed; identity compare only: changedInstance), each verdict held by one candidate.",
             "updateChangedFlags: the static (I)I whose result is an argument of calls to restartable composables (>= 3, 4x the runner-up) and whose body holds the runtime's masks 0x12492492 and 0x24924924.",
             "Override groups (the composer's program supertypes and all their subtypes) are named together.",
@@ -168,7 +168,7 @@ pub static REGISTRY: &[Rule] = &[
         preconditions: &[
             "The lambda class is found by behavior: a method opens the composer's startRestartGroup keyed by an int field of its class, which a constructor stores from its first parameter.",
             "The <clinit> stores the instance built with a constant K straight into the field; K is stored into no other field.",
-            "D, not S: no program-wide fact proves each module's compiler (shouldExecute exists from 2.1.0 with PausableComposition, whose singletons are still lambda-N), so the name is recorded, not applied.",
+            "D, not S: no program-wide fact proves each module's compiler (shouldExecute exists from 2.1.0 with PausableComposition, whose singletons are still lambda-N; apps mix eras), so the name is applied as a readable D name.",
         ],
         fallback: Some(STRUCTURAL_NAME),
         fixtures: &["compose_shapes", "compose_witness2_k2110p", "compose_basic", "compose_basic_r94"],

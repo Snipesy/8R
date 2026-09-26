@@ -188,7 +188,7 @@ fn derives_from(body: &Body, rd: &ReachingDefs, at: usize, reg: Reg, from: &BTre
 }
 
 /// Instructions reachable from `start` (normal flow) without entering `stop`.
-fn reachable(body: &Body, start: usize, stop: &BTreeSet<usize>) -> BTreeSet<usize> {
+pub(crate) fn reachable(body: &Body, start: usize, stop: &BTreeSet<usize>) -> BTreeSet<usize> {
     let mut seen = BTreeSet::new();
     let mut stack = vec![start];
     while let Some(i) = stack.pop() {
@@ -369,6 +369,16 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
             }
         }
 
+        // The skip check. The dirty-bit prelude comes before it: masks and `$default` ties after it
+        // belong to the body (a non-restartable callee R8 inlined, whose `$changed` derives from
+        // ours: review witness Outer3; a child call's `$changed | 6<<3s`: witness FlagsU).
+        let skip_calls: BTreeSet<(String, String)> =
+            roles.composer.iter().filter(|r| r.name == "shouldExecute" || r.name == "getSkipping").map(|r| r.method.clone()).collect();
+        let skip_at = b.insns.iter().position(|x| {
+            matches!(&x.op, Op::Invoke { method, .. } if s.get(method.class) == c.class && skip_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
+        });
+        let body_code: BTreeSet<usize> = skip_at.map_or_else(BTreeSet::new, |k| reachable(b, k, &BTreeSet::new()));
+        let in_prelude = |k: usize| skip_at.is_some() && !body_code.contains(&k);
         let changed_regs: BTreeSet<Reg> = comp.changed.iter().map(|&j| regs[j]).collect();
         // Whether `x` (at `i`) ORs one slot's "static" bits `0b110 << 3s` into a `$changed`-derived
         // value: the compiler's `if ($default & (1<<i)) $dirty |= 6 << 3s`.
@@ -411,7 +421,7 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
                     let arm = reachable(b, start, &joined);
                     let arm_defs: BTreeSet<usize> =
                         rd.defs.iter().enumerate().filter(|(_, d)| matches!(d.site, DefSite::Insn(k) if arm.contains(&(k as usize)))).map(|(d, _)| d).collect();
-                    tied |= arm.iter().any(|&k| dirty_tie(k, &b.insns[k].op));
+                    tied |= arm.iter().any(|&k| in_prelude(k) && dirty_tie(k, &b.insns[k].op));
                     // Or it guards the param's `changed(p)` whose result goes into the dirty bits
                     // (`$default & bit == 0 && changed(p) ? 4<<3s : 2<<3s`, for defaults that
                     // call composables). `remember(key)` calls `changed` too, but never ORs the
@@ -419,12 +429,13 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
                     let from_default = reachable(b, start, &BTreeSet::new());
                     let other = reachable(b, other_start, &from_default);
                     let changed_call = other.iter().any(|&k| {
-                        matches!(&b.insns[k].op, Op::Invoke { method, .. } if s.get(method.class) == c.class && changed_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
+                        in_prelude(k)
+                            && matches!(&b.insns[k].op, Op::Invoke { method, .. } if s.get(method.class) == c.class && changed_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
                     });
                     // The OR happens in an arm or right where they join, not later in the body.
                     let join = joined.intersection(&from_default).next().copied().unwrap_or(usize::MAX);
                     let at_join = (join..join.saturating_add(3)).filter(|k| joined.contains(k));
-                    let dirty_or = arm.iter().chain(&other).copied().chain(at_join).any(|k| match &b.insns[k].op {
+                    let dirty_or = arm.iter().chain(&other).copied().chain(at_join).filter(|&k| in_prelude(k)).any(|k| match &b.insns[k].op {
                         Op::Binop { op: BinOp::Or, ty: NumType::Int, a, b: Operand::Reg(q), .. } => {
                             derives_from(b, &rd, k, *a, &changed_regs) || derives_from(b, &rd, k, *q, &changed_regs)
                         }
@@ -478,13 +489,6 @@ pub fn composables(p: &Model, c: &Composer, roles: &Roles) -> Vec<Composable> {
         comp.default_bits.sort();
         comp.default_bits.dedup();
 
-        // The skip check: masks after it belong to the body, e.g. to a non-restartable callee R8
-        // inlined whose own `$changed` derives from ours (review witness Outer3).
-        let skip_calls: BTreeSet<(String, String)> =
-            roles.composer.iter().filter(|r| r.name == "shouldExecute" || r.name == "getSkipping").map(|r| r.method.clone()).collect();
-        let skip_at = b.insns.iter().position(|x| {
-            matches!(&x.op, Op::Invoke { method, .. } if s.get(method.class) == c.class && skip_calls.contains(&(s.get(method.name).to_string(), s.get(method.proto).to_string())))
-        });
         // Slot bindings: changed(p) → `? 4<<3s : 2<<3s`.
         let mut slots: Vec<(usize, usize, u32)> = Vec::new();
         let mut top_slot: Option<u32> = None;

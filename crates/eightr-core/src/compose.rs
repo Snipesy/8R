@@ -194,9 +194,23 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
     for &(ci, mi, _) in &c.restartable {
         let Some(b) = &p.classes[ci].methods[mi].code else { continue };
         let insns = &b.insns;
-        // Only the first skip-decision-shaped call is the composable's skip check: a later `()Z`
-        // is the defaults block's getDefaultsInvalid (whose else arm also skips to group end).
-        let mut skip_seen = false;
+        // Only a skip-decision-shaped call no other one leads to is the composable's skip check:
+        // the defaults block's getDefaultsInvalid (whose else arm also skips to group end) is
+        // reached from it, wherever R8 lays the blocks out.
+        let skip_shaped: Vec<usize> = insns
+            .iter()
+            .enumerate()
+            .filter(|(i, x)| {
+                matches!(&x.op, Op::Invoke { method, .. } if on_c(method) && matches!(s.get(method.proto), "(ZI)Z" | "(IZ)Z" | "()Z"))
+                    && matches!(insns.get(i + 1).map(|y| &y.op), Some(Op::MoveResult { .. }))
+            })
+            .map(|(i, _)| i)
+            .collect();
+        let reached_from_other: BTreeSet<usize> = skip_shaped
+            .iter()
+            .flat_map(|&k| crate::composables::reachable(b, k + 1, &BTreeSet::new()).into_iter().filter(move |&j| j != k))
+            .filter(|j| skip_shaped.contains(j))
+            .collect();
         for (i, insn) in insns.iter().enumerate() {
             let Op::Invoke { method, .. } = &insn.op else { continue };
             if !on_c(method) {
@@ -216,9 +230,10 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
                 // getSkipping()Z (older) when true. The skip path's first composer call is
                 // skipToGroupEnd()V; a ()Z whose path starts otherwise (getInserting → createNode,
                 // ...) isn't voted for.
-                "(ZI)Z" | "()Z" => {
+                // R8 may reorder shouldExecute's parameters: `(IZ)Z` (Gretio).
+                "(ZI)Z" | "(IZ)Z" | "()Z" => {
                     let Some((cond, target)) = result.and_then(branch_on) else { continue };
-                    if std::mem::replace(&mut skip_seen, true) {
+                    if reached_from_other.contains(&i) {
                         continue;
                     }
                     let skips_when_true = proto == "()Z";
@@ -339,11 +354,8 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
     };
     // A role holds when one method plays it in most composables that show it at all.
     let mut out = vec![Role { method: c.start_restart_group.clone(), name: "startRestartGroup" }];
-    // The skip checks of the two compiler eras never meet in one program's composables compiled
-    // by one compiler; if both have votes, the (ZI)Z shape (never a composer getter) decides.
-    if votes.get("shouldExecute").is_some_and(|v| !v.is_empty()) {
-        votes.remove("getSkipping");
-    }
+    // Both eras' skip checks may appear in one program (libraries and app compiled by different
+    // compilers, as in Gretio): each role stands on its own votes.
     let mut winners: Vec<Role> = Vec::new();
     let mut deferred: Vec<(&'static str, Ranked)> = Vec::new();
     for (role, cands) in votes {
@@ -505,6 +517,9 @@ pub fn singletons(p: &Model, c: &Composer) -> Vec<(usize, usize, i32)> {
         }
     }
     let mut out: Vec<(usize, usize, i32)> = found.into_iter().filter(|(_, v)| v.len() == 1).map(|(k, v)| (v[0].0, v[0].1, k)).collect();
+    // A field stored from two keys is dropped too.
+    let fields: Vec<(usize, usize)> = out.iter().map(|x| (x.0, x.1)).collect();
+    out.retain(|x| fields.iter().filter(|f| **f == (x.0, x.1)).count() == 1);
     out.sort();
     out
 }
