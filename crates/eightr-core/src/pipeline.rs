@@ -33,6 +33,8 @@ pub struct Outcome {
     pub program: Program,
     pub labels: Labels,
     pub report: Report,
+    /// Every recovered (S) and structural (D) name, ready to apply to the program.
+    pub renaming: eightr_ir::rename::Renaming,
 }
 
 pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
@@ -87,10 +89,33 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
         pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings })?;
     }
 
+    let naming = crate::naming::name(&program, &mut labels, &mut findings)?;
+    let mut renaming = naming.renaming;
+    // Recovered S values (e.g. lateinit field names) join the structural names.
+    for ((item, attr), label) in labels.iter() {
+        let (Some(value), true) = (&label.value, label.class == eightr_rules::Class::Solved) else { continue };
+        if *attr != Attribute::MemberName {
+            continue;
+        }
+        let (class, index, field) = match *item {
+            ItemId::Field { class, index } => (class, index, true),
+            ItemId::Method { class, index } => (class, index, false),
+            ItemId::Class { .. } => continue,
+        };
+        let c = program.class(class);
+        let d = program.descriptor(class).to_string();
+        if field {
+            let f = &c.fields[index as usize];
+            renaming.fields.insert((d, program.str(f.name).to_string(), program.str(f.ty).to_string()), value.clone());
+        } else {
+            let m = &c.methods[index as usize];
+            renaming.methods.insert((d, program.str(m.name).to_string(), program.str(m.proto).to_string()), value.clone());
+        }
+    }
     findings.sort();
     findings.dedup();
     let report = build_report(&program, &labels, summaries, markers, sources, findings, config);
-    Ok(Outcome { program, labels, report })
+    Ok(Outcome { program, labels, report, renaming })
 }
 
 fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {

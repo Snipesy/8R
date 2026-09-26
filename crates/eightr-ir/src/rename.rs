@@ -2,7 +2,7 @@
 //! code, signatures, annotations, values, and debug info follows. Used by the α-invariance
 //! tests (to produce equally valid alternative R8 outputs) and by the naming stage.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::lift::Body;
 use crate::model::Program;
@@ -19,12 +19,110 @@ pub struct Renaming {
     /// with that name, and to every reference to such a member (references whose owner is a
     /// program class). Renaming by name keeps overrides and overloads consistent.
     pub members: BTreeMap<String, String>,
+    /// Precise field renames: (declaring class, name, type) → new name, all in pre-rename
+    /// terms. References are resolved to their declaring class the way the JVM does.
+    pub fields: BTreeMap<(String, String, String), String>,
+    /// Precise method renames: (declaring class, name, descriptor) → new name. The caller
+    /// must give every method of an override group the same new name.
+    pub methods: BTreeMap<(String, String, String), String>,
+}
+
+/// (superclass, interfaces, fields (name, type), methods (name, proto))
+type ClassShape = (Option<String>, Vec<String>, BTreeSet<(String, String)>, BTreeSet<(String, String)>);
+
+/// Pre-rename class hierarchy, for resolving member references to declarations.
+struct Hierarchy {
+    classes: BTreeMap<String, ClassShape>,
+}
+
+impl Hierarchy {
+    fn of(p: &Program) -> Hierarchy {
+        let s = &p.syms;
+        let classes = p
+            .classes
+            .iter()
+            .map(|c| {
+                (
+                    s.get(c.ty).to_string(),
+                    (
+                        c.superclass.map(|t| s.get(t).to_string()),
+                        c.interfaces.iter().map(|t| s.get(*t).to_string()).collect(),
+                        c.fields.iter().map(|f| (s.get(f.name).to_string(), s.get(f.ty).to_string())).collect(),
+                        c.methods.iter().map(|m| (s.get(m.name).to_string(), s.get(m.proto).to_string())).collect(),
+                    ),
+                )
+            })
+            .collect();
+        Hierarchy { classes }
+    }
+
+    /// JVM field resolution: the class, then its superinterfaces (recursively), then its
+    /// superclass. Returns the declaring program class.
+    fn field(&self, class: &str, name: &str, ty: &str, depth: u32) -> Option<String> {
+        let (sup, ifaces, fields, _) = self.classes.get(class)?;
+        if depth > 64 {
+            return None;
+        }
+        if fields.contains(&(name.to_string(), ty.to_string())) {
+            return Some(class.to_string());
+        }
+        for i in ifaces {
+            if let Some(d) = self.field(i, name, ty, depth + 1) {
+                return Some(d);
+            }
+        }
+        sup.as_deref().and_then(|s| self.field(s, name, ty, depth + 1))
+    }
+
+    /// JVM method resolution: the class and its superclasses, then superinterfaces.
+    fn method(&self, class: &str, name: &str, proto: &str) -> Option<String> {
+        let key = (name.to_string(), proto.to_string());
+        let mut c = Some(class.to_string());
+        let mut depth = 0;
+        while let Some(cur) = c {
+            let Some((sup, _, _, methods)) = self.classes.get(&cur) else { break };
+            if methods.contains(&key) {
+                return Some(cur);
+            }
+            c = sup.clone();
+            depth += 1;
+            if depth > 64 {
+                return None;
+            }
+        }
+        // Interfaces, breadth-first from the class and its superclasses.
+        let mut queue: Vec<String> = Vec::new();
+        let mut c = Some(class.to_string());
+        while let Some(cur) = c {
+            let Some((sup, ifaces, _, _)) = self.classes.get(&cur) else { break };
+            queue.extend(ifaces.iter().cloned());
+            c = sup.clone();
+            if queue.len() > 4096 {
+                break;
+            }
+        }
+        let mut seen = BTreeSet::new();
+        while let Some(i) = queue.first().cloned() {
+            queue.remove(0);
+            if !seen.insert(i.clone()) {
+                continue;
+            }
+            if let Some((_, ifaces, _, methods)) = self.classes.get(&i) {
+                if methods.contains(&key) {
+                    return Some(i);
+                }
+                queue.extend(ifaces.iter().cloned());
+            }
+        }
+        None
+    }
 }
 
 struct Ctx<'a> {
     r: &'a Renaming,
     /// Descriptors of program classes, before renaming.
     program: std::collections::BTreeSet<String>,
+    hierarchy: Option<Hierarchy>,
     syms: &'a mut Interner,
 }
 
@@ -69,23 +167,48 @@ impl Ctx<'_> {
         }
         out
     }
-    fn member_name(&mut self, owner_before: Sym, name: Sym) -> Sym {
+    fn global_name(&mut self, owner_before: Sym, name: Sym) -> Option<Sym> {
         if !self.program.contains(self.syms.get(owner_before)) {
+            return None;
+        }
+        let n = self.r.members.get(self.syms.get(name))?.clone();
+        Some(self.syms.intern(&n))
+    }
+    /// New name for a field declared or referenced as (owner, name, type), pre-rename.
+    fn field_name(&mut self, owner: Sym, name: Sym, ty: Sym) -> Sym {
+        if let Some(n) = self.global_name(owner, name) {
+            return n;
+        }
+        if self.r.fields.is_empty() {
             return name;
         }
-        match self.r.members.get(self.syms.get(name)) {
-            Some(n) => {
-                let n = n.clone();
-                self.syms.intern(&n)
-            }
+        let (o, n, t) = (self.syms.get(owner).to_string(), self.syms.get(name).to_string(), self.syms.get(ty).to_string());
+        let decl = self.hierarchy.as_ref().and_then(|h| h.field(&o, &n, &t, 0));
+        match decl.and_then(|d| self.r.fields.get(&(d, n, t)).cloned()) {
+            Some(new) => self.syms.intern(&new),
+            None => name,
+        }
+    }
+    /// New name for a method declared or referenced as (owner, name, proto), pre-rename.
+    fn method_name(&mut self, owner: Sym, name: Sym, proto: Sym) -> Sym {
+        if let Some(n) = self.global_name(owner, name) {
+            return n;
+        }
+        if self.r.methods.is_empty() {
+            return name;
+        }
+        let (o, n, pr) = (self.syms.get(owner).to_string(), self.syms.get(name).to_string(), self.syms.get(proto).to_string());
+        let decl = self.hierarchy.as_ref().and_then(|h| h.method(&o, &n, &pr));
+        match decl.and_then(|d| self.r.methods.get(&(d, n, pr)).cloned()) {
+            Some(new) => self.syms.intern(&new),
             None => name,
         }
     }
     fn field(&mut self, f: FieldRef) -> FieldRef {
-        FieldRef { name: self.member_name(f.class, f.name), class: self.ty(f.class), ty: self.ty(f.ty) }
+        FieldRef { name: self.field_name(f.class, f.name, f.ty), class: self.ty(f.class), ty: self.ty(f.ty) }
     }
     fn method(&mut self, m: MethodRef) -> MethodRef {
-        MethodRef { name: self.member_name(m.class, m.name), class: self.ty(m.class), proto: self.proto(m.proto) }
+        MethodRef { name: self.method_name(m.class, m.name, m.proto), class: self.ty(m.class), proto: self.proto(m.proto) }
     }
     fn handle(&mut self, h: MethodHandleRef) -> MethodHandleRef {
         let member = match h.member {
@@ -203,19 +326,20 @@ impl Renaming {
     /// Applies the renaming to `p` in place and re-sorts classes.
     pub fn apply(&self, p: &mut Program) {
         let program = p.classes.iter().map(|c| p.syms.get(c.ty).to_string()).collect();
+        let hierarchy = (!self.fields.is_empty() || !self.methods.is_empty()).then(|| Hierarchy::of(p));
         let mut syms = std::mem::take(&mut p.syms);
-        let mut cx = Ctx { r: self, program, syms: &mut syms };
+        let mut cx = Ctx { r: self, program, hierarchy, syms: &mut syms };
         for c in &mut p.classes {
             let owner = cx.syms.get(c.ty).to_string();
             c.annotations = cx.annotations(&c.annotations, Some(&owner));
             for f in &mut c.fields {
-                f.name = cx.member_name(c.ty, f.name);
+                f.name = cx.field_name(c.ty, f.name, f.ty);
                 f.ty = cx.ty(f.ty);
                 f.static_value = f.static_value.as_ref().map(|v| cx.value(v));
                 f.annotations = cx.annotations(&f.annotations, None);
             }
             for m in &mut c.methods {
-                m.name = cx.member_name(c.ty, m.name);
+                m.name = cx.method_name(c.ty, m.name, m.proto);
                 m.proto = cx.proto(m.proto);
                 m.annotations = cx.annotations(&m.annotations, None);
                 if let Some(ps) = &mut m.parameter_annotations {
@@ -244,10 +368,10 @@ mod tests {
     fn signature_rewriting() {
         let r = Renaming {
             classes: [("La/b;".to_string(), "La/z;".to_string()), ("Lq;".to_string(), "Lr;".to_string())].into(),
-            members: BTreeMap::new(),
+            ..Default::default()
         };
         let mut syms = Interner::default();
-        let cx = Ctx { r: &r, program: Default::default(), syms: &mut syms };
+        let cx = Ctx { r: &r, program: Default::default(), hierarchy: None, syms: &mut syms };
         assert_eq!(cx.signature("Ljava/util/List<La/b;>;"), "Ljava/util/List<La/z;>;");
         assert_eq!(cx.signature("(La/b;[Lq;)La/b;"), "(La/z;[Lr;)La/z;");
         assert_eq!(cx.signature("<T:La/b;>Ljava/lang/Object;"), "<T:La/z;>Ljava/lang/Object;");

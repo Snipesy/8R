@@ -1,7 +1,7 @@
 //! Un-passes. Each implements one or more registered rules.
 
 mod annotation_member;
-mod kept_name;
+pub mod kept_name;
 mod lateinit;
 mod library_override;
 

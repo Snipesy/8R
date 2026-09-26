@@ -217,63 +217,66 @@ pub fn body_semantic(b: &Body, s: &Interner) -> String {
     out
 }
 
+/// Canonical rendering of one field (declaration, static value, annotations).
+pub fn field(f: &crate::model::Field, s: &Interner) -> String {
+    let mut o = format!("  field {}:{} access {:#x}", s.get(f.name), s.get(f.ty), f.access);
+    // An explicit default and an absent initial value mean the same thing.
+    if let Some(v) = f.static_value.as_ref().filter(|v| !crate::value::is_default(v)) {
+        o.push_str(&format!(" = {}", value(v, s)));
+    }
+    o.push('\n');
+    annotations(&mut o, "    ", &f.annotations, s);
+    o
+}
+
+/// Canonical rendering of one method (signature, annotations, body).
+pub fn method(m: &crate::model::Method, s: &Interner) -> String {
+    let mut o = format!("  method {}{} access {:#x}\n", s.get(m.name), s.get(m.proto), m.access);
+    annotations(&mut o, "    ", &m.annotations, s);
+    if let Some(ps) = &m.parameter_annotations {
+        for (i, set) in ps.iter().enumerate() {
+            let _ = writeln!(o, "    param {i}:");
+            annotations(&mut o, "      ", set, s);
+        }
+    }
+    if let Some(b) = &m.code {
+        o.push_str(&body_semantic(b, s));
+    }
+    o
+}
+
+/// Canonical rendering of one class. Member order isn't semantic, so members are sorted.
+pub fn class(c: &crate::model::Class, s: &Interner) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "class {} access {:#x}", s.get(c.ty), c.access);
+    if let Some(sup) = c.superclass {
+        let _ = writeln!(out, "  extends {}", s.get(sup));
+    }
+    for i in &c.interfaces {
+        let _ = writeln!(out, "  implements {}", s.get(*i));
+    }
+    if let Some(f) = c.source_file {
+        let _ = writeln!(out, "  source {:?}", s.get(f));
+    }
+    annotations(&mut out, "  ", &c.annotations, s);
+    let mut fields: Vec<String> = c.fields.iter().map(|f| field(f, s)).collect();
+    fields.sort();
+    out.extend(fields);
+    let mut methods: Vec<String> = c.methods.iter().map(|m| method(m, s)).collect();
+    methods.sort();
+    out.extend(methods);
+    out
+}
+
 /// Canonical rendering of a whole program. Two programs are semantically equal (for the
 /// round-trip tests) iff their renderings are equal.
 pub fn program(p: &crate::model::Program) -> String {
-    let s = &p.syms;
     let mut out = String::new();
     for r in &p.retained_strings {
         let _ = writeln!(out, "retain {r:?}");
     }
     for c in &p.classes {
-        let _ = writeln!(out, "class {} access {:#x}", s.get(c.ty), c.access);
-        if let Some(sup) = c.superclass {
-            let _ = writeln!(out, "  extends {}", s.get(sup));
-        }
-        for i in &c.interfaces {
-            let _ = writeln!(out, "  implements {}", s.get(*i));
-        }
-        if let Some(f) = c.source_file {
-            let _ = writeln!(out, "  source {:?}", s.get(f));
-        }
-        annotations(&mut out, "  ", &c.annotations, s);
-        // Member order within a class isn't semantic; the writer sorts by id.
-        let mut fields: Vec<String> = c
-            .fields
-            .iter()
-            .map(|f| {
-                let mut o = format!("  field {}:{} access {:#x}", s.get(f.name), s.get(f.ty), f.access);
-                // An explicit default and an absent initial value mean the same thing.
-                if let Some(v) = f.static_value.as_ref().filter(|v| !crate::value::is_default(v)) {
-                    o.push_str(&format!(" = {}", value(v, s)));
-                }
-                o.push('\n');
-                annotations(&mut o, "    ", &f.annotations, s);
-                o
-            })
-            .collect();
-        fields.sort();
-        out.extend(fields);
-        let mut methods: Vec<String> = c
-            .methods
-            .iter()
-            .map(|m| {
-                let mut o = format!("  method {}{} access {:#x}\n", s.get(m.name), s.get(m.proto), m.access);
-                annotations(&mut o, "    ", &m.annotations, s);
-                if let Some(ps) = &m.parameter_annotations {
-                    for (i, set) in ps.iter().enumerate() {
-                        let _ = writeln!(o, "    param {i}:");
-                        annotations(&mut o, "      ", set, s);
-                    }
-                }
-                if let Some(b) = &m.code {
-                    o.push_str(&body_semantic(b, s));
-                }
-                o
-            })
-            .collect();
-        methods.sort();
-        out.extend(methods);
+        out.push_str(&class(c, &p.syms));
     }
     out
 }

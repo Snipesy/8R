@@ -782,6 +782,19 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   residual types in signatures back to original types.
 - **Kotlin fixtures (step 5):** pinned kotlinc 2.4.20 + plugins and runtime libraries
   (`fixtures/toolchain.conf`, SHA-256 verified), consumer rules passed as AGP does.
+- **Naming + output (step 6):** `core/structural-name` (D) gives every unproven name a
+  structural `{hint}_{hash}` (Weisfeiler–Lehman over the program with non-S names erased,
+  including incoming and position-sensitive usage; members also by where they're used).
+  Renaming is behavior-preserving: fields, static/private methods always; virtual methods
+  only when no member of the override group can override a platform method (checked against
+  an embedded android.jar table, `cargo xtask platform-api`). Structurally indistinguishable
+  items are `core/structural-tie` (N, full candidate set). `8r undo app.apk -o out/` writes
+  `classes*.dex`, `8r-mapping.txt` (ProGuard format, recovered -> current; load in jadx with
+  `--mappings-path out/8r-mapping.txt -Prename-mappings.format=PROGUARD_FILE
+  -Prename-mappings.invert=yes`), and `report.json`. Tests: inverse renaming restores the input
+  exactly, overrides preserved and none created, unique field names, mapping matches both
+  sides, D8 accepts the output, 8R is idempotent, jadx shows recovered names, and the α test
+  requires the **emitted dex to be byte-identical** under scrambling.
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every

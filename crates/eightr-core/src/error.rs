@@ -10,6 +10,7 @@ pub enum Error {
     /// A pass tried to record an application of a rule that isn't in the registry, or for an
     /// attribute the rule doesn't declare. Always a bug in 8R.
     UnregisteredRule { rule: String, detail: String },
+    Write(String),
 }
 
 impl fmt::Display for Error {
@@ -23,6 +24,7 @@ impl fmt::Display for Error {
                 write!(f, "class {descriptor} defined in both {} and {}", inputs[0], inputs[1])
             }
             Error::UnregisteredRule { rule, detail } => write!(f, "internal error: rule {rule}: {detail}"),
+            Error::Write(e) => write!(f, "writing output: {e}"),
         }
     }
 }
