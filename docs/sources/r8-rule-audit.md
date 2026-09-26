@@ -25,9 +25,9 @@ preconditions and implementation of `r8/kept-name`
 | Repackaging | D | CONFIRMED, but it happens **by default** (not only with `-repackageclasses`) | E1 |
 | Aggressive overloading | D | CONFIRMED | — |
 | Line numbers | D·id | CONFIRMED | — |
-| Source file | D | CONFIRMED. The premise is wrong: plain R8 full mode writes `SourceFile`, not `r8-map-id-…` | E17 |
+| Source file | D | CONFIRMED. The premise is wrong for 8.10: plain R8 full mode writes `SourceFile`, not `r8-map-id-…`. R8 9.4.24 writes `r8-map-id-…` by default | E17, 9.4.24 fixtures |
 | Inlining | D·id | CONFIRMED | E10, E13 |
-| Outlining | D | CONFIRMED (α-invariant); outlines are **on by default** | E6c |
+| Outlining | D | CONFIRMED (α-invariant); outlines are **on by default**. R8 ≥ 9 adds bottom-up throw outlines. Implemented: `r8/outline-inline`, `r8/bu-outline-inline` | E6c, §3.7 |
 | Lambda desugaring | D | CONFIRMED | — |
 | Backports | S | **DOWNGRADE → SPLIT (S / N)**. Math and StrictMath share templates, producing byte-identical dex | E8 |
 | API-model outlines | S | CONFIRMED **for the call target only**, with precondition (synthetic holder) | E13 |
@@ -122,7 +122,9 @@ These survive whenever minification is off (`-dontobfuscate`) or the holder is k
 - **Classes:** `$$ExternalSynthetic{Lambda,Outline,Backport,ApiModelOutline,…}N`,
   `$-CC`, `$EnumUnboxingSharedUtility` / `$EnumUnboxingLocalUtility`, `$Wrapper`,
   `-IA`, `R8$$SyntheticClass`, `R8$$REMOVED$$CLASS$$N` (mapping only).
-  Source: `synthesis/SyntheticNaming.java`.
+  Source: `synthesis/SyntheticNaming.java`. **R8/D8 9.4.24 name synthetics `Outer$N`**
+  (`Main$0`, `Account$0`) instead of `$$ExternalSynthetic…N`, which looks like a javac anonymous
+  class; only `ACC_SYNTHETIC` tells them apart [V-exp 9.4.24 fixtures].
 - **Members:**
   - Merging and desugaring: `$r8$classId` (`ClassMerger.java:57`), `$r8$clinit`,
     `$r8$lambda$…`, `$r8$backportedMethods$utility…`, `$r8$twr$utility`,
@@ -315,7 +317,9 @@ identifier.
 `naming/SourceFileRewriter.computeNonCompatProvider`: in full mode, when minifying **or**
 optimizing, the attribute is rewritten to the constant `"SourceFile"` even with
 `-keepattributes SourceFile` (E17: all four classes, even with `-dontobfuscate`).
-`r8-map-id-…` only appears when the build tool passes a source-file template (AGP does).
+In 8.10, `r8-map-id-…` only appears when the build tool passes a source-file template (AGP does).
+R8 9.4.24 writes `r8-map-id-<pg-map-id>` with no template (every `*_r94`/`r94_*` fixture, with
+or without `-keepattributes SourceFile`) [V-exp 9.4.24].
 
 Upgrade candidate (§4.5): compat mode (`r8-mode:"compat"` in the marker) with
 `-keepattributes SourceFile` keeps per-class originals.
@@ -331,13 +335,24 @@ The outliner is **enabled by default** in R8 8.10: E6c produced
 `q.Main$Adder$$ExternalSyntheticOutline0.m(String,int,PrintStream)` shared by 23 call sites
 across two classes.
 
-Discriminator: the holder is `PUBLIC ABSTRACT SYNTHETIC` (0x1401), with only static methods.
-javac and kotlinc never emit abstract synthetic classes, so a genuine user static helper can't
-be taken for an outline. Other R8 synthetics share that holder shape (backports, API outlines,
-`ThrowIAE`, `TwrCloseResource`). Inlining those is still semantics-preserving, so D holds.
+The discriminator first proposed here, "the holder is `PUBLIC ABSTRACT SYNTHETIC` (0x1401) with
+only static methods", is **wrong** [V-exp R8 9.4.24 fixtures, Gretio]: holder flags don't discriminate. In
+9.4.24 a classic-outline holder is `PUBLIC ABSTRACT SYNTHETIC`, a bottom-up (throw) outline holder
+is `PUBLIC FINAL SYNTHETIC`, and horizontal merging can put an outline into a merged lambda
+group with instance fields, `<init>` and `$r8$classId` (`kotlin_serialization_r94`
+`Account$0`). What holds is `ACC_SYNTHETIC` on the holder (javac and kotlinc don't set it on the
+classes that hold hand-written helpers). Several R8/D8 synthetics share that holder shape, so
+the method body decides (r8-desugar.md §4.5): classic outlines have ≥ 3 operations including a
+call and touch only library classes; throw outlines build and throw an exception. Look-alikes
+this excludes: D8 backports (`Main$0.m(J)I`, pure arithmetic), `$-CC` companions (call app
+code), API-model outlines (2 operations), and hand-written helpers in non-synthetic classes
+(Compose `PreconditionsKt.throwIllegalArgumentException`, `ArraysKt.copyInto`). Inlining a
+static method also needs no `<clinit>` in the holder's superclass chain, no program subclasses,
+and per-site accessibility. Precision and recall are 100% against every fixture mapping.
 
-α-invariance holds if the decision uses only flags and structure, never the
-`$$ExternalSyntheticOutline` name, which only exists under `-dontobfuscate`.
+α-invariance holds if the decision uses only flags and structure, never the name
+(`$$ExternalSyntheticOutline` in 8.x, `Outer$N` in 9.4), which only survives under
+`-dontobfuscate` or in D8 output.
 
 Caveat: the input may itself be pre-desugared (a library jar produced by D8/R8 CF output).
 There the outline is original code. D still holds.
@@ -751,6 +766,7 @@ Exclusions:
 | Class/member renaming | S only via §4.1, §4.2, §4.3, §4.4 and the fixed kept-name. Everything else D. |
 | Backports | S if the template is unique for the marker version and the body matches exactly. N {Math, StrictMath} / {Byte, Char, Short} otherwise. D without marker. |
 | API-model outlines | S for the call target only, with the synthetic-holder precondition. Body and signature D. |
+| Outlining | D, done: `r8/outline-inline` (classic) and `r8/bu-outline-inline` (throw), detection by holder `ACC_SYNTHETIC` + body shape, not holder abstractness (§3.7). |
 | `$-CC` | S (default) only with abstract declaration + forwarders. Otherwise N {default, static} for receiver-typed methods, and D owner for static methods without receiver. |
 | Nest bridges | S only with STATIC\|BRIDGE\|SYNTHETIC. Otherwise D. |
 | Horizontal merging | D when a dispatching classId exists. D·id otherwise. Document that the partition is often invisible and interfaces/fields are unioned. |
