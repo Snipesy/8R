@@ -56,6 +56,7 @@ impl Pass for ComposeLibKey {
             }
             false
         };
+        let pins = eightr_ir::reflect::pins(model);
         let mut notes = Vec::new();
         for ((class, _, _), ks) in targets {
             let [k] = ks[..] else { continue };
@@ -74,6 +75,10 @@ impl Pass for ComposeLibKey {
                     continue;
                 }
             } else if labelled {
+                continue;
+            }
+            // A name reflection pins in the class would read as pinned on the next run.
+            if !same && pins.method(s.get(model.classes[class].ty), &f.name) {
                 continue;
             }
             // Another method of the class, or above it, already has the name and proto.

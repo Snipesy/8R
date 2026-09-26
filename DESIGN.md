@@ -878,7 +878,7 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
     propagation, conflict-free per round.
   - `r8/sigdb-method-name` (D) names methods outside override groups, with `@eightr.Original`; voted classes
     get the library simple name as their structural hint.
-  - On `sigdb_app` (same versions): 93% precise, 70% recall (`tests/sigdb.rs`, ratcheted).
+  - On `sigdb_app` (same versions): 95% precise, 59% recall of library methods, constructors aside (`tests/sigdb.rs`, ratcheted; about the same across versions).
 - **Library versions (M6):** `report.libraries` from `META-INF/*.version`, root `*.properties`, `name/x.y.z`
   strings, registrar id/version pairs, and the Compose key version sets. Gretio: 176 entries.
 - **Idempotence:** 8R on its own output is byte-identical, fixtures and Gretio alike.

@@ -69,6 +69,12 @@ pub fn run_all(model: &mut Model) -> Result<Vec<RewriteRecord>> {
             return Err(Error::UnregisteredRule { rule: rec.rule.to_string(), detail: "rewrite record".into() });
         }
     }
+    // One record per (rule, item): the latest round's says how it ended.
+    let mut latest: std::collections::BTreeMap<(&'static str, String), RewriteRecord> = std::collections::BTreeMap::new();
+    for r in records {
+        latest.insert((r.rule, r.item.clone()), r);
+    }
+    let mut records: Vec<RewriteRecord> = latest.into_values().collect();
     records.sort();
     Ok(records)
 }

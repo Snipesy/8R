@@ -157,6 +157,31 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
         }
     }
     let key_class = |k: Key| -> ClassKey { (k.0, dbs[k.0 as usize].methods[k.1 as usize].0) };
+    // Primitive-kind compatibility of an app method with a DB method (R8 only removes params and
+    // may make an instance method static): the app's primitive params are a sub-multiset of the
+    // DB's (plus the receiver as a reference), and the returns agree in kind.
+    let prims = |proto: &str| -> Option<(BTreeMap<char, usize>, char)> {
+        let (ps, r) = eightr_ir::types::parse_proto(proto)?;
+        let mut m = BTreeMap::new();
+        for t in ps {
+            let c = t.chars().next()?;
+            if !matches!(c, 'L' | '[') {
+                *m.entry(c).or_insert(0) += 1;
+            }
+        }
+        let rk = match r.chars().next()? {
+            'L' | '[' => 'L',
+            c => c,
+        };
+        Some((m, rk))
+    };
+    let app_prims: Vec<Option<(BTreeMap<char, usize>, char)>> = app.iter().map(|m| prims(s.get(p.classes[m.class].methods[m.method].proto))).collect();
+    let compatible = |a: usize, k: Key| -> bool {
+        let (Some((ap, ar)), Some((dp, dr))) = (&app_prims[a], prims(&dbs[k.0 as usize].methods[k.1 as usize].2)) else { return false };
+        (*ar == 'V' || *ar == dr) && ap.iter().all(|(c, n)| dp.get(c).is_some_and(|d| d >= n))
+    };
+    // `access$x` bridges: R8 inlines the bridged body into them, so the body names the callee.
+    let bridge = |k: Key| dbs[k.0 as usize].methods[k.1 as usize].1.starts_with("access$");
     // Constructors and initializers pair only with their own kind (`<init>` names never move).
     let special = |name: &str| name.starts_with('<');
     let app_special: Vec<bool> = app.iter().map(|m| special(s.get(p.classes[m.class].methods[m.method].name))).collect();
@@ -186,7 +211,9 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
             let Some(keys) = family.get(&h) else { continue };
             let free: Vec<&Key> = keys.iter().filter(|k| !taken.contains(k)).collect();
             if let ([k], 1) = (free.as_slice(), keys.len()) {
-                if !kind_ok(a, **k) {
+                // A callee inlined into one caller brings its strings along: the string stage also
+                // needs compatible primitive kinds.
+                if !kind_ok(a, **k) || bridge(**k) || (via == "exact:strings" && !compatible(a, **k)) {
                     continue;
                 }
                 matched.insert(a, (**k, via));
@@ -233,6 +260,9 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
 
     // 3. Propagation.
     let mut classes: BTreeMap<usize, ClassKey> = BTreeMap::new();
+    // Class pairs backed by a seed or at least two matched members: one matched method (e.g. in
+    // a merged static holder) doesn't make its class the library's for similarity guesses.
+    let mut strong: BTreeSet<usize> = BTreeSet::new();
     for _round in 0..8 {
         // Class votes from the current state.
         let mut votes: BTreeMap<usize, BTreeMap<ClassKey, u32>> = BTreeMap::new();
@@ -243,14 +273,21 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
             *votes.entry(app[a].class).or_default().entry(key_class(k)).or_default() += 2;
         }
         classes.clear();
+        strong.clear();
         for (ci, v) in &votes {
             let mut ranked: Vec<(&ClassKey, &u32)> = v.iter().collect();
             ranked.sort_by_key(|(k, n)| (std::cmp::Reverse(**n), **k));
             let total: u32 = v.values().sum();
             let (top, n) = ranked[0];
+            // A seed, or at least two members: one matched method (e.g. in a merged static holder)
+            // doesn't make its class the library's.
+            let independent = seeds.get(ci) == Some(top) || *n >= 4;
             let unique = ranked.get(1).is_none_or(|x| x.1 < n);
             if unique && *n * 3 >= total * 2 {
                 classes.insert(*ci, *top);
+                if independent {
+                    strong.insert(*ci);
+                }
             }
         }
         let mut proposals: Vec<(usize, Key, &'static str)> = Vec::new();
@@ -298,7 +335,10 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
                     proposals.push((a, same_db[0], "class:proto"));
                 }
             }
-            // Mutual best.
+            // Mutual best: only in strongly voted class pairs.
+            if !strong.contains(&ci) {
+                continue;
+            }
             let score = |a: usize, k: Key| sim(a, k) + if key_proto(k).contains(&app[a].proto) { 0.2 } else { 0.0 };
             let best_of = |a: usize| -> Option<(Key, f64, f64)> {
                 let mut sc: Vec<(f64, Key)> = keys.iter().map(|&k| (score(a, k), k)).collect();
@@ -317,7 +357,7 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
                 }
             }
         }
-        proposals.retain(|&(a, k, _)| kind_ok(a, k));
+        proposals.retain(|&(a, k, via)| kind_ok(a, k) && !bridge(k) && (via == "callgraph" || compatible(a, k)));
         let accepted = resolve(&proposals);
         let mut grew = false;
         for (a, k, via) in accepted {
@@ -333,5 +373,7 @@ pub fn match_program(p: &Model, dbs: &[SigDb]) -> Matches {
         }
     }
     let methods = matched.into_iter().map(|(a, (key, via))| Match { class: app[a].class, method: app[a].method, key, via }).collect();
+    // Class pairs reported (hints) only when strongly backed.
+    classes.retain(|ci, _| strong.contains(ci));
     Matches { methods, classes }
 }
