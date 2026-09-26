@@ -221,3 +221,60 @@ fn outputs_behave_like_inputs() {
     eprintln!("compared {compared} runs");
     assert!(compared >= 8, "too few fixtures actually executed ({compared})");
 }
+
+/// Hard verifier failures ART reports for `dex` (whole program, every class, via
+/// `dex2oat --compiler-filter=verify`), as log lines.
+fn art_verify(adb: &Path, dex: &[Vec<u8>], work: &Path) -> Vec<String> {
+    let _ = fs::remove_dir_all(work);
+    fs::create_dir_all(work).unwrap();
+    let mut files = String::new();
+    for (i, bytes) in dex.iter().enumerate() {
+        let d = work.join(format!("classes{i}.dex"));
+        fs::write(&d, bytes).unwrap();
+        let r = format!("/data/local/tmp/8r-verify-{i}.dex");
+        let ok = Command::new(adb).arg("push").arg(&d).arg(&r).output().unwrap();
+        assert!(ok.status.success(), "adb push failed: {}", String::from_utf8_lossy(&ok.stderr));
+        files.push_str(&format!(" --dex-file={r}"));
+    }
+    // Read the log of this dex2oat process only (tests run concurrently).
+    let shell = format!(
+        "dex2oat64{files} --oat-file=/data/local/tmp/8r-verify.odex --compiler-filter=verify & p=$!; wait $p; logcat -d --pid=$p"
+    );
+    let out = Command::new(adb).args(["shell", &shell]).output().unwrap();
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| l.contains("failed to verify") || l.contains("Rejecting class"))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Every class of every output passes ART's verifier whenever the R8 build's does: rewrites
+/// must keep registers, wide pairs and types consistent even in code no `main` reaches.
+#[test]
+fn art_verifies_every_output_class() {
+    let Some(adb) = std::env::var_os("EIGHTR_ADB").map(PathBuf::from) else {
+        eprintln!("skipping: set EIGHTR_ADB");
+        return;
+    };
+    let out_root = root().join("fixtures/out");
+    let mut names: Vec<String> = fs::read_dir(&out_root).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    let work = Path::new(env!("CARGO_TARGET_TMPDIR")).join("art-verify");
+    let mut checked = 0;
+    for name in names {
+        for variant in ["r8", "d8"] {
+            let Ok(input) = fs::read(out_root.join(&name).join(variant).join("classes.dex")) else { continue };
+            let baseline = art_verify(&adb, std::slice::from_ref(&input), &work);
+            let output = art_verify(&adb, &eightr_output(&input, false), &work);
+            assert!(
+                output.len() <= baseline.len(),
+                "{name}/{variant}: ART rejects 8R output ({} failures, {} in the R8 build):\n{}",
+                output.len(),
+                baseline.len(),
+                output.join("\n")
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 20, "only {checked} builds verified");
+}

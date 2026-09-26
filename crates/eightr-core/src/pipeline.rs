@@ -185,6 +185,7 @@ fn all_items(program: &Program) -> Vec<ItemId> {
     v
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_report(
     program: &Program,
     labels: &Labels,

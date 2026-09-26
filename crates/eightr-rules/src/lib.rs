@@ -100,6 +100,8 @@ pub const IDENTITY: &str = "core/identity";
 pub const STRUCTURAL_NAME: &str = "core/structural-name";
 pub const STRUCTURAL_TIE: &str = "core/structural-tie";
 pub const KEPT_NAME: &str = "r8/kept-name";
+pub const OUTLINE_INLINE: &str = "r8/outline-inline";
+pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
@@ -171,6 +173,20 @@ pub static REGISTRY: &[Rule] = &[
         fixtures: &["opcodes"],
     },
     Rule {
+        id: BU_OUTLINE_INLINE,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::Body],
+        summary: "Inline R8's bottom-up (throw) outlines back into their call sites and drop the dead default return after them.",
+        preconditions: &[
+            "Static method with straight-line code ending in `throw` of a freshly constructed exception, reached only by invoke-static from >= 2 sites.",
+            "Its class has no <clinit> (inlining would skip class initialization), and everything it references is accessible from each caller.",
+            "Registers stay encodable after the splice; otherwise that site keeps its call.",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["r94_outline"],
+    },
+    Rule {
         id: KEPT_NAME,
         source: Source::R8,
         class: Class::Solved,
@@ -199,6 +215,21 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["shapes", "kotlin_basic", "compose_basic"],
+    },
+    Rule {
+        id: OUTLINE_INLINE,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::Body],
+        summary: "Inline R8's outlines (shared straight-line helpers) back into their call sites.",
+        preconditions: &[
+            "Static method with straight-line code of invokes, new-instance, arithmetic and moves ending in a return, reached only by invoke-static from >= 2 sites.",
+            "Its class has no <clinit>, and everything it references is accessible from each caller.",
+            "Registers stay encodable after the splice; otherwise that site keeps its call.",
+            "D, not S: a hand-written static helper can have the same shape (inlining it is still behavior-preserving).",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["r94_outline", "kotlin_serialization"],
     },
 ];
 

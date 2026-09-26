@@ -47,11 +47,21 @@ pub fn splice(body: &mut Body, at: u32, remove: u32, insert: Vec<Op>, pc: u32) {
     body.tries.retain(|t| t.end > t.start);
     let mut positions = Vec::with_capacity(body.positions.len());
     for &(i, line) in &body.positions {
-        if i >= at && i < end && i != at {
-            continue; // interior of the removed range: the region keeps its first line
+        // Interior of the removed range: the region keeps its first line (and nothing, if
+        // nothing is inserted: the next instruction has its own position or inherits one).
+        if i >= at && i < end && (i != at || n == 0) {
+            continue;
         }
         positions.push((f(i), line));
     }
+    // One position per instruction: a later entry for the same index wins, as when decoding.
+    positions.dedup_by(|later, earlier| {
+        let same = later.0 == earlier.0;
+        if same {
+            earlier.1 = later.1;
+        }
+        same
+    });
     body.positions = positions;
     for l in &mut body.locals {
         l.start = f(l.start);
@@ -66,6 +76,31 @@ pub fn splice(body: &mut Body, at: u32, remove: u32, insert: Vec<Op>, pc: u32) {
         })
         .collect();
     body.insns.splice(at as usize..end as usize, new);
+}
+
+/// Deletes instructions no path reaches (e.g. the default `return` R8 left after a call it
+/// knew always throws). Returns how many were removed. Leaves the body unchanged if its CFG
+/// can't be built.
+pub fn remove_unreachable(body: &mut Body) -> usize {
+    let Ok(cfg) = crate::cfg::Cfg::build(body) else { return 0 };
+    let mut dead: Vec<(u32, u32)> = cfg
+        .blocks
+        .iter()
+        .enumerate()
+        .filter(|(b, _)| !cfg.is_reachable(*b as u32))
+        .map(|(_, blk)| (blk.start, blk.end))
+        .collect();
+    // Never delete everything, and keep at least one instruction.
+    if dead.iter().map(|(s, e)| (e - s) as usize).sum::<usize>() >= body.insns.len() {
+        return 0;
+    }
+    dead.sort_by_key(|d| std::cmp::Reverse(d.0));
+    let mut removed = 0;
+    for (start, end) in dead {
+        splice(body, start, end - start, Vec::new(), 0);
+        removed += (end - start) as usize;
+    }
+    removed
 }
 
 /// Recomputes `outs`: the most argument words any call in the body passes.
@@ -123,6 +158,26 @@ mod tests {
         assert_eq!((b.tries[0].start, b.tries[0].end, b.tries[0].handlers[0].target), (1, 6, 6));
         assert_eq!(b.positions, vec![(0, 10), (2, 11), (6, 12)]);
         assert_eq!((b.locals[0].start, b.locals[0].end), (2, 7));
+    }
+
+    #[test]
+    fn removes_code_after_throw() {
+        let mut b = body(vec![
+            Op::Const { dst: 0, value: Const::Narrow(0) },
+            Op::Throw { src: 0 },
+            Op::Const { dst: 1, value: Const::Narrow(0) },
+            Op::Return { width: crate::op::Width::Single, src: 1 },
+        ]);
+        assert_eq!(remove_unreachable(&mut b), 2);
+        assert_eq!(b.insns.len(), 2);
+    }
+
+    #[test]
+    fn deleting_keeps_one_position_per_instruction() {
+        let mut b = body(vec![Op::Nop, Op::Nop, Op::ReturnVoid]);
+        b.positions = vec![(0, 1), (1, 2), (2, 3)];
+        splice(&mut b, 1, 1, vec![], 0);
+        assert_eq!(b.positions, vec![(0, 1), (1, 3)]);
     }
 
     #[test]
