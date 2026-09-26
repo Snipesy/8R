@@ -466,3 +466,50 @@ fn merged_class_detection_matches_mapping() {
     assert!(checked >= 50, "only {checked} splits checked");
     assert!(found * 100 >= truth_total * 85, "merged-class recall {found}/{truth_total} below 85%");
 }
+
+/// Enum unboxing: the utility's S member names match the mapping (the generic S test can't
+/// grade members of synthesized classes), and the recovered enums match `r94_enum`'s source.
+#[test]
+fn enum_unboxing_evidence_matches_ground_truth() {
+    let mut graded = 0;
+    for fixture in fixture_names() {
+        let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
+        let mapping = Mapping::parse(&text).unwrap();
+        let by_obf = mapping.by_obfuscated();
+        let out = outcome(&fixture, "r8");
+        let p = &out.program;
+        for ((item, _), label) in out.labels.iter() {
+            if !label.rules.contains(&eightr_rules::ENUM_UNBOXING_UTILITY) {
+                continue;
+            }
+            let (ItemId::Field { class, .. } | ItemId::Method { class, .. } | ItemId::Class { class }) = *item;
+            let cm = &mapping.classes[by_obf[dotted(p.descriptor(class)).as_str()]];
+            let obf_name = match *item {
+                ItemId::Field { class, index } => p.str(p.class(class).fields[index as usize].name).to_string(),
+                ItemId::Method { class, index } => p.str(p.class(class).methods[index as usize].name).to_string(),
+                ItemId::Class { .. } => unreachable!(),
+            };
+            let originals: Vec<&str> = cm
+                .members
+                .iter()
+                .filter_map(|m| match &m.kind {
+                    MemberKind::Field(f) if f.obfuscated == obf_name => Some(f.original_name.as_str()),
+                    MemberKind::Method(x) if x.obfuscated == obf_name => Some(x.original_name.as_str()),
+                    _ => None,
+                })
+                .collect();
+            let value = label.value.as_deref().unwrap();
+            assert!(originals.contains(&value), "{fixture}: {} named {value}, mapping says {originals:?}", p.describe(*item));
+            graded += 1;
+        }
+    }
+    assert!(graded >= 3, "only {graded} enum-utility names graded");
+
+    let out = outcome("r94_enum", "r8");
+    let got: Vec<(Option<&str>, Vec<&str>)> = out.report.enums.iter().map(|e| (e.fqn.as_deref(), e.constants.iter().map(String::as_str).collect())).collect();
+    assert_eq!(got, vec![
+        (None, vec!["ADD", "MUL", "SUB"]),
+        (None, vec!["MERCURY", "VENUS", "EARTH", "MARS"]),
+        (Some("com.example.enums.Color"), vec!["RED", "GREEN", "BLUE"]),
+    ]);
+}

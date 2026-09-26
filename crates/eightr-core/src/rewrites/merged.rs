@@ -96,6 +96,26 @@ fn origins(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Vec<DefSite> {
     out
 }
 
+/// Does the value `def_at` defines in `reg` only feed branch operands (through copies)?
+fn only_branch_uses(body: &Body, rd: &ReachingDefs, def_at: u32, reg: Reg, depth: u32) -> bool {
+    let Some(d) = rd.defs.iter().position(|x| x.site == DefSite::Insn(def_at) && x.reg == reg) else { return false };
+    for (j, insn) in body.insns.iter().enumerate() {
+        let Some(uses) = rd.uses[j].as_ref() else { continue };
+        if !uses.iter().any(|(r, defs)| *r == reg && defs.contains(&d)) {
+            continue;
+        }
+        let ok = match &insn.op {
+            Op::If { .. } | Op::IfZ { .. } | Op::Switch { .. } => true,
+            Op::Move { dst, src, .. } if *src == reg && depth > 0 => only_branch_uses(body, rd, j as u32, *dst, depth - 1),
+            _ => false,
+        };
+        if !ok {
+            return false;
+        }
+    }
+    true
+}
+
 /// The value of `reg` at `at` if every definition reaching it is the same narrow constant.
 fn const_value(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Option<i32> {
     let o = origins(body, rd, at, reg);
@@ -154,13 +174,20 @@ fn id_fields(p: &Model, ci: usize) -> Vec<(FieldRef, BTreeMap<usize, IdSource>)>
                 continue;
             }
             let Some(body) = m.code.as_ref() else { return out };
-            let Some(rd) = analyze(body) else { return out };
+            let Ok(cfg) = Cfg::build(body) else { return out };
+            let rd = ReachingDefs::compute(body, &cfg);
+            let entry = cfg.rpo.first().copied().unwrap_or(0);
+            let this = body.registers - body.ins;
             let mut src = None;
+            // `this` escaped (passed to a call other than a constructor) before the id store?
+            let mut escaped = false;
             for (i, insn) in body.insns.iter().enumerate() {
                 let i = i as u32;
                 match &insn.op {
                     Op::InstancePut { src: v, obj, field, .. } if *field == fref => {
-                        if src.is_some() || !is_this(body, &rd, i, *obj) {
+                        // The store must run on every path, before anything could read the id:
+                        // in the entry block, before `this` escapes.
+                        if src.is_some() || !is_this(body, &rd, i, *obj) || cfg.block_of[i as usize] != entry || escaped {
                             continue 'field;
                         }
                         let o = origins(body, &rd, i, *v);
@@ -179,6 +206,7 @@ fn id_fields(p: &Model, ci: usize) -> Vec<(FieldRef, BTreeMap<usize, IdSource>)>
                         let Some(to) = c.methods.iter().position(|x| x.name == method.name && x.proto == method.proto) else { continue 'field };
                         delegations.push((mi, to));
                     }
+                    Op::Invoke { method, args, .. } if p.syms.get(method.name) != "<init>" && args.contains(&this) => escaped = true,
                     _ => {}
                 }
             }
@@ -211,8 +239,26 @@ impl Rewrite for SplitMerged {
     fn run(&self, p: &mut Model, records: &mut Vec<RewriteRecord>) -> Result<()> {
         let subclassed: BTreeSet<&str> = p.classes.iter().filter_map(|c| c.superclass).map(|t| p.syms.get(t)).collect();
         let mut plans: Vec<Plan> = Vec::new();
+        // Java serialization names the class in streams and skips constructors: leave those.
+        let serializable = |ci: usize| {
+            let mut stack = vec![p.classes[ci].ty];
+            let mut seen = BTreeSet::new();
+            while let Some(t) = stack.pop() {
+                let d = p.syms.get(t);
+                if d == "Ljava/io/Serializable;" {
+                    return true;
+                }
+                if !seen.insert(d.to_string()) {
+                    continue;
+                }
+                if let Some(i) = p.find(d) {
+                    stack.extend(p.classes[i].superclass.iter().chain(&p.classes[i].interfaces).copied());
+                }
+            }
+            false
+        };
         for ci in 0..p.classes.len() {
-            if subclassed.contains(p.syms.get(p.classes[ci].ty)) {
+            if subclassed.contains(p.syms.get(p.classes[ci].ty)) || serializable(ci) {
                 continue;
             }
             for (field, ctors) in id_fields(p, ci) {
@@ -221,6 +267,46 @@ impl Rewrite for SplitMerged {
         }
         if plans.is_empty() {
             return Ok(());
+        }
+        // R8's class id is only ever a dispatch key: every read of it, anywhere, feeds only
+        // `if`/`switch` operands. (A captured int that happens to be constant at every
+        // instantiation is used as a value.)
+        {
+            let plans_of = |f: &FieldRef| -> Vec<usize> { plans.iter().enumerate().filter(|(_, pl)| pl.field == *f).map(|(k, _)| k).collect() };
+            let mut bad: BTreeSet<usize> = BTreeSet::new();
+            for c in &p.classes {
+                for m in &c.methods {
+                    let Some(body) = &m.code else { continue };
+                    let reads: Vec<(u32, Reg, Vec<usize>)> = body
+                        .insns
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, x)| match &x.op {
+                            Op::InstanceGet { dst, field, .. } => Some((i as u32, *dst, plans_of(field))).filter(|r| !r.2.is_empty()),
+                            _ => None,
+                        })
+                        .collect();
+                    if reads.is_empty() {
+                        continue;
+                    }
+                    let Some(rd) = analyze(body) else {
+                        bad.extend(reads.iter().flat_map(|r| r.2.iter().copied()));
+                        continue;
+                    };
+                    for (i, dst, ks) in reads {
+                        if !only_branch_uses(body, &rd, i, dst, 4) {
+                            bad.extend(ks.iter().copied());
+                        }
+                    }
+                }
+            }
+            if !bad.is_empty() {
+                let keep: Vec<Plan> = plans.drain(..).enumerate().filter(|(k, _)| !bad.contains(k)).map(|(_, pl)| pl).collect();
+                plans = keep;
+            }
+            if plans.is_empty() {
+                return Ok(());
+            }
         }
         // Candidate plans per class (a class may have several id-shaped fields).
         let mut by_type: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
@@ -265,12 +351,44 @@ impl Rewrite for SplitMerged {
                                 rejected.extend(by_type.values().flatten().copied());
                                 continue;
                             };
+                            // A syntactic approximation of "the value is typed as a merged class":
+                            // its definition says so, or the method casts that register to it.
+                            for x in body.insns.iter() {
+                                if let Op::CheckCast { reg, ty } = &x.op {
+                                    if *reg == args[0] {
+                                        rejected.extend(by_type.get(p.syms.get(*ty)).into_iter().flatten());
+                                    }
+                                }
+                            }
+                            let param_types: Vec<String> = {
+                                let mut v = Vec::new();
+                                if m.access & access::STATIC == 0 {
+                                    v.push(p.syms.get(c.ty).to_string());
+                                }
+                                for t in parse_proto(p.syms.get(m.proto)).map(|x| x.0).unwrap_or_default() {
+                                    v.push(t.to_string());
+                                    if matches!(t, "J" | "D") {
+                                        v.push(String::new());
+                                    }
+                                }
+                                v
+                            };
                             for o in origins(body, rd, i, args[0]) {
                                 let typed = match o {
-                                    DefSite::Param => by_type.get(p.syms.get(c.ty)).filter(|_| args[0] == body.registers - body.ins && m.access & access::STATIC == 0),
+                                    DefSite::Param => arg_word(body, args[0]).and_then(|w| param_types.get(w)).and_then(|t| by_type.get(t.as_str())),
                                     DefSite::Insn(j) => match &body.insns[j as usize].op {
                                         Op::NewInstance { ty, .. } => by_type.get(p.syms.get(*ty)),
                                         Op::InstanceGet { field, .. } | Op::StaticGet { field, .. } => by_type.get(p.syms.get(field.ty)),
+                                        // An element of an array of the class.
+                                        Op::ArrayGet { array, .. } => {
+                                            let arrays: Vec<&str> = body.insns.iter().filter_map(|y| match &y.op {
+                                                Op::NewArray { ty, .. } | Op::FilledNewArray { ty, .. } => Some(p.syms.get(*ty)),
+                                                Op::StaticGet { field, .. } | Op::InstanceGet { field, .. } => Some(p.syms.get(field.ty)),
+                                                _ => None,
+                                            }).collect();
+                                            let _ = array;
+                                            arrays.iter().find_map(|a| a.strip_prefix('[').and_then(|e| by_type.get(e)))
+                                        }
                                         Op::MoveResult { .. } => match body.insns.get(j as usize - 1).map(|x| &x.op) {
                                             Some(Op::Invoke { method, .. }) => parse_proto(p.syms.get(method.proto)).and_then(|(_, r)| by_type.get(r)),
                                             _ => None,
@@ -357,7 +475,8 @@ impl Rewrite for SplitMerged {
     }
 }
 
-/// Class descriptors named by method handles, method types, annotations or constant values.
+/// Class descriptors named by method handles, call-site arguments, annotation values or
+/// constant values.
 fn handle_refs(p: &Model) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for c in &p.classes {
@@ -381,6 +500,19 @@ fn handle_refs(p: &Model) -> BTreeSet<String> {
             eightr_ir::refs::value_types(p, v, |d| {
                 out.insert(d.to_string());
             });
+        }
+        // Annotations (e.g. `@JsonSubTypes(C.class)`, then reflective instantiation).
+        let anns = c
+            .annotations
+            .iter()
+            .chain(c.fields.iter().flat_map(|f| &f.annotations))
+            .chain(c.methods.iter().flat_map(|m| m.annotations.iter().chain(m.parameter_annotations.iter().flatten().flatten())));
+        for a in anns {
+            for (_, v) in &a.annotation.elements {
+                eightr_ir::refs::value_types(p, v, |d| {
+                    out.insert(d.to_string());
+                });
+            }
         }
     }
     out
@@ -417,7 +549,11 @@ fn prepare(p: &mut Model, plan: &Plan) -> Option<Prepared> {
         .filter(|(_, m)| {
             m.access & (access::STATIC | access::PRIVATE | access::CONSTRUCTOR | access::ABSTRACT) == 0
                 && p.syms.get(m.name) != "<init>"
-                && m.code.as_ref().is_some_and(|b| b.insns.iter().any(|i| matches!(&i.op, Op::InstanceGet { field, .. } if *field == plan.field)))
+                && m.code.as_ref().is_some_and(|b| {
+                    analyze(b).is_some_and(|rd| {
+                        b.insns.iter().enumerate().any(|(i, x)| matches!(&x.op, Op::InstanceGet { field, obj, .. } if *field == plan.field && is_this(b, &rd, i as u32, *obj)))
+                    })
+                })
         })
         .map(|(i, _)| i)
         .collect();
@@ -430,7 +566,11 @@ fn prepare(p: &mut Model, plan: &Plan) -> Option<Prepared> {
     for &id in &ids {
         // A placeholder descriptor: naming replaces it structurally, so the id never shows.
         let tag = if id < 0 { format!("m{}", -(i64::from(id))) } else { id.to_string() };
-        sub_of.insert(id, p.syms.intern(&format!("{inner}$$Split{tag};")));
+        let desc = format!("{inner}$$Split{tag};");
+        if p.find(&desc).is_some() {
+            return None; // an existing class has that name
+        }
+        sub_of.insert(id, p.syms.intern(&desc));
     }
     let drop_id = plan.sites.iter().all(|s| match plan.ctors[&s.ctor] {
         IdSource::Const(_) => true,
@@ -443,10 +583,22 @@ fn prepare(p: &mut Model, plan: &Plan) -> Option<Prepared> {
             _ => false,
         },
     });
-    let mut ctors = BTreeMap::new();
-    for &(id, ctor) in &used {
-        ctors.insert((id, ctor), sub_ctor(p, plan, ctor, id, drop_id)?);
-    }
+    // Subclass constructors of one id must have distinct protos (dropping the id can make two
+    // base constructors collide): keep the id parameter then, or give up.
+    let build = |p: &mut Model, drop_id: bool| -> Option<BTreeMap<(i32, usize), (Body, Sym)>> {
+        let mut ctors = BTreeMap::new();
+        for &(id, ctor) in &used {
+            ctors.insert((id, ctor), sub_ctor(p, plan, ctor, id, drop_id)?);
+        }
+        let mut seen = BTreeSet::new();
+        let unique = ctors.iter().all(|((id, _), (_, proto))| seen.insert((*id, p.syms.get(*proto).to_string())));
+        unique.then_some(ctors)
+    };
+    let (ctors, drop_id) = match build(p, drop_id) {
+        Some(c) => (c, drop_id),
+        None if drop_id => (build(p, false)?, false),
+        None => return None,
+    };
     Some(Prepared { ids, dispatch, sub_of, ctors, drop_id })
 }
 
@@ -494,6 +646,15 @@ fn widen_privates(p: &mut Model, class: usize, dispatch: &[usize]) -> Vec<usize>
         }
         out
     };
+    let package = |t: Sym| {
+        let d = p.syms.get(t);
+        d.rsplit_once('/').map_or("", |(a, _)| a).to_string()
+    };
+    let own_package = package(ty);
+    let protected_elsewhere = |p: &Model, owner: Sym, is: &dyn Fn(&Method) -> bool| -> bool {
+        package(owner) != own_package
+            && p.find(p.syms.get(owner)).is_some_and(|i| p.classes[i].methods.iter().any(|m| is(m) && m.access & access::PROTECTED != 0))
+    };
     let c = &p.classes[class];
     let private_field = |f: &FieldRef| f.class == ty && c.fields.iter().any(|x| x.name == f.name && x.ty == f.ty && x.access & access::PRIVATE != 0);
     let private_method = |m: &MethodRef| {
@@ -515,6 +676,9 @@ fn widen_privates(p: &mut Model, class: usize, dispatch: &[usize]) -> Vec<usize>
                 // `invoke-super` resolves from the class holding the code: moved into a
                 // subclass it would reach the base (whose method becomes abstract).
                 Op::Invoke { kind: InvokeKind::Super, .. } => ok = false,
+                // Protected members of another package are reachable from the base through
+                // its own receivers only; a moved copy's receiver type changes. Keep it simple.
+                Op::Invoke { method, .. } if protected_elsewhere(p, method.class, &|m: &Method| m.name == method.name && m.proto == method.proto) => ok = false,
                 Op::Invoke { method, .. } => {
                     if let Some(k) = private_method(method) {
                         let x = &c.methods[k];
@@ -861,5 +1025,114 @@ mod tests {
         let get = g.methods.iter().find(|m| p.syms.get(m.name) == "get").unwrap();
         assert!(get.code.is_some() && get.access & access::ABSTRACT == 0);
         assert!(p.classes.iter().filter(|c| c.superclass == Some(g.ty)).all(|c| c.methods.iter().all(|m| p.syms.get(m.name) != "get")));
+    }
+
+    // Findings of the Phase 2 review, as regression tests.
+    fn add_to_u(p: &mut Model, m: Method) {
+        let u = p.find("LU;").unwrap();
+        p.classes[u].methods.push(m);
+        p.sort();
+    }
+
+    #[test]
+    fn review_getclass_on_param_typed_as_class_refuses() {
+        let mut p = group(plain_arm);
+        let gc = MethodRef { class: p.syms.intern("Ljava/lang/Object;"), name: p.syms.intern("getClass"), proto: p.syms.intern("()Ljava/lang/Class;") };
+        let b = body(2, 1, vec![
+            Op::Invoke { kind: InvokeKind::Virtual, method: gc, args: vec![1] },
+            Op::MoveResult { width: Width::Object, dst: 0 },
+            Op::Return { width: Width::Object, src: 0 },
+        ]);
+        let m = meth(&mut p, "k", "(LG;)Ljava/lang/Class;", access::PUBLIC | access::STATIC, Some(b));
+        add_to_u(&mut p, m);
+        assert_eq!(run(&mut p).len(), 0, "split despite getClass() on an LG;-typed parameter");
+    }
+
+    #[test]
+    fn review_getclass_on_checkcast_refuses() {
+        let mut p = group(plain_arm);
+        let g = p.syms.intern("LG;");
+        let gc = MethodRef { class: p.syms.intern("Ljava/lang/Object;"), name: p.syms.intern("getClass"), proto: p.syms.intern("()Ljava/lang/Class;") };
+        let b = body(2, 1, vec![
+            Op::CheckCast { reg: 1, ty: g },
+            Op::Invoke { kind: InvokeKind::Virtual, method: gc, args: vec![1] },
+            Op::MoveResult { width: Width::Object, dst: 0 },
+            Op::Return { width: Width::Object, src: 0 },
+        ]);
+        let m = meth(&mut p, "k", "(Ljava/lang/Object;)Ljava/lang/Class;", access::PUBLIC | access::STATIC, Some(b));
+        add_to_u(&mut p, m);
+        assert_eq!(run(&mut p).len(), 0, "split despite getClass() on a check-cast LG; value");
+    }
+
+    #[test]
+    fn review_subclass_constructor_protos_are_unique() {
+        let mut p = group(plain_arm);
+        let gi = p.find("LG;").unwrap();
+        let g = p.classes[gi].ty;
+        let id = FieldRef { class: g, name: p.syms.intern("a"), ty: p.syms.intern("B") };
+        let cap = FieldRef { class: g, name: p.syms.intern("b"), ty: p.syms.intern("I") };
+        let obj_init = MethodRef { class: p.syms.intern("Ljava/lang/Object;"), name: p.syms.intern("<init>"), proto: p.syms.intern("()V") };
+        let c2 = body(3, 2, vec![
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::InstancePut { kind: eightr_ir::op::MemKind::Byte, src: 0, obj: 1, field: id },
+            Op::InstancePut { kind: eightr_ir::op::MemKind::Narrow, src: 2, obj: 1, field: cap },
+            Op::Invoke { kind: InvokeKind::Direct, method: obj_init, args: vec![1] },
+            Op::ReturnVoid,
+        ]);
+        let m = meth(&mut p, "<init>", "(I)V", access::PUBLIC | access::CONSTRUCTOR, Some(c2));
+        p.classes[gi].methods.push(m);
+        let g_init1 = MethodRef { class: g, name: p.syms.intern("<init>"), proto: p.syms.intern("(I)V") };
+        let b = body(3, 1, vec![
+            Op::NewInstance { dst: 0, ty: g },
+            Op::Invoke { kind: InvokeKind::Direct, method: g_init1, args: vec![0, 2] },
+            Op::Return { width: Width::Object, src: 0 },
+        ]);
+        let m = meth(&mut p, "m2", "(I)LG;", access::PUBLIC | access::STATIC, Some(b));
+        add_to_u(&mut p, m);
+        if run(&mut p).is_empty() { return; }
+        for c in &p.classes {
+            let mut seen = BTreeSet::new();
+            for m in &c.methods {
+                assert!(seen.insert((p.syms.get(m.name).to_string(), p.syms.get(m.proto).to_string())), "{}: duplicate {}{}", p.syms.get(c.ty), p.syms.get(m.name), p.syms.get(m.proto));
+            }
+        }
+    }
+
+    #[test]
+    fn review_conditional_id_write_refuses() {
+        let mut p = group(plain_arm);
+        let gi = p.find("LG;").unwrap();
+        let g = p.classes[gi].ty;
+        let id = FieldRef { class: g, name: p.syms.intern("a"), ty: p.syms.intern("B") };
+        let cap = FieldRef { class: g, name: p.syms.intern("b"), ty: p.syms.intern("I") };
+        let obj_init = MethodRef { class: p.syms.intern("Ljava/lang/Object;"), name: p.syms.intern("<init>"), proto: p.syms.intern("()V") };
+        let ctor = body(3, 3, vec![
+            Op::IfZ { cond: eightr_ir::op::Cond::Eq, a: 1, target: 2 },
+            Op::InstancePut { kind: eightr_ir::op::MemKind::Byte, src: 2, obj: 0, field: id },
+            Op::InstancePut { kind: eightr_ir::op::MemKind::Narrow, src: 1, obj: 0, field: cap },
+            Op::Invoke { kind: InvokeKind::Direct, method: obj_init, args: vec![0] },
+            Op::ReturnVoid,
+        ]);
+        let k = p.classes[gi].methods.iter().position(|m| p.syms.get(m.name) == "<init>").unwrap();
+        p.classes[gi].methods[k].code = Some(ctor);
+        assert_eq!(run(&mut p).len(), 0, "split although the id store doesn't dominate the constructor's exit");
+    }
+
+    #[test]
+    fn review_arithmetic_capture_is_not_a_class_id() {
+        let mut p = group(plain_arm);
+        let gi = p.find("LG;").unwrap();
+        let g = p.classes[gi].ty;
+        let id = FieldRef { class: g, name: p.syms.intern("a"), ty: p.syms.intern("B") };
+        let cap = FieldRef { class: g, name: p.syms.intern("b"), ty: p.syms.intern("I") };
+        let get = body(3, 1, vec![
+            Op::InstanceGet { kind: eightr_ir::op::MemKind::Byte, dst: 0, obj: 2, field: id },
+            Op::InstanceGet { kind: eightr_ir::op::MemKind::Narrow, dst: 1, obj: 2, field: cap },
+            Op::Binop { op: BinOp::Add, ty: NumType::Int, dst: 1, a: 1, b: Operand::Reg(0) },
+            Op::Return { width: Width::Single, src: 1 },
+        ]);
+        let k = p.classes[gi].methods.iter().position(|m| p.syms.get(m.name) == "get").unwrap();
+        p.classes[gi].methods[k].code = Some(get);
+        assert_eq!(run(&mut p).len(), 0, "an arithmetic capture was split as a class id");
     }
 }

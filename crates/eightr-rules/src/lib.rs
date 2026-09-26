@@ -103,6 +103,7 @@ pub const KEPT_NAME: &str = "r8/kept-name";
 pub const OUTLINE_INLINE: &str = "r8/outline-inline";
 pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
 pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
+pub const ENUM_UNBOXING_UTILITY: &str = "r8/enum-unboxing-utility";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
@@ -189,6 +190,19 @@ pub static REGISTRY: &[Rule] = &[
         fixtures: &["r94_outline"],
     },
     Rule {
+        id: ENUM_UNBOXING_UTILITY,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "Name the members of R8's shared enum-unboxing utility: `$VALUES`, `ordinal`, `values` (R8 generates these names verbatim).",
+        preconditions: &[
+            "A synthetic class with a static int[] set in <clinit> to exactly {1..N} by filled-new-array.",
+            "`ordinal`: a static (I)I that throws on 0 and returns x - 1; `values`: a static (I)[I copying a prefix of the array with System.arraycopy. At least one of them present.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["r94_enum", "shapes"],
+    },
+    Rule {
         id: KEPT_NAME,
         source: Source::R8,
         class: Class::Solved,
@@ -241,8 +255,9 @@ pub static REGISTRY: &[Rule] = &[
         attributes: &[A::Body],
         summary: "Split a class R8's horizontal merger combined (merged siblings, lambda groups) into an abstract base plus one subclass per class id, each overriding the id-dispatching methods with its own arm.",
         preconditions: &[
-            "A synthetic final byte/short/int instance field written only by the class's constructors, once each, from a constant or a parameter; no constructor delegates to another of the class.",
-            "Every instantiation passes a constant id and pairs one new-instance with one <init>; no program subclass, no const-class, method handle or constant naming the class, no used getClass() on a value typed as it.",
+            "A synthetic final byte/short/int instance field stored by the class's constructors once, in the entry block before `this` escapes, from a constant or a parameter (delegation only to constructors not storing it); every read of it anywhere only feeds if/switch operands (R8's class id is only a dispatch key).",
+            "Every instantiation passes a constant id and pairs one new-instance with one <init>; no program subclass, not Serializable, no const-class, method handle, annotation or constant naming the class.",
+            "No used getClass() on a value syntactically typed as the class (definition, parameter type, check-cast, array element). An approximation: values typed Object or as an interface escape it; R8 merged the class under the same assumption.",
             "S facts: at least (number of ids) classes were merged, and each override is exactly that id's behavior. The split form (base + subclasses, names) is D.",
         ],
         fallback: Some(IDENTITY),

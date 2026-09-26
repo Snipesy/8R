@@ -1,6 +1,7 @@
 //! Un-passes. Each implements one or more registered rules.
 
 mod annotation_member;
+pub mod enum_unboxing;
 pub mod kept_name;
 mod lateinit;
 mod library_override;
@@ -19,6 +20,8 @@ pub struct Context<'a> {
     pub evidence: &'a Evidence,
     pub labels: &'a mut Labels,
     pub findings: &'a mut Vec<crate::report::Finding>,
+    /// Enums R8 unboxed (evidence for a class that no longer exists).
+    pub enums: &'a mut Vec<enum_unboxing::RecoveredEnum>,
 }
 
 pub trait Pass {
@@ -34,6 +37,7 @@ pub fn all() -> Vec<Box<dyn Pass>> {
     let mut v: Vec<Box<dyn Pass>> = vec![
         Box::new(kept_name::KeptName),
         Box::new(annotation_member::AnnotationMember),
+        Box::new(enum_unboxing::EnumUnboxing),
         Box::new(library_override::LibraryOverride),
         Box::new(lateinit::Lateinit),
     ];
