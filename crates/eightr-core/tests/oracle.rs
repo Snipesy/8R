@@ -424,7 +424,8 @@ fn outline_detection_matches_mapping() {
                 let holder = owner.rsplit_once('$').is_some_and(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
                 let bottom_up = synthesized
                     && holder
-                    && x.original_name == "m"
+                    // `m`, or `m$1`, `m$2`, ... when a holder has colliding ones.
+                    && x.original_name.strip_prefix('m').is_some_and(|r| r.is_empty() || r.strip_prefix('$').is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit())))
                     && x.return_type == "void"
                     && ends_in_throw(&plain.program.model, &c.obfuscated, &x.obfuscated);
                 bottom_up_truth += usize::from(bottom_up);

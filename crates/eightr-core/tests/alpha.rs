@@ -103,7 +103,11 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
                     MemberKind::Method(m) => m.obfuscated == n && m.original_name == n,
                 })
             });
-            if was_renamed { renamed.insert(n.to_string()) } else { kept.insert(n.to_string()) };
+            // R8 reports a moved or merged body under its original name even where the residual
+            // name is a kept one (a lambda body `f$lambda$1` living on as `newThread`, overriding
+            // a library method): only generator-shaped names were generated.
+            let generated = n.len() <= 4 && n.bytes().all(|b| b.is_ascii_alphanumeric()) && n.as_bytes()[0].is_ascii_alphabetic();
+            if was_renamed && generated { renamed.insert(n.to_string()) } else { kept.insert(n.to_string()) };
         }
         for m in c.methods.iter().filter_map(|m| m.code.as_ref()) {
             for i in &m.insns {
@@ -264,10 +268,14 @@ fn outputs_are_alpha_invariant() {
             let got = projection(&scrambled, &inverse);
             if got != expected {
                 let first = expected.lines().zip(got.lines()).position(|(a, b)| a != b).unwrap_or(0);
+                let (e, g): (std::collections::BTreeSet<&str>, std::collections::BTreeSet<&str>) = (expected.lines().collect(), got.lines().collect());
+                let only = |a: &std::collections::BTreeSet<&str>, b: &std::collections::BTreeSet<&str>| a.difference(b).filter(|l| !l.contains("structural")).take(6).map(|l| l.to_string()).collect::<Vec<_>>().join("\n    ");
                 panic!(
-                    "{fixture} seed {seed}: output depends on R8's arbitrary choices (first difference at line {first}):\n  expected: {}\n  got:      {}",
+                    "{fixture} seed {seed}: output depends on R8's arbitrary choices (first difference at line {first}):\n  expected: {}\n  got:      {}\n  only expected:\n    {}\n  only got:\n    {}",
                     expected.lines().nth(first).unwrap_or(""),
-                    got.lines().nth(first).unwrap_or("")
+                    got.lines().nth(first).unwrap_or(""),
+                    only(&e, &g),
+                    only(&g, &e)
                 );
             }
             // The strongest form: 8R's emitted program is byte-identical.

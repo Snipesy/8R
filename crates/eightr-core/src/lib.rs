@@ -15,6 +15,7 @@ pub mod compose;
 pub mod composables;
 pub mod inline_hints;
 pub mod rewrites;
+pub mod sigdb;
 pub mod sources;
 
 pub use error::{Error, Result};

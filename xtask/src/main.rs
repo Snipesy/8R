@@ -24,6 +24,8 @@
 //!
 //! Outputs are checked in so the normal test suite needs no JDK or Android SDK.
 
+mod sigdb;
+
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -38,7 +40,8 @@ fn main() {
         Some("fixtures") => fixtures(&args[1..]),
         Some("platform-api") => platform_api(),
         Some("fetch") => fetch_tools(&args[1..]),
-        _ => Err("usage: cargo xtask fixtures [NAME...] | platform-api | fetch jadx".into()),
+        Some("sigdb") => sigdb::sigdb(&args[1..]),
+        _ => Err("usage: cargo xtask fixtures [NAME...] | platform-api | fetch jadx | sigdb [LIBRARY...]".into()),
     };
     if let Err(e) = result {
         eprintln!("xtask: {e}");
