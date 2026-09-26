@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "inlined_occurrences": 21355,
-    "recall": 0.034,
-    "touched": 720
+    "inlined_occurrences": 28266,
+    "recall": 0.03,
+    "touched": 855
   },
   "discarded-getclass": {
-    "hints": 539,
-    "precision": 0.777
+    "hints": 651,
+    "precision": 0.76
   },
   "discarded-getclass@r8-8": {
     "base_rate": 0.518,
@@ -16,13 +16,14 @@
   },
   "discarded-getclass@r8-9": {
     "base_rate": 0.522,
-    "hints": 404,
-    "lift": 1.456,
-    "precision": 0.76
+    "hints": 516,
+    "lift": 1.421,
+    "precision": 0.742
   },
   "fixtures": [
     "compose_basic",
     "compose_basic_r94",
+    "compose_shapes",
     "dontobfuscate",
     "hello",
     "kotlin_basic",
@@ -41,10 +42,10 @@
     "shapes"
   ],
   "idiom:areEqual": {
-    "hints": 105,
-    "occurrences": 102,
-    "precision": 0.848,
-    "recall": 0.873
+    "hints": 132,
+    "occurrences": 132,
+    "precision": 0.856,
+    "recall": 0.856
   },
   "idiom:areEqual@r8-8": {
     "base_rate": 0.518,
@@ -54,15 +55,15 @@
   },
   "idiom:areEqual@r8-9": {
     "base_rate": 0.522,
-    "hints": 54,
-    "lift": 1.632,
-    "precision": 0.852
+    "hints": 81,
+    "lift": 1.654,
+    "precision": 0.864
   },
   "idiom:collectionSizeOrDefault": {
-    "hints": 5,
-    "occurrences": 10,
-    "precision": 0.4,
-    "recall": 0.3
+    "hints": 7,
+    "occurrences": 12,
+    "precision": 0.429,
+    "recall": 0.333
   },
   "idiom:collectionSizeOrDefault@r8-8": {
     "base_rate": 0.518,
@@ -72,13 +73,13 @@
   },
   "idiom:collectionSizeOrDefault@r8-9": {
     "base_rate": 0.522,
-    "hints": 3,
-    "lift": 0.639,
-    "precision": 0.333
+    "hints": 5,
+    "lift": 0.766,
+    "precision": 0.4
   },
   "inlined-instance-call": {
-    "hints": 178,
-    "precision": 0.865
+    "hints": 215,
+    "precision": 0.847
   },
   "inlined-instance-call@r8-8": {
     "base_rate": 0.518,
@@ -88,13 +89,13 @@
   },
   "inlined-instance-call@r8-9": {
     "base_rate": 0.522,
-    "hints": 116,
-    "lift": 1.619,
-    "precision": 0.845
+    "hints": 153,
+    "lift": 1.576,
+    "precision": 0.824
   },
   "param-null-check": {
-    "hints": 109,
-    "precision": 0.303
+    "hints": 156,
+    "precision": 0.282
   },
   "param-null-check@r8-8": {
     "base_rate": 0.518,
@@ -104,8 +105,8 @@
   },
   "param-null-check@r8-9": {
     "base_rate": 0.522,
-    "hints": 108,
-    "lift": 0.585,
-    "precision": 0.306
+    "hints": 155,
+    "lift": 0.543,
+    "precision": 0.284
   }
 }

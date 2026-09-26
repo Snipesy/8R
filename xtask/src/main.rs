@@ -7,6 +7,7 @@
 //! keep = -keep class com.example.Main { *; }     # one ProGuard rule per `keep` line
 //! lib = kxs-core                                 # library from fixtures/toolchain.conf
 //! plugin = kotlinx-serialization                 # kotlinc plugin (kotlinx-serialization, compose)
+//! plugin_option = <plugin id>:<key>=<value>        # kotlinc -P plugin:<...> option
 //! ```
 //!
 //! Libraries are program input to R8 (shrunk into the app, as in a real build) together with
@@ -129,6 +130,9 @@ struct Conf {
     keep: Vec<String>,
     libs: Vec<String>,
     plugins: Vec<String>,
+    /// `-P plugin:<id>:<option>` arguments for kotlinc (e.g. Compose's `sourceInformation=true`,
+    /// which Gradle turns on by default).
+    plugin_options: Vec<String>,
     /// Toolchain artifact for D8/R8 (default: the SDK build-tools d8.jar).
     r8: Option<String>,
     /// Take sources from another fixture's directory (for twins built with another R8).
@@ -137,7 +141,7 @@ struct Conf {
 
 fn parse_conf(path: &Path) -> Result<Conf> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), r8: None, sources: None };
+    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), plugin_options: Vec::new(), r8: None, sources: None };
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let (k, v) = line.split_once('=').ok_or_else(|| format!("bad line in {}: {line}", path.display()))?;
         match k.trim() {
@@ -145,6 +149,7 @@ fn parse_conf(path: &Path) -> Result<Conf> {
             "keep" => conf.keep.push(v.trim().to_string()),
             "lib" => conf.libs.push(v.trim().to_string()),
             "plugin" => conf.plugins.push(v.trim().to_string()),
+            "plugin_option" => conf.plugin_options.push(v.trim().to_string()),
             "r8" => conf.r8 = Some(v.trim().to_string()),
             "sources" => conf.sources = Some(v.trim().to_string()),
             // Entry point for the execution-equivalence tests; not used by the build.
@@ -328,6 +333,9 @@ fn fixtures(only: &[String]) -> Result<()> {
                 let mut arg = std::ffi::OsString::from("-Xplugin=");
                 arg.push(home.join("lib").join(jar));
                 cmd.arg(arg);
+            }
+            for o in &conf.plugin_options {
+                cmd.arg("-P").arg(format!("plugin:{o}"));
             }
             cmd.args(&kt_sources);
             run(&mut cmd)?;

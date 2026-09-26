@@ -9,7 +9,7 @@
 //!   inlining), so a fixture whose *unmodified* build doesn't run on a backend is skipped for
 //!   that backend, with the reason printed.
 //! * **ART via adb** (set `EIGHTR_ADB` to an adb binary with a device/emulator attached):
-//!   `dalvikvm64` on the device. Authoritative; used when available.
+//!   `app_process` on the device (the full Android runtime). Authoritative; used when available.
 //!
 //! Fixture mains never print class names, so renaming alone can't change their output.
 
@@ -129,7 +129,9 @@ impl Backend for Art {
             assert!(ok.status.success(), "adb push failed: {}", String::from_utf8_lossy(&ok.stderr));
             remote.push(r);
         }
-        let shell = format!("dalvikvm64 -cp {} {main} {}; echo \"__exit=$?\"", remote.join(":"), ARGS.join(" "));
+        // `app_process` starts the full Android runtime (framework natives such as `Log`, which
+        // Compose's runtime uses), unlike a bare `dalvikvm`.
+        let shell = format!("CLASSPATH={} app_process /system/bin {main} {}; echo \"__exit=$?\"", remote.join(":"), ARGS.join(" "));
         let out = Command::new(&self.adb).args(["shell", &shell]).output().unwrap();
         let text = String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n");
         let (stdout, code) = match text.rsplit_once("__exit=") {
