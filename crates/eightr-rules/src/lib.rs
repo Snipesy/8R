@@ -105,12 +105,27 @@ pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
 pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
 pub const ENUM_UNBOXING_UTILITY: &str = "r8/enum-unboxing-utility";
 pub const REBOX_ENUM: &str = "r8/rebox-enum";
+pub const COMPOSE_RUNTIME_API: &str = "compose/runtime-api";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
 
 /// All registered rules, sorted by id.
 pub static REGISTRY: &[Rule] = &[
+    Rule {
+        id: COMPOSE_RUNTIME_API,
+        source: Source::Compose,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "Name the Compose runtime Composer's members by the roles the compiler plugin's calls give them (startRestartGroup, endRestartGroup, shouldExecute, skipToGroupEnd, rememberedValue, updateRememberedValue, changed).",
+        preconditions: &[
+            "The Composer is found structurally: the class whose (I)C method is the constant-key entry call of the most methods (>= 5, 3x the runner-up).",
+            "Each role is played by one method in most composables showing it (a clear winner, 4x the runner-up): the skip decision (ZI)Z, the call on its false path, the null-tested object result, rememberedValue compared then updateRememberedValue(Object), (X)Z feeding the dirty bits.",
+            "Override groups (the composer's program supertypes/subtypes) are named together.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["compose_shapes", "compose_basic", "compose_basic_r94"],
+    },
     Rule {
         id: IDENTITY,
         source: Source::Core,

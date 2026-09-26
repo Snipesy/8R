@@ -1,6 +1,7 @@
 //! Un-passes. Each implements one or more registered rules.
 
 mod annotation_member;
+mod compose_api;
 pub mod enum_unboxing;
 pub mod kept_name;
 mod lateinit;
@@ -35,6 +36,7 @@ pub fn all() -> Vec<Box<dyn Pass>> {
     let mut v: Vec<Box<dyn Pass>> = vec![
         Box::new(kept_name::KeptName),
         Box::new(annotation_member::AnnotationMember),
+        Box::new(compose_api::ComposeApi),
         Box::new(enum_unboxing::EnumUnboxing),
         Box::new(library_override::LibraryOverride),
         Box::new(lateinit::Lateinit),
