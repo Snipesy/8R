@@ -162,6 +162,7 @@ pub fn strip(p: &mut Model) {
         crate::passes::compose_params::COMPOSABLE,
         crate::passes::compose_params::RESTART_SCOPE,
         crate::passes::compose_params::COMPOSABLE_SINGLETON,
+        crate::passes::compose_libkey::ORIGINAL,
     ]
         .iter()
         .filter_map(|t| p.syms.lookup(t))

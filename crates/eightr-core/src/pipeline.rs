@@ -154,6 +154,17 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
         let all = crate::composables::composables(&program.model, &c, &crate::compose::roles(&program.model, &c));
         let mut summary = crate::composables::summary(&all);
         summary.singleton_fields = crate::compose::singletons(&program.model, &c).len() as u64;
+        let db = crate::compose_keys::KeyDb::embedded();
+        let libs = crate::compose_keys::identify(&program.model, &c, db);
+        summary.library_composables_s = libs.iter().filter(|l| l.corroborated).count() as u64;
+        summary.library_composables_d = libs.len() as u64 - summary.library_composables_s;
+        for (library, versions, covered, total) in crate::compose_keys::versions(&program.model, &libs, db) {
+            report.libraries.push(crate::report::LibraryVersion {
+                library: format!("androidx.compose:{library}"),
+                versions,
+                evidence: format!("compose keys {covered}/{total}"),
+            });
+        }
         report.compose = Some(summary);
         if config.verbose_labels {
             report.composables = all;
@@ -282,6 +293,7 @@ fn build_report(
         inlining: Default::default(),
         inline_hints: Vec::new(),
         compose: None,
+        libraries: Vec::new(),
         composables: Vec::new(),
         summary,
         labels: entries,

@@ -27,6 +27,9 @@ pub struct Report {
     /// Every inlining hint, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub inline_hints: Vec<crate::inline_hints::InlineHint>,
+    /// Libraries in the app and their versions, with the evidence for each.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub libraries: Vec<LibraryVersion>,
     /// Compose: restartable composables and what their synthetic parameters prove.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compose: Option<crate::composables::ComposeSummary>,
@@ -106,4 +109,15 @@ impl Report {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("report serializes") + "\n"
     }
+}
+
+/// A library found in the app, with the versions its evidence allows.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct LibraryVersion {
+    /// Artifact or library name (`material3`, `okhttp`, `kotlinx_coroutines_core`, ...).
+    pub library: String,
+    /// Every version the evidence is consistent with (one when exact).
+    pub versions: Vec<String>,
+    /// What says so, e.g. `compose keys 112/151` or `META-INF/x.version`.
+    pub evidence: String,
 }

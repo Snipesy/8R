@@ -71,6 +71,19 @@ pub struct Program {
     pub retained_strings: Vec<String>,
 }
 
+/// Whether `v` is the JVM default of a field of type `ty` (what an absent static value means).
+pub fn is_default_for(v: &Value, ty: &str) -> bool {
+    match (v, ty.as_bytes().first()) {
+        (Value::Null, Some(b'L' | b'[')) => true,
+        (Value::Boolean(false), Some(b'Z')) => true,
+        (Value::Byte(0), Some(b'B')) | (Value::Short(0), Some(b'S')) | (Value::Char(0), Some(b'C')) => true,
+        (Value::Int(0), Some(b'I')) | (Value::Long(0), Some(b'J')) => true,
+        // Bit patterns: -0.0 is not the default.
+        (Value::Float(0), Some(b'F')) | (Value::Double(0), Some(b'D')) => true,
+        _ => false,
+    }
+}
+
 /// Is `s` a D8/R8/L8-style marker (`~~Tool{json}`)?
 pub fn is_marker(s: &str) -> bool {
     s.strip_prefix("~~").and_then(|r| r.find('{').map(|b| b > 0 && r[..b].bytes().all(|c| c.is_ascii_alphanumeric()))).unwrap_or(false)
@@ -96,6 +109,9 @@ fn load_class(r: &mut Resolver, dex: &Dex, def: &eightr_dex::class::ClassDef, or
     for (i, f) in data.fields().enumerate() {
         let fref = r.field(f.field_idx)?;
         let static_value = if i < data.static_fields.len() { statics.get(i).map(|v| r.value(v)).transpose()? } else { None };
+        // An explicit default equals no value: writers must spell out defaults before a
+        // non-default value, so whether one is spelled out depends on field (name) order.
+        let static_value = static_value.filter(|v| !is_default_for(v, r.syms.get(fref.ty)));
         let annotations = match dir.fields.iter().find(|(idx, _)| *idx == f.field_idx) {
             Some(&(_, off)) => r.annotation_set(off)?,
             None => Vec::new(),

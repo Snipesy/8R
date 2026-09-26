@@ -106,6 +106,17 @@ fn solved_names_match_held_back_mapping() {
     let mut unverifiable = 0;
     for fixture in fixture_names() {
         let mapping = Mapping::parse_normalized(&fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")).unwrap()).unwrap();
+        // (name, arity) of every source method (not synthesized) in the mapping.
+        let source_methods: std::collections::BTreeSet<(String, usize)> = mapping
+            .classes
+            .iter()
+            .flat_map(|c| c.members.iter())
+            .filter(|mm| !mm.metadata.iter().any(|x| x.parsed == Metadata::Synthesized))
+            .filter_map(|mm| match &mm.kind {
+                MemberKind::Method(m) => Some((m.original_name.clone(), m.params.len())),
+                _ => None,
+            })
+            .collect();
         let by_obf = mapping.by_obfuscated();
         let out = outcome(&fixture, "r8");
         let p = &out.program;
@@ -219,8 +230,14 @@ fn solved_names_match_held_back_mapping() {
                         // Constructor names are the one exception: every constructor is named
                         // <init>, so the name claim holds even for a synthesized constructor (whose
                         // *signature* isn't original; that's a different attribute).
+                        // An override of an Object method is named by the library too, even when R8
+                        // synthesized it (e.g. an equals for a merged class).
                         let ctor = meth_name == "<init>" || meth_name == "<clinit>";
-                        assert!(ctor || !md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized method");
+                        let forced = matches!((meth_name, meth_proto), ("equals", "(Ljava/lang/Object;)Z") | ("hashCode", "()I") | ("toString", "()Ljava/lang/String;"))
+                            // R8's forwarding methods (default interface methods, merged classes)
+                            // take the name of the source method they forward to.
+                            || source_methods.contains(&(claimed.to_string(), m.params.len()));
+                        assert!(ctor || forced || !md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized method");
                         assert_eq!(m.original_name, claimed, "{ctx}");
                     }
                 }
@@ -438,9 +455,8 @@ fn outline_detection_matches_mapping() {
             assert!(truth.contains(d), "{fixture}: {}.{} was inlined as an outline but isn't one", d.0, d.1);
             checked += 1;
         }
-        for t in &truth {
-            assert!(detected.contains(t), "{fixture}: outline {}.{} was not detected", t.0, t.1);
-        }
+        let missed: Vec<String> = truth.iter().filter(|t| !detected.contains(*t)).map(|t| format!("{}.{}", t.0, t.1)).collect();
+        assert!(missed.is_empty(), "{fixture}: outlines not detected: {missed:?}");
     }
     assert!(checked >= 8, "only {checked} outline detections checked");
     assert!(bottom_up_truth >= 5, "only {bottom_up_truth} bottom-up outlines in the mappings");
@@ -459,7 +475,7 @@ fn ends_in_throw(model: &eightr_ir::model::Program, class: &str, name: &str) -> 
 
 /// Merged-class detection (`r8/split-merged-class`) against the mapping: every split class must
 /// hold a `$r8$classId` field per the mapping (precision), and most of those must be split
-/// (recall, over classes without program subclasses; the rest are refused on purpose: abstract
+/// (recall, over classes without program subclasses and not Serializable; the rest are refused on purpose: abstract
 /// merged classes, class literals of the group, constructors that store the id twice).
 #[test]
 fn merged_class_detection_matches_mapping() {
@@ -490,7 +506,26 @@ fn merged_class_detection_matches_mapping() {
         let input = run(&load(&fixture, "r8"), &Config { no_rewrites: true, ..Default::default() }).unwrap();
         let m = &input.program.model;
         let subclassed: std::collections::BTreeSet<&str> = m.classes.iter().filter_map(|c| c.superclass).map(|t| m.syms.get(t)).collect();
-        let truth: Vec<&String> = truth.iter().filter(|t| !subclassed.contains(t.as_str())).collect();
+        // Serializable classes are refused by design too (serialization names the class and
+        // skips constructors): coroutine lambdas, whose BaseContinuationImpl is Serializable.
+        let serializable = |d: &str| {
+            let mut stack = vec![d.to_string()];
+            let mut seen = std::collections::BTreeSet::new();
+            while let Some(t) = stack.pop() {
+                if t == "Ljava/io/Serializable;" {
+                    return true;
+                }
+                if !seen.insert(t.clone()) {
+                    continue;
+                }
+                if let Some(i) = m.find(&t) {
+                    let c = &m.classes[i];
+                    stack.extend(c.superclass.iter().chain(&c.interfaces).map(|x| m.syms.get(*x).to_string()));
+                }
+            }
+            false
+        };
+        let truth: Vec<&String> = truth.iter().filter(|t| !subclassed.contains(t.as_str()) && !serializable(t)).collect();
         truth_total += truth.len();
         found += truth.iter().filter(|t| split.contains(t.as_str())).count();
     }

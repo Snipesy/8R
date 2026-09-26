@@ -44,6 +44,12 @@ struct Platform {
     methods: BTreeSet<(&'static str, &'static str)>,
 }
 
+/// Is `desc` a class of the Android platform (android.jar)? A program class with such a name is
+/// a stub R8 synthesized for a class newer than min-api.
+pub fn is_platform_class(desc: &str) -> bool {
+    platform().classes.contains(desc)
+}
+
 fn platform() -> &'static Platform {
     static P: std::sync::OnceLock<Platform> = std::sync::OnceLock::new();
     P.get_or_init(|| {
@@ -152,7 +158,7 @@ impl Ctx<'_> {
     fn stable_type(&self, d: &str) -> bool {
         let base = d.trim_start_matches('[');
         match self.p.find(base) {
-            Some(id) => self.s_class(id),
+            Some(id) => self.s_class(id) || is_platform_class(base),
             None => true,
         }
     }
@@ -285,7 +291,15 @@ fn class_labels(cx: &Ctx) -> Vec<String> {
             let ci = id.0 as usize;
             for (mi, m) in p.class(id).methods.iter().enumerate() {
                 let Some(body) = &m.code else { continue };
-                let mh = hash_hex(&eightr_ir::print::method(&model.classes[norm_of[ci]].methods[mi], &model.syms));
+                let text = eightr_ir::print::method(&model.classes[norm_of[ci]].methods[mi], &model.syms);
+                let mh = hash_hex(&text);
+                if let Some(dir) = std::env::var_os("EIGHTR_NAMING_DEBUG_METHODS") {
+                    use std::io::Write;
+                    let path = std::path::Path::new(&dir).join("methods.txt");
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        let _ = writeln!(f, "{mh}\t{}", text.replace('\n', "\u{1}"));
+                    }
+                }
                 for (k, insn) in body.insns.iter().enumerate() {
                     for d in op_types(p, &insn.op) {
                         if let Some(x) = p.find(d.trim_start_matches('[')) {
@@ -572,7 +586,10 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     let mut class_cands: Vec<(String, String, ClassId)> = Vec::new(); // (label, hint, id)
     for id in p.class_ids().filter(|id| !cx.s_class(*id)) {
         let d = p.descriptor(id);
-        if is_structural_name(simple_name_of(d)) || pins.class(d) {
+        // A platform class's name on a program class: a stub R8 synthesized for APIs newer than
+        // min-api. On devices that have the API the platform's class is loaded instead, so every
+        // reference must keep the name.
+        if is_structural_name(simple_name_of(d)) || pins.class(d) || is_platform_class(d) {
             taken.entry(package_of(d).to_string()).or_default().insert(simple_name_of(d).to_string());
             continue;
         }
@@ -637,6 +654,7 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     for id in p.class_ids() {
         for (i, f) in p.class(id).fields.iter().enumerate() {
             if cx.s_member(ItemId::Field { class: id, index: i as u32 })
+                || is_platform_class(p.descriptor(id))
                 || cx.recovered_member(ItemId::Field { class: id, index: i as u32 })
                 || is_structural_name(p.str(f.name))
                 || pins.field(p.descriptor(id), p.str(f.name))
@@ -680,7 +698,12 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     for id in p.class_ids() {
         for (i, m) in p.class(id).methods.iter().enumerate() {
             let item = ItemId::Method { class: id, index: i as u32 };
-            if m.access & access::CONSTRUCTOR != 0 || cx.s_member(item) || is_structural_name(p.str(m.name)) {
+            if m.access & access::CONSTRUCTOR != 0
+                || cx.s_member(item)
+                || cx.recovered_member(item)
+                || is_platform_class(p.descriptor(id))
+                || is_structural_name(p.str(m.name))
+            {
                 continue;
             }
             let members = if is_virtual(m) {

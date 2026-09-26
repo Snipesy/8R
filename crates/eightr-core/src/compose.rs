@@ -140,11 +140,11 @@ pub struct Role {
 
 /// The first call satisfying `on` from `start`, following gotos; `None` at any other branch or
 /// after 16 instructions.
-fn first_call<'a>(insns: &'a [eightr_ir::lift::Insn], start: usize, on: &dyn Fn(&eightr_ir::op::MethodRef) -> bool) -> Option<&'a eightr_ir::op::MethodRef> {
+fn first_call<'a>(insns: &'a [eightr_ir::lift::Insn], start: usize, on: &dyn Fn(&eightr_ir::op::MethodRef) -> bool) -> Option<(usize, &'a eightr_ir::op::MethodRef)> {
     let mut at = start;
     for _ in 0..16 {
         match &insns.get(at)?.op {
-            Op::Invoke { method, .. } if on(method) => return Some(method),
+            Op::Invoke { method, .. } if on(method) => return Some((at, method)),
             Op::Goto { target } => at = *target as usize,
             op if op.is_branch() || matches!(op, Op::Return { .. } | Op::ReturnVoid | Op::Throw { .. }) => return None,
             _ => at += 1,
@@ -229,8 +229,14 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
                         _ => continue,
                     };
                     let skip_at = if jump_when_true == skips_when_true { target as usize } else { i + 3 };
-                    if let Some(m2) = first_call(insns, skip_at, &on_c) {
-                        if s.get(m2.proto) == "()V" {
+                    if let Some((k, m2)) = first_call(insns, skip_at, &on_c) {
+                        // skipToGroupEnd is followed by the group's end (`endRestartGroup()`, an
+                        // object result); a defaults block's `endDefaults()` by the body.
+                        let ends = first_call(insns, k + 1, &on_c).is_some_and(|(_, m3)| {
+                            let pr = s.get(m3.proto);
+                            pr.starts_with("()L") && pr != "()Ljava/lang/Object;" && !pr.ends_with(&format!("){}", c.class))
+                        });
+                        if s.get(m2.proto) == "()V" && ends {
                             vote(if skips_when_true { "getSkipping" } else { "shouldExecute" }, key(method));
                             vote("skipToGroupEnd", key(m2));
                         }

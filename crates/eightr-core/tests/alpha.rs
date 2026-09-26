@@ -142,28 +142,64 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
             }
         }
     }
-    let pool: Vec<String> = renamed.difference(&kept).cloned().collect();
+    // Methods: one program-wide permutation of generated names, by name (references are renamed
+    // with them, resolvable or not; override groups share a name). Names some field also uses
+    // stay out: fields are permuted per class below.
+    let field_names: BTreeSet<String> = model.classes.iter().flat_map(|c| c.fields.iter().map(|f| s.get(f.name).to_string())).collect();
+    let pool: Vec<String> = renamed.difference(&kept).filter(|n| !field_names.contains(*n)).cloned().collect();
     let mut shuffled = pool.clone();
     rng.shuffle(&mut shuffled);
-    let members = pool.into_iter().zip(shuffled).collect();
-    Renaming { classes, members, ..Default::default() }
+    let members: BTreeMap<String, String> = pool.into_iter().zip(shuffled).collect();
+    let mut fields = BTreeMap::new();
+    let subclassed: BTreeSet<&str> = model.classes.iter().filter_map(|c| c.superclass).map(|t| s.get(t)).collect();
+    for c in &model.classes {
+        let desc = s.get(c.ty).to_string();
+        // Fields: R8 names each class's fields in sequence, so the arbitrary choice is which
+        // field gets which of the class's names: permute within the class. Only where no
+        // program superclass or subclass has fields: R8 never lets a field shadow another of the
+        // same name and type, and a permutation could.
+        let mut sup = c.superclass.and_then(|t| model.find(s.get(t)));
+        let mut inherits = false;
+        while let Some(k) = sup {
+            inherits |= !model.classes[k].fields.is_empty();
+            sup = model.classes[k].superclass.and_then(|t| model.find(s.get(t)));
+        }
+        if inherits || subclassed.contains(desc.as_str()) {
+            continue;
+        }
+        let names: Vec<String> = c.fields.iter().map(|f| s.get(f.name).to_string()).filter(|n| renamed.contains(n) && !kept.contains(n)).collect();
+        let mut shuffled = names.clone();
+        rng.shuffle(&mut shuffled);
+        for (f, new) in c.fields.iter().filter(|f| names.contains(&s.get(f.name).to_string())).zip(shuffled) {
+            fields.insert((desc.clone(), s.get(f.name).to_string(), s.get(f.ty).to_string()), new);
+        }
+    }
+    Renaming { classes, members, fields, ..Default::default() }
 }
 
 /// Inverse of a renaming, applied to descriptors, protos, and member names.
 struct Inverse {
     classes: BTreeMap<String, String>,
     members: BTreeMap<String, String>,
+    /// (renamed class descriptor, renamed field name) → original field name.
+    fields: BTreeMap<(String, String), String>,
 }
 
 impl Inverse {
     fn of(r: &Renaming) -> Inverse {
+        let class = |d: &String| r.classes.get(d).cloned().unwrap_or_else(|| d.clone());
         Inverse {
             classes: r.classes.iter().map(|(a, b)| (b.clone(), a.clone())).collect(),
-            members: r.members.iter().map(|(a, b)| (b.clone(), a.clone())).collect(),
+            members: r.members.iter().chain(r.methods.iter().map(|((_, n, _), new)| (n, new))).map(|(a, b)| (b.clone(), a.clone())).collect(),
+            fields: r.fields.iter().map(|((c, n, _), new)| ((class(c), new.clone()), n.clone())).collect(),
         }
     }
     fn identity() -> Inverse {
-        Inverse { classes: BTreeMap::new(), members: BTreeMap::new() }
+        Inverse { classes: BTreeMap::new(), members: BTreeMap::new(), fields: BTreeMap::new() }
+    }
+    /// A field of (renamed) class `class`.
+    fn field(&self, class: &str, n: &str) -> String {
+        self.fields.get(&(class.to_string(), n.to_string())).cloned().unwrap_or_else(|| n.to_string())
     }
     fn desc(&self, d: &str) -> String {
         let dims = d.bytes().take_while(|&b| b == b'[').count();
@@ -200,7 +236,7 @@ fn projection(out: &Outcome, inv: &Inverse) -> String {
             ItemId::Class { class } => format!("C {}", inv.desc(p.descriptor(class))),
             ItemId::Field { class, index } => {
                 let f = &p.class(class).fields[index as usize];
-                format!("F {}->{}:{}", inv.desc(p.descriptor(class)), inv.member(p.str(f.name)), inv.desc(p.str(f.ty)))
+                format!("F {}->{}:{}", inv.desc(p.descriptor(class)), inv.field(p.descriptor(class), p.str(f.name)), inv.desc(p.str(f.ty)))
             }
             ItemId::Method { class, index } => {
                 let m = &p.class(class).methods[index as usize];
@@ -234,6 +270,9 @@ fn outputs_are_alpha_invariant() {
     let seeds = std::env::var("EIGHTR_ALPHA_SEEDS").ok().and_then(|s| s.parse().ok()).unwrap_or(6u64);
     let mut total_renamed = 0;
     for fixture in fixtures {
+        if std::env::var("EIGHTR_ALPHA_FIXTURE").is_ok_and(|f| f != fixture) {
+            continue;
+        }
         let dir = fixtures_root().join(&fixture).join("r8");
         let bytes = fs::read(dir.join("classes.dex")).unwrap();
         let mapping = Mapping::parse(&fs::read_to_string(dir.join("mapping.txt")).unwrap()).unwrap();
@@ -242,12 +281,13 @@ fn outputs_are_alpha_invariant() {
         let expected = projection(&original, &Inverse::identity());
         let expected_out = eightr_core::output::emit(&original).unwrap();
 
-        for seed in 1..=seeds {
+        let from = std::env::var("EIGHTR_ALPHA_SEED_FROM").ok().and_then(|s| s.parse().ok()).unwrap_or(1u64);
+        for seed in from..=seeds {
             let mut rng = Rng(0x9e37_79b9_7f4a_7c15 ^ seed.wrapping_mul(0x1000_0001) ^ fixture.len() as u64);
             let dex = Dex::parse(&bytes).unwrap();
             let mut model = Model::load(&[&dex]).unwrap();
             let renaming = random_alpha(&model, &mapping, &mut rng);
-            total_renamed += renaming.classes.len() + renaming.members.len();
+            total_renamed += renaming.classes.len() + renaming.members.len() + renaming.fields.len();
             if std::env::var_os("EIGHTR_ALPHA_DEBUG").is_some() {
                 eprintln!("{fixture} seed {seed}: classes {:?}\n  members {:?}", renaming.classes, renaming.members);
             }
@@ -269,7 +309,7 @@ fn outputs_are_alpha_invariant() {
             if got != expected {
                 let first = expected.lines().zip(got.lines()).position(|(a, b)| a != b).unwrap_or(0);
                 let (e, g): (std::collections::BTreeSet<&str>, std::collections::BTreeSet<&str>) = (expected.lines().collect(), got.lines().collect());
-                let only = |a: &std::collections::BTreeSet<&str>, b: &std::collections::BTreeSet<&str>| a.difference(b).filter(|l| !l.contains("structural")).take(6).map(|l| l.to_string()).collect::<Vec<_>>().join("\n    ");
+                let only = |a: &std::collections::BTreeSet<&str>, b: &std::collections::BTreeSet<&str>| a.difference(b).filter(|l| std::env::var_os("EIGHTR_ALPHA_ALL").is_some() || !l.contains("structural")).take(40).map(|l| l.to_string()).collect::<Vec<_>>().join("\n    ");
                 panic!(
                     "{fixture} seed {seed}: output depends on R8's arbitrary choices (first difference at line {first}):\n  expected: {}\n  got:      {}\n  only expected:\n    {}\n  only got:\n    {}",
                     expected.lines().nth(first).unwrap_or(""),
@@ -281,16 +321,67 @@ fn outputs_are_alpha_invariant() {
             // The strongest form: 8R's emitted program is byte-identical.
             let got_out = eightr_core::output::emit(&scrambled).unwrap();
             let same_dex = expected_out.dex.iter().map(|d| &d.1).eq(got_out.dex.iter().map(|d| &d.1));
+            // Structurally indistinguishable members (N ties) take their names in input order:
+            // equal up to which member of each tie set got which name.
+            let ties: Vec<Vec<String>> = original.labels.iter().filter_map(|(_, l)| l.candidates.clone()).filter(|c| c.len() > 1).collect();
+            let canon = |t: String| -> String {
+                if ties.is_empty() {
+                    return t;
+                }
+                let mut rep: BTreeMap<&str, &str> = BTreeMap::new();
+                for set in &ties {
+                    let first = set.iter().min().unwrap();
+                    for n in set {
+                        rep.insert(n.as_str(), first.as_str());
+                    }
+                }
+                t.lines()
+                    .map(|l| {
+                        l.split_inclusive(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '$'))
+                            .map(|w| {
+                                let (word, sep) = w.split_at(w.trim_end_matches(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '$')).len());
+                                format!("{}{sep}", rep.get(word).copied().unwrap_or(word))
+                            })
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            let dump_of = |o: &eightr_core::output::Output| {
+                let dexes: Vec<Dex> = o.dex.iter().map(|d| Dex::parse(&d.1).unwrap()).collect();
+                let refs: Vec<&Dex> = dexes.iter().collect();
+                eightr_ir::print::program(&Model::load(&refs).unwrap())
+            };
+            let same_dex = same_dex || (!ties.is_empty() && canon(dump_of(&expected_out)) == canon(dump_of(&got_out)));
             if !same_dex {
                 let dump = |o: &eightr_core::output::Output| {
                     let dexes: Vec<Dex> = o.dex.iter().map(|d| Dex::parse(&d.1).unwrap()).collect();
                     let refs: Vec<&Dex> = dexes.iter().collect();
                     eightr_ir::print::program(&Model::load(&refs).unwrap())
                 };
+                let strings = |o: &eightr_core::output::Output| -> std::collections::BTreeSet<String> {
+                    o.dex.iter().flat_map(|d| Dex::parse(&d.1).unwrap().strings().map(|x| x.unwrap().into_owned()).collect::<Vec<_>>()).collect()
+                };
+                if let Some(dir) = std::env::var_os("EIGHTR_ALPHA_DUMP") {
+                    let dir = std::path::PathBuf::from(dir);
+                    let _ = fs::create_dir_all(&dir);
+                    fs::write(dir.join("expected.dex"), &expected_out.dex[0].1).unwrap();
+                    fs::write(dir.join("got.dex"), &got_out.dex[0].1).unwrap();
+                }
+                let (sa, sb) = (strings(&expected_out), strings(&got_out));
+                eprintln!("strings only expected: {:?}\nstrings only got: {:?}", sa.difference(&sb).take(10).collect::<Vec<_>>(), sb.difference(&sa).take(10).collect::<Vec<_>>());
                 let (a, b) = (dump(&expected_out), dump(&got_out));
                 let first = a.lines().zip(b.lines()).position(|(x, y)| x != y).unwrap_or(0);
                 let ctx = |t: &str| t.lines().skip(first.saturating_sub(4)).take(6).collect::<Vec<_>>().join("\n");
-                panic!("{fixture} seed {seed}: emitted dex differs under scrambling at line {first}:\n--- expected\n{}\n--- got\n{}", ctx(&a), ctx(&b));
+                panic!(
+                    "{fixture} seed {seed}: emitted dex differs under scrambling at line {first} (printed {} vs {} lines, dex sizes {:?} vs {:?}):\n--- expected\n{}\n--- got\n{}",
+                    a.lines().count(),
+                    b.lines().count(),
+                    expected_out.dex.iter().map(|d| d.1.len()).collect::<Vec<_>>(),
+                    got_out.dex.iter().map(|d| d.1.len()).collect::<Vec<_>>(),
+                    ctx(&a),
+                    ctx(&b)
+                );
             }
         }
     }

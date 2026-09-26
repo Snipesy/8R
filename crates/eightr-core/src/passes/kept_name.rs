@@ -195,7 +195,11 @@ impl Pass for KeptName {
             // R8 ≥ 9 names its synthetics `Outer$N` (no marker) and flags them ACC_SYNTHETIC;
             // javac's anonymous `Outer$1` isn't flagged.
             let r8_numbered = class.access & eightr_dex::class::access::SYNTHETIC != 0 && !t.is_empty() && t.bytes().all(|c| c.is_ascii_digit());
-            let class_kept = !may_be_minified(t, bounds.class)
+            // R8 synthesizes stubs of platform classes newer than min-api under their platform
+            // names: not the app's own classes.
+            let platform_stub = crate::naming::is_platform_class(desc);
+            let class_kept = !platform_stub
+                && !may_be_minified(t, bounds.class)
                 && !is_synthetic(simple)
                 && !r8_numbered
                 && !desc.starts_with("Lj$/")

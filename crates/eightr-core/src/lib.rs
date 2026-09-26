@@ -13,6 +13,7 @@ pub mod program;
 pub mod report;
 pub mod compose;
 pub mod composables;
+pub mod compose_keys;
 pub mod inline_hints;
 pub mod rewrites;
 pub mod sigdb;

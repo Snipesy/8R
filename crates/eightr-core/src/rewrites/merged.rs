@@ -264,7 +264,25 @@ impl Rewrite for SplitMerged {
         Source::R8
     }
 
+    /// Splitting is repeated to a fixpoint: splitting one class can separate the dispatch arms
+    /// that kept another from qualifying (a `getClass()` on a parameter in one arm of a merged
+    /// lambda, a cast of it to the other class in another), and 8R must be idempotent.
     fn run(&self, p: &mut Model, records: &mut Vec<RewriteRecord>) -> Result<()> {
+        for _ in 0..8 {
+            let before = records.len();
+            split_once(p, records)?;
+            // New subclasses are appended; lookups (`find`) need the classes sorted again.
+            p.sort();
+            if records.len() == before {
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn split_once(p: &mut Model, records: &mut Vec<RewriteRecord>) -> Result<()> {
+    {
         let subclassed: BTreeSet<&str> = p.classes.iter().filter_map(|c| c.superclass).map(|t| p.syms.get(t)).collect();
         let mut plans: Vec<Plan> = Vec::new();
         // Java serialization names the class in streams and skips constructors: leave those.
@@ -379,11 +397,18 @@ impl Rewrite for SplitMerged {
                                 rejected.extend(by_type.values().flatten().copied());
                                 continue;
                             };
-                            // A syntactic approximation of "the value is typed as a merged class":
-                            // its definition says so, or the method casts that register to it.
-                            for x in body.insns.iter() {
+                            // An approximation of "the value is typed as a merged class": its
+                            // definition says so, or the method casts that same value to it
+                            // (a cast of the register whose reaching definitions overlap the
+                            // receiver's; a mere register-number match would depend on register
+                            // allocation).
+                            let defs_at = |k: usize, r: Reg| -> BTreeSet<usize> {
+                                rd.uses.get(k).and_then(|u| u.as_ref()).and_then(|u| u.iter().find(|(x, _)| *x == r)).map(|(_, d)| d.iter().copied().collect()).unwrap_or_default()
+                            };
+                            let receiver = defs_at(i as usize, args[0]);
+                            for (j, x) in body.insns.iter().enumerate() {
                                 if let Op::CheckCast { reg, ty } = &x.op {
-                                    if *reg == args[0] {
+                                    if *reg == args[0] && !defs_at(j, *reg).is_disjoint(&receiver) {
                                         rejected.extend(by_type.get(p.syms.get(*ty)).into_iter().flatten());
                                     }
                                 }

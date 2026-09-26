@@ -62,8 +62,11 @@ pub struct ComposeSummary {
     pub slot_bindings: u64,
     pub default_bindings: u64,
     pub removed_params_proven: u64,
-    /// ComposableSingletons fields found (`lambda$K`; named only in the shouldExecute era).
+    /// ComposableSingletons fields found (named `lambda$K`, D).
     pub singleton_fields: u64,
+    /// Library composables identified by key: corroborated (S) and entry key only (D).
+    pub library_composables_s: u64,
+    pub library_composables_d: u64,
 }
 
 pub fn summary(all: &[Composable]) -> ComposeSummary {

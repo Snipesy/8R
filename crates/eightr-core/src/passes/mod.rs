@@ -2,6 +2,7 @@
 
 mod annotation_member;
 mod compose_api;
+pub mod compose_libkey;
 pub mod compose_params;
 pub mod enum_unboxing;
 pub mod kept_name;
@@ -39,6 +40,7 @@ pub fn all() -> Vec<Box<dyn Pass>> {
         Box::new(annotation_member::AnnotationMember),
         Box::new(compose_api::ComposeApi),
         Box::new(compose_params::ComposeParams),
+        Box::new(compose_libkey::ComposeLibKey),
         Box::new(enum_unboxing::EnumUnboxing),
         Box::new(library_override::LibraryOverride),
         Box::new(lateinit::Lateinit),

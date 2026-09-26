@@ -24,6 +24,7 @@
 //!
 //! Outputs are checked in so the normal test suite needs no JDK or Android SDK.
 
+mod compose_keys;
 mod sigdb;
 
 use std::collections::BTreeMap;
@@ -41,7 +42,8 @@ fn main() {
         Some("platform-api") => platform_api(),
         Some("fetch") => fetch_tools(&args[1..]),
         Some("sigdb") => sigdb::sigdb(&args[1..]),
-        _ => Err("usage: cargo xtask fixtures [NAME...] | platform-api | fetch jadx | sigdb [LIBRARY...]".into()),
+        Some("compose-keys") => compose_keys::compose_keys(),
+        _ => Err("usage: cargo xtask fixtures [NAME...] | platform-api | fetch jadx | sigdb [LIBRARY...] | compose-keys".into()),
     };
     if let Err(e) = result {
         eprintln!("xtask: {e}");
