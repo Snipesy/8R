@@ -1,6 +1,6 @@
 //! load → preflight → program → evidence → un-passes (undo order) → report.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use eightr_dex::Dex;
 use eightr_rules::Attribute;
@@ -126,6 +126,32 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     // singletons' `lambda$K`) join the structural names. Names looked up reflectively through
     // strings stay as they are.
     let pins = eightr_ir::reflect::pins(&program.model);
+    // Recovered S class simple names (e.g. a data class's `toString` name): the class keeps its
+    // package; refused if the descriptor is taken by any other class's final name.
+    {
+        let finals: BTreeSet<String> = program
+            .class_ids()
+            .map(|id| renaming.classes.get(program.descriptor(id)).cloned().unwrap_or_else(|| program.descriptor(id).to_string()))
+            .collect();
+        let mut wanted: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for ((item, attr), label) in labels.iter() {
+            let (ItemId::Class { class }, Attribute::ClassName, Some(value), eightr_rules::Class::Solved) = (*item, *attr, &label.value, label.class) else { continue };
+            let d = program.descriptor(class).to_string();
+            if pins.class(&d) {
+                continue;
+            }
+            let pkg = crate::program::package_of(&d);
+            let new = if pkg.is_empty() { format!("L{value};") } else { format!("L{pkg}/{value};") };
+            wanted.entry(new).or_default().push(d);
+        }
+        for (new, olds) in wanted {
+            if let [old] = &olds[..] {
+                if !finals.contains(&new) {
+                    renaming.classes.insert(old.clone(), new);
+                }
+            }
+        }
+    }
     for ((item, attr), label) in labels.iter() {
         let recovered = label.class == eightr_rules::Class::Solved || !label.rules.contains(&eightr_rules::STRUCTURAL_NAME);
         let (Some(value), true) = (&label.value, recovered) else { continue };

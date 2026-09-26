@@ -99,6 +99,8 @@ pub struct Rule {
 use Attribute as A;
 
 pub const IDENTITY: &str = "core/identity";
+pub const DATA_CLASS_NAME: &str = "kotlinc/data-class-name";
+pub const DATA_CLASS_PROPERTY: &str = "kotlinc/data-class-property";
 pub const SIGDB_METHOD_NAME: &str = "r8/sigdb-method-name";
 pub const STRUCTURAL_NAME: &str = "core/structural-name";
 pub const STRUCTURAL_TIE: &str = "core/structural-tie";
@@ -226,6 +228,30 @@ pub static REGISTRY: &[Rule] = &[
         // Exhaustive by construction: there is no failure mode to fall back from.
         fallback: None,
         fixtures: &["kotlin_basic", "kotlin_serialization", "compose_basic"],
+    },
+    Rule {
+        id: DATA_CLASS_NAME,
+        source: Source::Kotlinc,
+        class: Class::Solved,
+        attributes: &[A::ClassName],
+        summary: "A Kotlin data class's simple name from its generated toString template \"Name(p1=\" + f1 + \", p2=\" + ... + \")\" (the package stays as it is).",
+        preconditions: &[
+            "toString is straight-line StringBuilder appends of: a literal \"Name(p1=\", then alternately this.f_i and \", p_{i+1}=\", then \")\"; names are identifiers; fields distinct, of the class.",
+            "Ensemble: hashCode or equals reads the same fields in the same order (the compiler generates them together; a hand-written toString alone is only a hint).",
+            "The simple name is claimed by one class of the package and taken by no other; the class isn't pinned, a platform stub, or already named.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["kotlin_basic", "kotlin_basic_r94", "kotlin_serialization_r94"],
+    },
+    Rule {
+        id: DATA_CLASS_PROPERTY,
+        source: Source::Kotlinc,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "A Kotlin data class property's backing field named from the toString template (p_i = f_i).",
+        preconditions: &["As kotlinc/data-class-name (template and ensemble); the field isn't pinned or already named, and no other field of the class has the name."],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["kotlin_basic", "kotlin_basic_r94", "kotlin_serialization_r94"],
     },
     Rule {
         id: LATEINIT_FIELD_NAME,
