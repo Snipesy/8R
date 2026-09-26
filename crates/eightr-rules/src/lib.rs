@@ -179,8 +179,9 @@ pub static REGISTRY: &[Rule] = &[
         attributes: &[A::Body],
         summary: "Inline R8's bottom-up (throw) outlines back into their call sites and drop the dead default return after them.",
         preconditions: &[
-            "Static method with straight-line code ending in `throw` of a freshly constructed exception, reached only by invoke-static from >= 2 sites.",
-            "Its class has no <clinit> (inlining would skip class initialization), and everything it references is accessible from each caller.",
+            "Static method of a synthetic class, with straight-line code ending in `throw` of a freshly constructed exception, reached only by invoke-static from >= 2 sites.",
+            "Neither its class nor any superclass has a <clinit>, the class has no program subclasses, and everything it references (resolving inherited members) is accessible from each caller.",
+            "Outlines it calls are inlined into it first (callee-first order; cycles are skipped).",
             "Registers stay encodable after the splice; otherwise that site keeps its call.",
         ],
         fallback: Some(IDENTITY),
@@ -223,13 +224,14 @@ pub static REGISTRY: &[Rule] = &[
         attributes: &[A::Body],
         summary: "Inline R8's outlines (shared straight-line helpers) back into their call sites.",
         preconditions: &[
-            "Static method with straight-line code of invokes, new-instance, arithmetic and moves ending in a return, reached only by invoke-static from >= 2 sites.",
-            "Its class has no <clinit>, and everything it references is accessible from each caller.",
+            "Static method of a synthetic class, with straight-line code ending in a return, reached only by invoke-static from >= 2 sites.",
+            "At least 3 operations (R8's minimum outline size) including a call, and it only calls and instantiates library classes: keeps out interface companions (app calls), backports (pure arithmetic) and API-model outlines (one call).",
+            "Neither its class nor any superclass has a <clinit>, and the class has no program subclasses.",
             "Registers stay encodable after the splice; otherwise that site keeps its call.",
             "D, not S: a hand-written static helper can have the same shape (inlining it is still behavior-preserving).",
         ],
         fallback: Some(IDENTITY),
-        fixtures: &["r94_outline", "kotlin_serialization"],
+        fixtures: &["r94_outline", "kotlin_serialization", "r94_desugar"],
     },
 ];
 

@@ -354,20 +354,20 @@ fn program_ids_ignore_class_def_order() {
     assert_eq!(descs, sorted);
 }
 
-/// Outline detection (`r8/outline-inline`, `r8/bu-outline-inline`) against the mapping:
-/// every inlined method must be one R8 synthesized (precision), and every method R8 marked
-/// `com.android.tools.r8.outline` must be inlined at least at some call site (recall).
+/// Outline detection (`r8/outline-inline`, `r8/bu-outline-inline`) against the mapping. Truth:
+/// methods R8 marked `com.android.tools.r8.outline` (classic), and bottom-up throw outlines,
+/// which carry no marker but are synthesized as `Holder$N.m`, returning void and ending in
+/// `throw`. Every detection must be in the truth (precision), and every truth method detected
+/// (recall), including in fixtures full of look-alike synthetics (`r94_desugar`).
 #[test]
 fn outline_detection_matches_mapping() {
-    let mut checked = 0;
-    let mut bottom_up_truth = 0;
+    let (mut checked, mut bottom_up_truth) = (0, 0);
     for fixture in fixture_names() {
-        let map_path = fixtures_root().join(&fixture).join("r8/mapping.txt");
-        let Ok(text) = fs::read_to_string(&map_path) else { continue };
+        let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
         let mapping = Mapping::parse(&text).unwrap();
         let out = outcome(&fixture, "r8");
         let plain = run(&load(&fixture, "r8"), &Config { no_rewrites: true, ..Default::default() }).unwrap();
-        let detected: Vec<(String, String)> = out
+        let detected: std::collections::BTreeSet<(String, String)> = out
             .report
             .rewrites
             .iter()
@@ -379,38 +379,30 @@ fn outline_detection_matches_mapping() {
                 (dotted, name.to_string())
             })
             .collect();
-        for (class, name) in &detected {
-            let cm = mapping.classes.iter().find(|c| &c.obfuscated == class);
-            let synthesized = cm.is_some_and(|c| {
-                c.is_synthesized()
-                    || c.members.iter().any(|m| {
-                        matches!(&m.kind, MemberKind::Method(x) if &x.obfuscated == name)
-                            && m.metadata.iter().any(|md| md.parsed == Metadata::Synthesized)
-                    })
-            });
-            assert!(synthesized, "{fixture}: {class}.{name} was inlined as an outline but R8 didn't synthesize it");
-            checked += 1;
-        }
+        let mut truth = std::collections::BTreeSet::new();
         for c in &mapping.classes {
             for m in &c.members {
                 let MemberKind::Method(x) = &m.kind else { continue };
-                // Bottom-up (throw) outlines carry no outline marker: R8 synthesizes them as
-                // `Holder$N.m`, returning void and ending in `throw`.
                 let synthesized = m.metadata.iter().any(|md| md.parsed == Metadata::Synthesized);
                 let owner = x.original_owner.as_deref().unwrap_or(&c.original);
                 let holder = owner.rsplit_once('$').is_some_and(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-                let bottom_up = synthesized && holder && x.original_name == "m" && x.return_type == "void" && ends_in_throw(&plain.program.model, &c.obfuscated, &x.obfuscated);
+                let bottom_up = synthesized
+                    && holder
+                    && x.original_name == "m"
+                    && x.return_type == "void"
+                    && ends_in_throw(&plain.program.model, &c.obfuscated, &x.obfuscated);
                 bottom_up_truth += usize::from(bottom_up);
                 if bottom_up || m.metadata.iter().any(|md| md.parsed == Metadata::Outline) {
-                    assert!(
-                        detected.contains(&(c.obfuscated.clone(), x.obfuscated.clone())),
-                        "{fixture}: outline {}.{} ({}) was not detected",
-                        c.obfuscated,
-                        x.obfuscated,
-                        x.signature()
-                    );
+                    truth.insert((c.obfuscated.clone(), x.obfuscated.clone()));
                 }
             }
+        }
+        for d in &detected {
+            assert!(truth.contains(d), "{fixture}: {}.{} was inlined as an outline but isn't one", d.0, d.1);
+            checked += 1;
+        }
+        for t in &truth {
+            assert!(detected.contains(t), "{fixture}: outline {}.{} was not detected", t.0, t.1);
         }
     }
     assert!(checked >= 8, "only {checked} outline detections checked");

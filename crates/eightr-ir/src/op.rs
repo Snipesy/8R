@@ -295,6 +295,38 @@ impl Op {
         }
     }
 
+    /// First registers of the wide (long/double) pairs this op reads or writes. Exact except for
+    /// invokes and `filled-new-array`, whose argument widths live in the (uninterned) proto:
+    /// there every pair of consecutive argument registers is reported, an over-approximation.
+    pub fn wide_starts(&self) -> Vec<Reg> {
+        use Op::*;
+        let mut v = Vec::new();
+        if let Some((r, true)) = self.def() {
+            v.push(r);
+        }
+        match self {
+            Move { width: Width::Wide, src, .. } | Return { width: Width::Wide, src } => v.push(*src),
+            Cmp { kind, a, b, .. } if !matches!(kind, CmpKind::LFloat | CmpKind::GFloat) => v.extend([*a, *b]),
+            ArrayPut { kind: MemKind::Wide, src, .. }
+            | InstancePut { kind: MemKind::Wide, src, .. }
+            | StaticPut { kind: MemKind::Wide, src, .. } => v.push(*src),
+            Unop { op, src, .. } if matches!(op.types().0, NumType::Long | NumType::Double) => v.push(*src),
+            Binop { ty: NumType::Long | NumType::Double, a, b, op, .. } => {
+                v.push(*a);
+                if let Operand::Reg(b) = b {
+                    if !matches!(op, BinOp::Shl | BinOp::Shr | BinOp::Ushr) {
+                        v.push(*b);
+                    }
+                }
+            }
+            FilledNewArray { args, .. } | Invoke { args, .. } | InvokePolymorphic { args, .. } | InvokeCustom { args, .. } => {
+                v.extend(args.windows(2).filter(|w| w[1] == w[0].wrapping_add(1)).map(|w| w[0]));
+            }
+            _ => {}
+        }
+        v
+    }
+
     /// The value this op defines, as (reg, wide). A wide def writes `reg` and `reg + 1`.
     /// `check-cast` is not a def: it refines the type of an existing value.
     pub fn def(&self) -> Option<(Reg, bool)> {

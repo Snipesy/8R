@@ -475,3 +475,131 @@ mod tests {
         }
     }
 }
+
+/// Byte ranges of the class names (`Lpkg/Name`, without the `;` or type arguments) in a JVM
+/// generic signature: a class, field or method signature (JVMS §4.7.9.1). Inner class suffixes
+/// (`.Inner`) are simple names, not descriptors, and aren't reported. `None` if `sig` doesn't
+/// parse.
+pub fn signature_class_ranges(sig: &str) -> Option<Vec<std::ops::Range<usize>>> {
+    struct P<'a> {
+        b: &'a [u8],
+        i: usize,
+        out: Vec<std::ops::Range<usize>>,
+    }
+    impl P<'_> {
+        fn peek(&self) -> Option<u8> {
+            self.b.get(self.i).copied()
+        }
+        fn ident(&mut self, stops: &[u8]) -> Option<()> {
+            let start = self.i;
+            while self.peek().is_some_and(|c| !stops.contains(&c)) {
+                self.i += 1;
+            }
+            (self.i > start).then_some(())
+        }
+        fn ty(&mut self) -> Option<()> {
+            match self.peek()? {
+                b'B' | b'C' | b'D' | b'F' | b'I' | b'J' | b'S' | b'Z' | b'V' => self.i += 1,
+                b'[' => {
+                    self.i += 1;
+                    self.ty()?;
+                }
+                b'T' => {
+                    self.i += 1;
+                    self.ident(b";")?;
+                    self.i += 1;
+                }
+                b'L' => {
+                    let start = self.i;
+                    self.i += 1;
+                    self.ident(b";<.")?;
+                    self.out.push(start..self.i);
+                    loop {
+                        match self.peek()? {
+                            b'<' => self.args()?,
+                            b'.' => {
+                                self.i += 1;
+                                self.ident(b";<.")?;
+                            }
+                            b';' => {
+                                self.i += 1;
+                                break;
+                            }
+                            _ => return None,
+                        }
+                    }
+                }
+                _ => return None,
+            }
+            Some(())
+        }
+        fn args(&mut self) -> Option<()> {
+            self.i += 1; // '<'
+            while self.peek()? != b'>' {
+                match self.peek()? {
+                    b'*' => self.i += 1,
+                    b'+' | b'-' => {
+                        self.i += 1;
+                        self.ty()?;
+                    }
+                    _ => self.ty()?,
+                }
+            }
+            self.i += 1;
+            Some(())
+        }
+        fn params(&mut self) -> Option<()> {
+            self.i += 1; // '<'
+            while self.peek()? != b'>' {
+                self.ident(b":")?;
+                while self.peek()? == b':' {
+                    self.i += 1;
+                    if !matches!(self.peek()?, b':' | b'>') {
+                        self.ty()?;
+                    }
+                }
+            }
+            self.i += 1;
+            Some(())
+        }
+    }
+    let mut p = P { b: sig.as_bytes(), i: 0, out: Vec::new() };
+    if p.peek()? == b'<' {
+        p.params()?;
+    }
+    if p.peek() == Some(b'(') {
+        p.i += 1;
+        while p.peek()? != b')' {
+            p.ty()?;
+        }
+        p.i += 1;
+        p.ty()?;
+        while p.peek() == Some(b'^') {
+            p.i += 1;
+            p.ty()?;
+        }
+    } else {
+        while p.peek().is_some() {
+            p.ty()?;
+        }
+    }
+    Some(p.out)
+}
+
+#[cfg(test)]
+mod signature_tests {
+    use super::signature_class_ranges;
+
+    fn names(sig: &str) -> Vec<&str> {
+        signature_class_ranges(sig).unwrap().into_iter().map(|r| &sig[r]).collect()
+    }
+
+    #[test]
+    fn parses_class_field_and_method_signatures() {
+        assert_eq!(names("<T:Ljava/lang/Object;>La/Base<TT;>;La/I;"), ["Ljava/lang/Object", "La/Base", "La/I"]);
+        assert_eq!(names("Ljava/util/Map<Ljava/lang/String;+La/b;>;"), ["Ljava/util/Map", "Ljava/lang/String", "La/b"]);
+        // A class after a primitive parameter, and an inner class of a generic outer.
+        assert_eq!(names("<K::La/Cmp;>(ILa/b<*>.Inner<[J>;TK;)La/c;^La/E;"), ["La/Cmp", "La/b", "La/c", "La/E"]);
+        assert!(signature_class_ranges("(IL").is_none());
+    }
+}

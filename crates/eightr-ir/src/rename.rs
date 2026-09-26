@@ -146,6 +146,22 @@ impl Ctx<'_> {
     }
     /// Rewrites class names inside a JVM generic signature (`Ljava/util/List<La/b;>;`).
     fn signature(&self, sig: &str) -> String {
+        if let Some(ranges) = crate::types::signature_class_ranges(sig) {
+            let mut out = String::with_capacity(sig.len());
+            let mut last = 0;
+            for r in ranges {
+                out.push_str(&sig[last..r.start]);
+                let key = format!("{};", &sig[r.clone()]);
+                match self.r.classes.get(&key) {
+                    Some(n) => out.push_str(n.trim_end_matches(';')),
+                    None => out.push_str(&sig[r.clone()]),
+                }
+                last = r.end;
+            }
+            out.push_str(&sig[last..]);
+            return out;
+        }
+        // Unparseable (malformed or non-standard): rename class types after delimiters.
         let mut out = String::with_capacity(sig.len());
         let b = sig.as_bytes();
         let mut i = 0;

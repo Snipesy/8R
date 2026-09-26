@@ -1,0 +1,57 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 21
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 72ea9373b42a910f606031f9b4905d7c7c2549467d18065c1c1f214bc1eec061
+# pg_map_hash: SHA-256 72ea9373b42a910f606031f9b4905d7c7c2549467d18065c1c1f214bc1eec061
+com.example.desugar.Main -> com.example.desugar.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:java.lang.String req(java.lang.Object,java.lang.String):45:45 -> a
+    1:1:void main(java.lang.String[]):49:49 -> main
+    2:2:void com.example.desugar.Tri.<init>():22:22 -> main
+    2:2:void main(java.lang.String[]):49 -> main
+    3:3:void main(java.lang.String[]):49:49 -> main
+    4:4:void com.example.desugar.Quad.<init>():26:26 -> main
+    4:4:void main(java.lang.String[]):49 -> main
+    5:5:void main(java.lang.String[]):49:49 -> main
+    6:6:void com.example.desugar.Pent.<init>():30:30 -> main
+    6:6:void main(java.lang.String[]):49 -> main
+    7:10:void main(java.lang.String[]):49:52 -> main
+    11:11:void main(java.lang.String[]):54:54 -> main
+    12:12:void main(java.lang.String[]):56:56 -> main
+    13:13:int java.lang.Math.floorMod(int,int):0:0 -> main
+    13:13:int mix(long,int):37 -> main
+    13:13:void main(java.lang.String[]):56 -> main
+    14:14:void main(java.lang.String[]):56:56 -> main
+    15:15:long java.lang.Math.floorMod(long,long):0:0 -> main
+    15:15:int mix2(long,int):41 -> main
+    15:15:void main(java.lang.String[]):56 -> main
+    16:16:int java.lang.Math.addExact(int,int):0:0 -> main
+    16:16:int mix2(long,int):41 -> main
+    16:16:void main(java.lang.String[]):56 -> main
+    17:17:int java.lang.Math.floorDiv(int,int):0:0 -> main
+    17:17:int mix2(long,int):41 -> main
+    17:17:void main(java.lang.String[]):56 -> main
+    18:18:void main(java.lang.String[]):56:56 -> main
+    19:19:void main(java.lang.String[]):58:58 -> main
+    20:20:int java.lang.Double.hashCode(double):0:0 -> main
+    20:20:void main(java.lang.String[]):58 -> main
+    21:22:void main(java.lang.String[]):58:59 -> main
+com.example.desugar.Pent -> a:
+# {"id":"sourceFile","fileName":"Main.java"}
+    byte Pent.$r8$classId -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:void Pent.<init>(byte):0:0 -> <init>
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:int Pent.doubled():0:0 -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:int Pent.sides():0:0 -> b
+      # {"id":"com.android.tools.r8.synthesized"}
+com.example.desugar.Shape$-CC -> b:
+# {"id":"sourceFile","fileName":"Main.java"}
+# {"id":"com.android.tools.r8.synthesized"}
+    1:1:java.lang.String com.example.desugar.Shape.label(java.lang.String):14:14 -> a
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(La;)Ljava/lang/String;"}
+    1:1:int com.example.desugar.Shape.total(com.example.desugar.Shape,com.example.desugar.Shape):18:18 -> b
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(La;La;)I"}
