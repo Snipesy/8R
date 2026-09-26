@@ -69,6 +69,15 @@ impl Pass for Protobuf {
                 found.push((ci, name.to_string(), ms.len() == 1 && set.len() >= 3));
             }
         }
+        for ((item, attr), l) in cx.labels.iter() {
+            if let (ItemId::Class { class }, Attribute::ClassName, Some(v)) = (item, attr, &l.value) {
+                existing.entry(crate::program::package_of(cx.program.descriptor(*class)).to_string()).or_default().insert(v.clone());
+            }
+        }
+        // Re-running 8R on its output has no .proto files: the name must then read as kept (longer
+        // than a generated name could be, no trailing digit), or it's only a hint.
+        let bound = super::kept_name::length_bound(cx.evidence.name_stats.type_descriptors + super::kept_name::CLASS_SLACK);
+        let survives = |n: &str| !super::kept_name::may_be_minified(n, bound) && !n.ends_with(|c: char| c.is_ascii_digit());
         let mut claims: BTreeMap<(String, String), usize> = BTreeMap::new();
         for (ci, name, _) in &found {
             *claims.entry((crate::program::package_of(s.get(p.classes[*ci].ty)).to_string(), name.clone())).or_default() += 1;
@@ -81,7 +90,7 @@ impl Pass for Protobuf {
             let item = ItemId::Class { class: ClassId(ci as u32) };
             let own = crate::program::simple_name_of(d) == name;
             let free = own || (!existing.get(&pkg).is_some_and(|e| e.contains(&name)) && claims.get(&(pkg, name.clone())) == Some(&1));
-            if proven && free && cx.labels.get(item, Attribute::ClassName).is_none() && !pins.class(d) {
+            if proven && free && survives(&name) && cx.labels.get(item, Attribute::ClassName).is_none() && !pins.class(d) && !crate::naming::is_platform_class(d) {
                 labels.push((item, name));
             } else {
                 hints.push((ClassId(ci as u32), name));

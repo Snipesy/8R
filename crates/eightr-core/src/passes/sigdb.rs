@@ -124,23 +124,70 @@ impl Pass for Sigdb {
         // until none remain.
         // A name that occurs as a string constant in the class would read as a reflective lookup
         // of the member next time (pinned): not a D name to give.
-        let class_strings = |ci: usize| -> std::collections::BTreeSet<&str> {
-            p.classes[ci]
+        // (Code strings and static string values, as `reflect::pins` reads them.)
+        let class_strings = |ci: usize| -> std::collections::BTreeSet<String> {
+            let mut out: std::collections::BTreeSet<String> = p.classes[ci]
                 .methods
                 .iter()
                 .flat_map(|m| m.code.iter().flat_map(|b| &b.insns))
                 .filter_map(|x| match &x.op {
-                    eightr_ir::op::Op::ConstString { value, .. } => Some(s.get(*value)),
+                    eightr_ir::op::Op::ConstString { value, .. } => Some(s.get(*value).to_string()),
                     _ => None,
                 })
-                .collect()
+                .collect();
+            fn values(v: &eightr_ir::value::Value, s: &eightr_ir::sym::Interner, out: &mut std::collections::BTreeSet<String>) {
+                match v {
+                    eightr_ir::value::Value::String(x) => {
+                        out.insert(s.get(*x).to_string());
+                    }
+                    eightr_ir::value::Value::Array(a) => a.iter().for_each(|x| values(x, s, out)),
+                    _ => {}
+                }
+            }
+            for f in &p.classes[ci].fields {
+                if let Some(v) = &f.static_value {
+                    values(v, s, &mut out);
+                }
+            }
+            out
+        };
+        // Method references by (class, name, proto): a static or private method renamed to a
+        // name invoked on its class or a subclass would capture those calls (R8 may have made a
+        // library method static with an inherited framework method's shape).
+        let refs: std::collections::BTreeSet<(String, String, String)> = p
+            .classes
+            .iter()
+            .flat_map(|c| &c.methods)
+            .filter_map(|m| m.code.as_ref())
+            .flat_map(|b| &b.insns)
+            .filter_map(|x| match &x.op {
+                eightr_ir::op::Op::Invoke { method, .. } => Some((s.get(method.class).to_string(), s.get(method.name).to_string(), s.get(method.proto).to_string())),
+                _ => None,
+            })
+            .collect();
+        let subclasses_or_self = |ci: usize| -> Vec<String> {
+            let root = p.classes[ci].ty;
+            let mut out = vec![s.get(root).to_string()];
+            let mut grew = true;
+            while grew {
+                grew = false;
+                for c in &p.classes {
+                    let d = s.get(c.ty).to_string();
+                    if !out.contains(&d) && c.superclass.is_some_and(|t| out.iter().any(|o| o == s.get(t))) {
+                        out.push(d);
+                        grew = true;
+                    }
+                }
+            }
+            out
         };
         let mut accepted: BTreeMap<(usize, usize), (String, String, usize)> = BTreeMap::new();
         for ((class, new, proto), ks) in targets {
             if let [k] = ks[..] {
                 // Nor a name reflection pins in the class (e.g. a lookup of "get" on an unknown
                 // owner): the next run would take it for pinned.
-                if !class_strings(class).contains(new.as_str()) && !pins.method(s.get(p.classes[class].ty), &new) {
+                let called = subclasses_or_self(class).iter().any(|d| refs.contains(&(d.clone(), new.clone(), proto.clone())));
+                if !called && !class_strings(class).contains(&new) && !pins.method(s.get(p.classes[class].ty), &new) {
                     accepted.insert((class, matches.methods[k].method), (new, proto, k));
                 }
             }
@@ -186,7 +233,7 @@ impl Pass for Sigdb {
             let d = &dbs[li as usize].classes[dc as usize];
             let simple = d.trim_end_matches(';').rsplit('/').next().unwrap_or(d);
             let tail = simple.rsplit('$').find(|t| !t.is_empty() && !t.bytes().all(|b| b.is_ascii_digit())).unwrap_or(simple);
-            cx.program.class_hints.insert(ClassId(ci as u32), tail.to_string());
+            cx.program.class_hints.entry(ClassId(ci as u32)).or_insert_with(|| tail.to_string());
         }
         let m = &mut cx.program.model;
         let ty = m.syms.intern(super::compose_libkey::ORIGINAL);

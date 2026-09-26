@@ -31,7 +31,7 @@ pub struct NameStats {
 
 /// Slack for names R8 consumes without them appearing in the dex: `R`, reserved words, and
 /// unreferenced classpath types (classes), or library method names in supertypes (members).
-const CLASS_SLACK: u64 = 64;
+pub(crate) const CLASS_SLACK: u64 = 64;
 const MEMBER_SLACK: u64 = 4096;
 
 /// Words R8 never generates (`Minifier.RESERVED_NAMES`, the ≤3-character ones present in

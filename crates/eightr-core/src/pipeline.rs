@@ -147,10 +147,16 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
             wanted.entry(new).or_default().push(d);
         }
         for (new, olds) in wanted {
-            if let [old] = &olds[..] {
-                if !finals.contains(&new) {
+            match &olds[..] {
+                [old] if !finals.contains(&new) => {
                     renaming.classes.insert(old.clone(), new);
                 }
+                // Passes check claims against each other and existing names; reaching here leaves
+                // the class with its input name: say so.
+                _ => findings.push(Finding {
+                    severity: Severity::Warning,
+                    message: format!("recovered class name {new} refused: claimed by {olds:?} or taken"),
+                }),
             }
         }
     }

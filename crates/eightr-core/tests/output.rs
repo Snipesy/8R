@@ -41,16 +41,26 @@ fn undo(bytes: &[u8]) -> (eightr_core::Outcome, Output) {
     undo_with(bytes, false)
 }
 
-/// Names-only runs, for invariants that assume the output has the input's class set (the
-/// renaming bijection, override preservation, the mapping file). Structural rewrites are
-/// checked by execution (tests/exec.rs) and by the validity/idempotence/α tests.
-fn undo_names(bytes: &[u8]) -> (eightr_core::Outcome, Output) {
-    undo_with(bytes, true)
+/// A fixture's package resources (`.proto` sources, ...), as the CLI reads them from a package.
+fn resources_of(fixture: &str) -> Vec<(String, String)> {
+    let base = fixture.split('/').next().unwrap_or(fixture);
+    eightr_core::input::dir_resources(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/out").join(base).join("resources"))
+}
+
+fn undo_of(fixture: &str, bytes: &[u8]) -> (eightr_core::Outcome, Output) {
+    undo_with_resources(bytes, false, resources_of(fixture))
+}
+
+fn undo_names_of(fixture: &str, bytes: &[u8]) -> (eightr_core::Outcome, Output) {
+    undo_with_resources(bytes, true, resources_of(fixture))
 }
 
 fn undo_with(bytes: &[u8], no_rewrites: bool) -> (eightr_core::Outcome, Output) {
-    let outcome =
-        run(&[DexInput { name: "classes.dex".into(), bytes: bytes.to_vec() }], &Config { no_rewrites, ..Default::default() }).unwrap();
+    undo_with_resources(bytes, no_rewrites, Vec::new())
+}
+
+fn undo_with_resources(bytes: &[u8], no_rewrites: bool, resources: Vec<(String, String)>) -> (eightr_core::Outcome, Output) {
+    let outcome = run(&[DexInput { name: "classes.dex".into(), bytes: bytes.to_vec() }], &Config { no_rewrites, resources, ..Default::default() }).unwrap();
     let out = emit(&outcome).unwrap();
     (outcome, out)
 }
@@ -120,7 +130,7 @@ fn forget_added_param_names(before: &Model, after: &mut Model) {
 #[test]
 fn renaming_is_a_consistent_bijection() {
     for (name, bytes) in fixtures() {
-        let (outcome, out) = undo_names(&bytes);
+        let (outcome, out) = undo_names_of(&name, &bytes);
         let before = load(std::slice::from_ref(&bytes));
         let mut after = load(&out_files(&out));
         // 8R's hint annotations are its own metadata, not part of the program.
@@ -167,7 +177,7 @@ fn overrides(m: &Model) -> BTreeSet<(String, String, String, String)> {
 #[test]
 fn overrides_are_preserved_and_none_created() {
     for (name, bytes) in fixtures() {
-        let (outcome, out) = undo_names(&bytes);
+        let (outcome, out) = undo_names_of(&name, &bytes);
         let before = load(std::slice::from_ref(&bytes));
         let after = load(&out_files(&out));
         // Map the "before" override relation through the renaming and compare as sets.
@@ -189,7 +199,7 @@ fn overrides_are_preserved_and_none_created() {
 #[test]
 fn renamed_fields_are_unique_program_wide() {
     for (name, bytes) in fixtures() {
-        let (outcome, _) = undo_names(&bytes);
+        let (outcome, _) = undo_names_of(&name, &bytes);
         let mut seen = BTreeSet::new();
         for new in outcome.renaming.fields.values() {
             assert!(seen.insert(new.clone()), "{name}: field name {new} assigned twice");
@@ -200,7 +210,7 @@ fn renamed_fields_are_unique_program_wide() {
 #[test]
 fn mapping_file_describes_the_renaming() {
     for (name, bytes) in fixtures() {
-        let (_, out) = undo_names(&bytes);
+        let (_, out) = undo_names_of(&name, &bytes);
         let before = load(std::slice::from_ref(&bytes));
         let after = load(&out_files(&out));
         let m = Mapping::parse(&out.mapping).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -230,7 +240,7 @@ fn mapping_file_describes_the_renaming() {
 #[test]
 fn output_is_valid_dex() {
     for (name, bytes) in fixtures() {
-        let (_, out) = undo(&bytes);
+        let (_, out) = undo_of(&name, &bytes);
         for (file, b) in &out.dex {
             let dex = Dex::parse(b).unwrap_or_else(|e| panic!("{name}/{file}: {e}"));
             assert!(dex.checksum_ok() && dex.signature_ok(), "{name}/{file}");
@@ -257,7 +267,7 @@ fn d8_accepts_output() {
     };
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("output-d8");
     for (name, bytes) in fixtures().into_iter().filter(|(n, _)| n.ends_with("/r8")) {
-        let (_, out) = undo(&bytes);
+        let (_, out) = undo_of(&name, &bytes);
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("out")).unwrap();
         let mut cmd = Command::new("java");
@@ -276,7 +286,7 @@ fn d8_accepts_output() {
 #[test]
 fn undo_is_idempotent() {
     for (name, bytes) in fixtures() {
-        let (_, once) = undo(&bytes);
+        let (_, once) = undo_of(&name, &bytes);
         let files = out_files(&once);
         let inputs: Vec<DexInput> = files
             .iter()
@@ -344,7 +354,7 @@ fn every_program_reference_resolves() {
     }
     let mut checked = 0usize;
     for (name, bytes) in fixtures() {
-        let (_, out) = undo(&bytes);
+        let (_, out) = undo_of(&name, &bytes);
         let p = load(&out_files(&out));
         for c in &p.classes {
             for m in c.methods.iter().filter_map(|m| m.code.as_ref()) {
@@ -407,7 +417,7 @@ fn is_subclass(p: &Model, class: &str, of: &str) -> bool {
 fn every_program_reference_is_accessible() {
     let mut checked = 0usize;
     for (name, bytes) in fixtures() {
-        let (_, out) = undo(&bytes);
+        let (_, out) = undo_of(&name, &bytes);
         let p = load(&out_files(&out));
         for c in &p.classes {
             let from = p.syms.get(c.ty);
@@ -486,8 +496,8 @@ fn abstract_violations(p: &Model) -> (Vec<String>, Vec<String>) {
 #[test]
 fn no_abstract_method_is_reachable() {
     for (name, bytes) in fixtures() {
-        let (_, named) = undo_names(&bytes);
-        let (_, out) = undo(&bytes);
+        let (_, named) = undo_names_of(&name, &bytes);
+        let (_, out) = undo_of(&name, &bytes);
         let (base_missing, _) = abstract_violations(&load(&out_files(&named)));
         let (missing, supers) = abstract_violations(&load(&out_files(&out)));
         assert!(supers.is_empty(), "{name}: {supers:?}");

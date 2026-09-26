@@ -102,6 +102,7 @@ pub const IDENTITY: &str = "core/identity";
 pub const PROTOBUF_MESSAGE_NAME: &str = "r8/protobuf-message-name";
 pub const DATA_CLASS_NAME: &str = "kotlinc/data-class-name";
 pub const DATA_CLASS_PROPERTY: &str = "kotlinc/data-class-property";
+pub const DATA_CLASS_PROPERTY_HINT: &str = "kotlinc/data-class-property-hint";
 pub const SIGDB_METHOD_NAME: &str = "r8/sigdb-method-name";
 pub const STRUCTURAL_NAME: &str = "core/structural-name";
 pub const STRUCTURAL_TIE: &str = "core/structural-tie";
@@ -250,9 +251,23 @@ pub static REGISTRY: &[Rule] = &[
         class: Class::Solved,
         attributes: &[A::MemberName],
         summary: "A Kotlin data class property's backing field named from the toString template (p_i = f_i).",
-        preconditions: &["As kotlinc/data-class-name (template and ensemble); the field isn't pinned or already named, and no other field of the class has the name."],
-        fallback: Some(STRUCTURAL_NAME),
+        preconditions: &[
+            "As kotlinc/data-class-name (template, and hashCode and equals over the same fields in declaration order).",
+            "kotlinc's copy survives (copy or copy$default building the class): hand-written toString/hashCode/equals (Kotlin templates, IDE-generated, Lombok) look the same, copy is only generated for data classes.",
+            "The field isn't pinned or already named; no other field of the class, and no same-typed field of a program supertype, has the name.",
+        ],
+        fallback: Some(DATA_CLASS_PROPERTY_HINT),
         fixtures: &["kotlin_basic", "kotlin_basic_r94", "kotlin_serialization_r94"],
+    },
+    Rule {
+        id: DATA_CLASS_PROPERTY_HINT,
+        source: Source::Kotlinc,
+        class: Class::Deterministic,
+        attributes: &[A::MemberName],
+        summary: "kotlinc/data-class-property without a surviving copy (R8 removes it when unused): the toString name, applied as a readable D name.",
+        preconditions: &["As kotlinc/data-class-property, minus copy."],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["kotlin_basic_r94"],
     },
     Rule {
         id: LATEINIT_FIELD_NAME,
