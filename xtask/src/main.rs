@@ -147,6 +147,8 @@ fn parse_conf(path: &Path) -> Result<Conf> {
             "plugin" => conf.plugins.push(v.trim().to_string()),
             "r8" => conf.r8 = Some(v.trim().to_string()),
             "sources" => conf.sources = Some(v.trim().to_string()),
+            // Entry point for the execution-equivalence tests; not used by the build.
+            "main" => {}
             other => return Err(format!("unknown key {other} in {}", path.display())),
         }
     }
