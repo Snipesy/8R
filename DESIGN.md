@@ -774,6 +774,14 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
 - `eightr-dexwrite`: canonical DEX writer (sorted pools, branch relaxation, payloads, debug
   info, annotations, multidex split). Tests: exact round trip of every fixture, byte
   idempotence, independence from model order, and acceptance by AOSP `dexdump` and D8.
+- **Registered rules (step 4):** `r8/kept-name`, `r8/annotation-member-name`,
+  `r8/library-override-name` (all S, vouching for current names), and
+  `kotlinc/lateinit-field-name` (S, *recovers* renamed backing-field names from kotlinc's
+  uninitialized-access message, bound through the field reference, so inlining can't
+  mis-attribute it). The oracle grades recovered values against the mapping, translating
+  residual types in signatures back to original types.
+- **Kotlin fixtures (step 5):** pinned kotlinc 2.4.20 + plugins and runtime libraries
+  (`fixtures/toolchain.conf`, SHA-256 verified), consumer rules passed as AGP does.
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every

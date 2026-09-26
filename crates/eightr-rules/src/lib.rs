@@ -98,6 +98,9 @@ use Attribute as A;
 
 pub const IDENTITY: &str = "core/identity";
 pub const KEPT_NAME: &str = "r8/kept-name";
+pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
+pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
+pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
 
 /// All registered rules, sorted by id.
 pub static REGISTRY: &[Rule] = &[
@@ -110,6 +113,32 @@ pub static REGISTRY: &[Rule] = &[
         preconditions: &[],
         fallback: None,
         fixtures: &["hello", "shapes", "opcodes"],
+    },
+    Rule {
+        id: LATEINIT_FIELD_NAME,
+        source: Source::Kotlinc,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "A lateinit property's backing field is named after the property, and kotlinc's uninitialized-access check names it.",
+        preconditions: &[
+            "The message is kotlinc/stdlib's exact template: const \"lateinit property X has not been initialized\" (R8-folded), or const \"X\" passed to a helper whose body holds \"lateinit property \" and \" has not been initialized\".",
+            "Every path into the message's block is the null branch of a test on a register whose reaching definitions all read the same program field F (iget/sget, through at most one move).",
+            "Binding goes through the field reference, which survives inlining; all messages bound to F agree (otherwise refused and reported).",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["kotlin_basic"],
+    },
+    Rule {
+        id: ANNOTATION_MEMBER_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "R8 never renames the methods of an annotation interface.",
+        preconditions: &[
+            "The declaring class has ACC_ANNOTATION (R8's minifier reserves names when getHolder().isAnnotation(); verified by the R8 audit, E16).",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["opcodes"],
     },
     Rule {
         id: KEPT_NAME,
@@ -126,6 +155,19 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["hello", "shapes", "opcodes", "names_stress"],
+    },
+    Rule {
+        id: LIBRARY_OVERRIDE_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "A method overriding a library method keeps the library's name (R8 reserves it).",
+        preconditions: &[
+            "Non-static, non-private, non-constructor method of a program class C.",
+            "The dex references a library method (owner not a program class) with the same name and descriptor, whose owner is among C's library supertypes (collected through program supertypes).",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["shapes", "kotlin_basic", "compose_basic"],
     },
 ];
 

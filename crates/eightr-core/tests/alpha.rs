@@ -177,7 +177,7 @@ fn projection(out: &Outcome, inv: &Inverse) -> String {
                 format!("M {}->{}{}", inv.desc(p.descriptor(class)), inv.member(p.str(m.name)), inv.proto(p.str(m.proto)))
             }
         };
-        lines.push(format!("{key} {attr:?} {:?} {:?}", label.class, label.rules));
+        lines.push(format!("{key} {attr:?} {:?} {:?} {:?}", label.class, label.rules, label.value));
     }
     lines.sort();
     let r = &out.report;

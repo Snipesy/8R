@@ -84,7 +84,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
 
     let mut labels = Labels::default();
     for pass in passes::all() {
-        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels })?;
+        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings })?;
     }
 
     findings.sort();
@@ -189,6 +189,7 @@ fn build_report(
                 item: program.describe(*item),
                 attribute: *attr,
                 class: label.class,
+                value: label.value.clone(),
                 rules: label.rules.clone(),
                 candidates: label.candidates.clone(),
             });

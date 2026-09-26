@@ -12,6 +12,10 @@ use crate::program::ItemId;
 pub struct Label {
     /// Composition (minimum) of the classes of every rule applied.
     pub class: Class,
+    /// The recovered value when a rule changes the attribute (e.g. a recovered field name).
+    /// `None` means the current value stands.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
     /// Rules applied, in application order.
     pub rules: Vec<&'static str>,
     /// For N: the complete candidate set, canonically ordered. The rule guarantees the
@@ -26,14 +30,28 @@ pub struct Labels {
 }
 
 impl Labels {
-    /// Records that `rule` produced this attribute's current value. `candidates` is required
-    /// for N rules and forbidden otherwise.
+    /// Records that `rule` vouches for this attribute's current value. `candidates` is
+    /// required for N rules and forbidden otherwise.
     pub fn record(
         &mut self,
         item: ItemId,
         attribute: Attribute,
         rule_id: &str,
         candidates: Option<Vec<String>>,
+    ) -> Result<()> {
+        self.record_value(item, attribute, rule_id, candidates, None)
+    }
+
+    /// Like [`Labels::record`], with a recovered value that replaces the current one. Two
+    /// rules proposing different values for the same attribute is an internal error: for S
+    /// rules it means one of them is unsound.
+    pub fn record_value(
+        &mut self,
+        item: ItemId,
+        attribute: Attribute,
+        rule_id: &str,
+        candidates: Option<Vec<String>>,
+        value: Option<String>,
     ) -> Result<()> {
         let bad = |detail: String| Error::UnregisteredRule { rule: rule_id.to_string(), detail };
         let rule = lookup(rule_id).ok_or_else(|| bad("not in registry".into()))?;
@@ -50,7 +68,16 @@ impl Labels {
             (_, Some(_)) => return Err(bad("only N rules supply candidates".into())),
             (_, None) => None,
         };
-        let entry = self.map.entry((item, attribute)).or_insert(Label { class: rule.class, rules: Vec::new(), candidates: None });
+        let entry =
+            self.map.entry((item, attribute)).or_insert(Label { class: rule.class, value: None, rules: Vec::new(), candidates: None });
+        if let (Some(old), Some(new)) = (&entry.value, &value) {
+            if old != new {
+                return Err(bad(format!("proposes {new:?} but {:?} already proposed {old:?}", entry.rules)));
+            }
+        }
+        if value.is_some() {
+            entry.value = value;
+        }
         entry.class = entry.class.compose(rule.class);
         entry.rules.push(rule.id);
         if candidates.is_some() {
