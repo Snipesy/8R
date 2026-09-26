@@ -130,3 +130,49 @@ pub fn collect(p: &Model) -> (Vec<InlineHint>, InliningSummary) {
     hints.sort();
     (hints, summary)
 }
+
+/// The build-time annotation 8R puts on methods with hints (`@eightr.Inlined(areEqual = 2,
+/// nullChecks = 1, ...)`), so decompilers show them. Build visibility: never loaded at runtime.
+pub const ANNOTATION: &str = "Leightr/Inlined;";
+
+/// Removes 8R's own hint annotations (re-running 8R on its output must not see them).
+pub fn strip(p: &mut Model) {
+    let Some(ty) = p.syms.lookup(ANNOTATION) else { return };
+    for m in p.classes.iter_mut().flat_map(|c| c.methods.iter_mut()) {
+        m.annotations.retain(|a| a.annotation.ty != ty);
+    }
+}
+
+/// Annotates every method of `p` that has hints with their counts by kind.
+pub fn annotate(p: &mut Model) {
+    use eightr_ir::value::{Annotation, EncodedAnnotation, Value, Visibility};
+    fn element(kind: &'static str) -> &'static str {
+        match kind {
+            DISCARDED_GETCLASS => "nullChecks",
+            INLINED_INSTANCE_CALL => "inlinedInstanceCalls",
+            ARE_EQUAL => "areEqual",
+            COLLECTION_SIZE_OR_DEFAULT => "collectionSizeOrDefault",
+            other => other,
+        }
+    }
+    let mut plan: Vec<(usize, usize, BTreeMap<&'static str, i32>)> = Vec::new();
+    for (ci, c) in p.classes.iter().enumerate() {
+        for (mi, m) in c.methods.iter().enumerate() {
+            let Some(b) = &m.code else { continue };
+            let mut counts: BTreeMap<&'static str, i32> = BTreeMap::new();
+            for (_, kind) in body_hints(p, b) {
+                *counts.entry(element(kind)).or_default() += 1;
+            }
+            if !counts.is_empty() {
+                plan.push((ci, mi, counts));
+            }
+        }
+    }
+    let ty = p.syms.intern(ANNOTATION);
+    for (ci, mi, counts) in plan {
+        let elements = counts.into_iter().map(|(k, n)| (p.syms.intern(k), Value::Int(n))).collect();
+        let m = &mut p.classes[ci].methods[mi];
+        m.annotations.retain(|a| a.annotation.ty != ty);
+        m.annotations.push(Annotation { visibility: Visibility::Build, annotation: EncodedAnnotation { ty, elements } });
+    }
+}

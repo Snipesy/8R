@@ -32,6 +32,9 @@ enum Command {
         /// Include every label in the report.
         #[arg(long)]
         verbose: bool,
+        /// Don't annotate methods with their inlining hints (`@eightr.Inlined(...)`).
+        #[arg(long)]
+        no_hint_annotations: bool,
     },
     /// List every registered rule.
     Rules,
@@ -87,9 +90,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
-        Command::Undo { input, out, report, verbose } => {
+        Command::Undo { input, out, report, verbose, no_hint_annotations } => {
             let inputs = input::load(&input)?;
-            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, ..Default::default() })?;
+            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, no_hint_annotations, ..Default::default() })?;
             let json = outcome.report.to_json();
             let write = |p: &PathBuf, bytes: &[u8]| std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()));
             if let Some(dir) = &out {

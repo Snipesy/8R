@@ -22,6 +22,8 @@ pub struct Config {
     /// Skip structural rewrite passes (outline inlining, class un-merging, ...); only
     /// names are recovered. Used to isolate rewrites in tests.
     pub no_rewrites: bool,
+    /// Don't annotate methods with their inlining hints in the output (`@eightr.Inlined`).
+    pub no_hint_annotations: bool,
 }
 
 /// Read-only facts gathered before any pass runs.
@@ -38,6 +40,8 @@ pub struct Outcome {
     pub report: Report,
     /// Every recovered (S) and structural (D) name, ready to apply to the program.
     pub renaming: eightr_ir::rename::Renaming,
+    /// Emit `@eightr.Inlined` hint annotations.
+    pub annotate_hints: bool,
 }
 
 pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
@@ -83,6 +87,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
             Error::DuplicateClass { descriptor, inputs: inputs.map(|i| dexes[i].0.clone()) }
         }
     })?;
+    // 8R's own annotations from a previous run are not part of the program.
+    crate::inline_hints::strip(&mut model);
     // Evidence about the input (the re-boxing rewrite consumes what it's recovered from).
     let enums = crate::passes::enum_unboxing::recover_enums(&model, &model.classes);
     let (inline_hints, inlining) = crate::inline_hints::collect(&model);
@@ -127,7 +133,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     if config.verbose_labels {
         report.inline_hints = inline_hints;
     }
-    Ok(Outcome { program, labels, report, renaming })
+    Ok(Outcome { program, labels, report, renaming, annotate_hints: !config.no_hint_annotations })
 }
 
 fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {
