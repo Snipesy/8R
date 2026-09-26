@@ -274,8 +274,8 @@ impl Rewrite for OutlineInline {
         for (k, &(ci, mi, kind)) in &outlines {
             let total = sites[k].len();
             let n = inlined.get(k).copied().unwrap_or(0);
-            if n == 0 {
-                continue;
+            if n == 0 && !refused.contains_key(k) {
+                continue; // no call site was accessible: not reported as an outline
             }
             let rule = if kind == Kind::Throw { BU_OUTLINE_INLINE } else { OUTLINE_INLINE };
             let detail = if n == total {

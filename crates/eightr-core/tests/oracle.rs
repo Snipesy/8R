@@ -360,11 +360,13 @@ fn program_ids_ignore_class_def_order() {
 #[test]
 fn outline_detection_matches_mapping() {
     let mut checked = 0;
+    let mut bottom_up_truth = 0;
     for fixture in fixture_names() {
         let map_path = fixtures_root().join(&fixture).join("r8/mapping.txt");
         let Ok(text) = fs::read_to_string(&map_path) else { continue };
         let mapping = Mapping::parse(&text).unwrap();
         let out = outcome(&fixture, "r8");
+        let plain = run(&load(&fixture, "r8"), &Config { no_rewrites: true, ..Default::default() }).unwrap();
         let detected: Vec<(String, String)> = out
             .report
             .rewrites
@@ -392,7 +394,14 @@ fn outline_detection_matches_mapping() {
         for c in &mapping.classes {
             for m in &c.members {
                 let MemberKind::Method(x) = &m.kind else { continue };
-                if m.metadata.iter().any(|md| md.parsed == Metadata::Outline) {
+                // Bottom-up (throw) outlines carry no outline marker: R8 synthesizes them as
+                // `Holder$N.m`, returning void and ending in `throw`.
+                let synthesized = m.metadata.iter().any(|md| md.parsed == Metadata::Synthesized);
+                let owner = x.original_owner.as_deref().unwrap_or(&c.original);
+                let holder = owner.rsplit_once('$').is_some_and(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+                let bottom_up = synthesized && holder && x.original_name == "m" && x.return_type == "void" && ends_in_throw(&plain.program.model, &c.obfuscated, &x.obfuscated);
+                bottom_up_truth += usize::from(bottom_up);
+                if bottom_up || m.metadata.iter().any(|md| md.parsed == Metadata::Outline) {
                     assert!(
                         detected.contains(&(c.obfuscated.clone(), x.obfuscated.clone())),
                         "{fixture}: outline {}.{} ({}) was not detected",
@@ -405,4 +414,16 @@ fn outline_detection_matches_mapping() {
         }
     }
     assert!(checked >= 8, "only {checked} outline detections checked");
+    assert!(bottom_up_truth >= 5, "only {bottom_up_truth} bottom-up outlines in the mappings");
+}
+
+/// Whether residual method `class.name` (dotted class) ends in `throw` in the R8 build.
+fn ends_in_throw(model: &eightr_ir::model::Program, class: &str, name: &str) -> bool {
+    let desc = format!("L{};", class.replace('.', "/"));
+    model.find(&desc).is_some_and(|i| {
+        model.classes[i].methods.iter().any(|m| {
+            model.syms.get(m.name) == name
+                && m.code.as_ref().and_then(|b| b.insns.last()).is_some_and(|x| matches!(x.op, eightr_ir::op::Op::Throw { .. }))
+        })
+    })
 }
