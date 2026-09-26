@@ -131,10 +131,38 @@ fn const_value(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Option<i32>
     v
 }
 
-/// Is `reg` at `at` the method's receiver (`this`, never reassigned on any path)?
+/// The parameter registers `reg` at `at` holds on every path (following copies), or `None` when
+/// some definition isn't a parameter.
+fn param_origins(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Option<BTreeSet<Reg>> {
+    let mut out = BTreeSet::new();
+    let mut stack = vec![(at, reg)];
+    let mut seen = BTreeSet::new();
+    while let Some((i, r)) = stack.pop() {
+        if !seen.insert((i, r)) {
+            continue;
+        }
+        let (_, defs) = rd.uses.get(i as usize)?.as_ref()?.iter().find(|(u, _)| *u == r)?;
+        for &d in defs {
+            let def = rd.defs[d];
+            match def.site {
+                DefSite::Param => {
+                    out.insert(def.reg);
+                }
+                DefSite::Insn(j) => match &body.insns[j as usize].op {
+                    Op::Move { src, .. } => stack.push((j, *src)),
+                    _ => return None,
+                },
+            }
+        }
+    }
+    Some(out)
+}
+
+/// Is `reg` at `at` the method's receiver on every path (`this` itself, or a copy of it — R8
+/// copies `this` into other registers in large methods)?
 fn is_this(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> bool {
     let this = body.registers - body.ins;
-    reg == this && origins(body, rd, at, reg) == [DefSite::Param]
+    param_origins(body, rd, at, reg).is_some_and(|o| o.len() == 1 && o.contains(&this))
 }
 
 fn analyze(body: &Body) -> Option<ReachingDefs> {
@@ -1136,5 +1164,32 @@ mod tests {
         let k = p.classes[gi].methods.iter().position(|m| p.syms.get(m.name) == "get").unwrap();
         p.classes[gi].methods[k].code = Some(get);
         assert_eq!(run(&mut p).len(), 0, "an arithmetic capture was split as a class id");
+    }
+
+    /// R8 copies `this` in large methods: an id read through the copy is still dispatch on the
+    /// receiver (found on a real app: 281 splits specialized nothing).
+    #[test]
+    fn id_read_through_a_copy_of_this_is_specialized() {
+        let mut p = group(plain_arm);
+        let gi = p.find("LG;").unwrap();
+        let g = p.classes[gi].ty;
+        let id = FieldRef { class: g, name: p.syms.intern("a"), ty: p.syms.intern("B") };
+        let cap = FieldRef { class: g, name: p.syms.intern("b"), ty: p.syms.intern("I") };
+        // get(): v2 = this (v3); id and capture read through the copy.
+        let get = body(4, 1, vec![
+            Op::Move { width: Width::Object, dst: 2, src: 3 },
+            Op::InstanceGet { kind: eightr_ir::op::MemKind::Byte, dst: 0, obj: 2, field: id },
+            Op::InstanceGet { kind: eightr_ir::op::MemKind::Narrow, dst: 1, obj: 2, field: cap },
+            Op::IfZ { cond: eightr_ir::op::Cond::Ne, a: 0, target: 6 },
+            Op::Binop { op: BinOp::Add, ty: NumType::Int, dst: 1, a: 1, b: Operand::Lit(1) },
+            Op::Return { width: Width::Single, src: 1 },
+            Op::Binop { op: BinOp::Mul, ty: NumType::Int, dst: 1, a: 1, b: Operand::Lit(3) },
+            Op::Return { width: Width::Single, src: 1 },
+        ]);
+        let k = p.classes[gi].methods.iter().position(|m| p.syms.get(m.name) == "get").unwrap();
+        p.classes[gi].methods[k].code = Some(get);
+        let rec = run(&mut p);
+        assert_eq!(rec.len(), 1, "{rec:?}");
+        assert!(rec[0].detail.contains("1 dispatching"), "{rec:?}");
     }
 }
