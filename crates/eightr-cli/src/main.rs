@@ -92,7 +92,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::Undo { input, out, report, verbose, no_hint_annotations } => {
             let inputs = input::load(&input)?;
-            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, no_hint_annotations, ..Default::default() })?;
+            let resources = input::resources(&input);
+            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, no_hint_annotations, resources, ..Default::default() })?;
             let json = outcome.report.to_json();
             let write = |p: &PathBuf, bytes: &[u8]| std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()));
             if let Some(dir) = &out {

@@ -73,6 +73,32 @@ pub fn load(path: &Path) -> Result<Vec<DexInput>> {
     Ok(inputs)
 }
 
+/// Small text resources carrying library versions: `META-INF/*.version` and root
+/// `*.properties` of an APK/AAB/zip (AAB: under `base/root/`). Empty for other inputs.
+pub fn resources(path: &Path) -> Vec<(String, String)> {
+    let Ok(bytes) = fs::read(path) else { return Vec::new() };
+    if !bytes.starts_with(b"PK") {
+        return Vec::new();
+    }
+    let Ok(mut zip) = zip::ZipArchive::new(std::io::Cursor::new(bytes)) else { return Vec::new() };
+    let mut out = Vec::new();
+    for i in 0..zip.len() {
+        let Ok(mut f) = zip.by_index(i) else { continue };
+        let name = f.name().strip_prefix("base/root/").unwrap_or(f.name()).to_string();
+        let wanted = (name.starts_with("META-INF/") && name.ends_with(".version") && name.matches('/').count() == 1)
+            || (name.ends_with(".properties") && !name.contains('/'));
+        if !wanted || f.size() > 4096 {
+            continue;
+        }
+        let mut text = String::new();
+        if f.read_to_string(&mut text).is_ok() {
+            out.push((name, text));
+        }
+    }
+    out.sort();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

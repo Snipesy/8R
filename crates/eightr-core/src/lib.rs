@@ -4,6 +4,7 @@
 pub mod error;
 pub mod input;
 pub mod labels;
+pub mod libraries;
 pub mod marker;
 pub mod naming;
 pub mod output;
