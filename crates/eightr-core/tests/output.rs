@@ -94,6 +94,8 @@ fn renaming_is_a_consistent_bijection() {
         let (outcome, out) = undo_names(&bytes);
         let before = load(std::slice::from_ref(&bytes));
         let mut after = load(&out_files(&out));
+        // 8R's hint annotations are its own metadata, not part of the program.
+        eightr_core::inline_hints::strip(&mut after);
         inverse(&outcome.renaming, &before).apply(&mut after);
         let (a, b) = (eightr_ir::print::program(&before), eightr_ir::print::program(&after));
         if a != b {

@@ -96,6 +96,10 @@ pub fn emit(outcome: &Outcome) -> Result<Output> {
 
     let mut model = before.model.clone();
     r.apply(&mut model);
+    // Inlining hints, visible in decompilers (after naming: they never influence names).
+    if outcome.annotate_hints {
+        crate::inline_hints::annotate(&mut model);
+    }
     let files = write_dexes(&model)?;
     let dex = files
         .into_iter()
