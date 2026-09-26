@@ -48,19 +48,37 @@ const MESSAGE: &str = "No enum constant ";
 /// A compared value: its register and the definitions reaching it.
 type ValueKey = (Reg, Vec<usize>);
 
-/// `valueOf` maps in one method: per tested string value, literal → the value `k` the success
-/// branch yields (`"NAME".equals(s)` then `const k` / a copy of one).
-fn value_of_maps(p: &impl Strs, body: &Body) -> Vec<BTreeMap<i32, String>> {
-    value_of_chains(p, body).into_iter().map(|c| c.table).collect()
+
+/// The narrow constant `reg` holds when `at` executes, found by walking back through code with
+/// a single predecessor to its definition.
+fn const_before(body: &Body, cfg: &Cfg, at: u32, reg: Reg) -> Option<i32> {
+    let mut i = at;
+    for _ in 0..256 {
+        let blk = &cfg.blocks[cfg.block_of[i as usize] as usize];
+        if i > blk.start {
+            i -= 1;
+        } else {
+            let [pred] = blk.preds.as_slice() else { return None };
+            i = cfg.blocks[*pred as usize].last();
+        }
+        match &body.insns[i as usize].op {
+            Op::Const { dst, value: Const::Narrow(k) } if *dst == reg => return Some(*k),
+            op if op.def().is_some_and(|(r, w)| r == reg || (w && r + 1 == reg)) => return None,
+            _ => {}
+        }
+    }
+    None
 }
 
-/// Like [`value_of_maps`], with each success branch's defining instruction (the value `k`
-/// produced): as `compares`' instruction, with its register.
+/// Inlined `valueOf` chains in one method: per tested string value, literal → the value `k` the
+/// success branch yields (`"NAME".equals(s)` then `const k`, a copy of one, or a jump while the
+/// result register holds it), with each success instruction and the result register (as
+/// `compares`), and the message its failure path throws.
 pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
     let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
     let rd = ReachingDefs::compute(body, &cfg);
-    let mut by_input: BTreeMap<ValueKey, BTreeMap<i32, Option<String>>> = BTreeMap::new();
-    let mut produced: BTreeMap<ValueKey, Vec<(u32, Reg)>> = BTreeMap::new();
+    // Equals tests: (input value, literal, success instruction).
+    let mut tests: BTreeMap<ValueKey, Vec<(String, u32, u32)>> = BTreeMap::new();
     for (i, insn) in body.insns.iter().enumerate() {
         let Op::Invoke { method, args, .. } = &insn.op else { continue };
         if p.str(method.name) != "equals" || p.str(method.proto) != "(Ljava/lang/Object;)Z" || args.len() != 2 {
@@ -74,31 +92,59 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
             _ => continue,
         };
         let Some(Op::MoveResult { dst: r, .. }) = body.insns.get(i as usize + 1).map(|x| &x.op) else { continue };
-        let success = match body.insns.get(i as usize + 2).map(|x| &x.op) {
-            Some(Op::IfZ { cond: Cond::Eq, a, .. }) if a == r => i + 3,
-            Some(Op::IfZ { cond: Cond::Ne, a, target }) if a == r => *target,
+        let (success, failure) = match body.insns.get(i as usize + 2).map(|x| &x.op) {
+            Some(Op::IfZ { cond: Cond::Eq, a, target }) if a == r => (i + 3, *target),
+            Some(Op::IfZ { cond: Cond::Ne, a, target }) if a == r => (*target, i + 3),
             _ => continue,
         };
-        let (k, dst) = match body.insns.get(success as usize).map(|x| &x.op) {
-            Some(Op::Const { value: Const::Narrow(k), dst }) => (Some(*k), *dst),
-            Some(Op::Move { src, dst, .. }) => (const_at(body, &rd, success, *src), *dst),
-            _ => (None, 0),
-        };
-        let Some(k) = k.filter(|k| *k >= 1) else { continue };
         let defs = rd.uses[i as usize].as_ref().and_then(|u| u.iter().find(|(x, _)| *x == input)).map(|(_, d)| d.clone()).unwrap_or_default();
-        produced.entry((input, defs.clone())).or_default().push((success, dst));
-        let slot = by_input.entry((input, defs)).or_default().entry(k).or_insert_with(|| Some(name.clone()));
-        if slot.as_deref() != Some(name.as_str()) {
-            *slot = None;
+        tests.entry((input, defs)).or_default().push((name, success, failure));
+    }
+    let mut out = Vec::new();
+    for (_, list) in tests {
+        // The result register: the one successes define (`const`/copy of a constant). A success
+        // that only jumps to the join yields that register's current constant.
+        let defined: BTreeSet<Reg> = list
+            .iter()
+            .filter_map(|(_, s, _)| match body.insns.get(*s as usize).map(|x| &x.op) {
+                Some(Op::Const { dst, value: Const::Narrow(_) }) | Some(Op::Move { dst, .. }) => Some(*dst),
+                _ => None,
+            })
+            .collect();
+        let [result] = defined.into_iter().collect::<Vec<_>>()[..] else { continue };
+        let mut table: BTreeMap<i32, Option<String>> = BTreeMap::new();
+        let mut produced = Vec::new();
+        for (name, s, _) in &list {
+            let k = match body.insns.get(*s as usize).map(|x| &x.op) {
+                Some(Op::Const { dst, value: Const::Narrow(k) }) if *dst == result => Some(*k),
+                Some(Op::Move { dst, src, .. }) if *dst == result => const_at(body, &rd, *s, *src),
+                Some(Op::Goto { .. }) => const_before(body, &cfg, *s, result),
+                _ => None,
+            };
+            let Some(k) = k.filter(|k| *k >= 1) else { continue };
+            produced.push((*s, result));
+            let slot = table.entry(k).or_insert_with(|| Some(name.clone()));
+            if slot.as_deref() != Some(name.as_str()) {
+                *slot = None;
+            }
+        }
+        let Some(table) = table.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>() else { continue };
+        // The message the failure path builds (the last test falls into `new
+        // IllegalArgumentException("No enum constant X.")`, a few instructions in).
+        let messages: BTreeSet<String> = list
+            .iter()
+            .flat_map(|(_, _, f)| body.insns.iter().skip(*f as usize).take(4))
+            .filter_map(|x| match &x.op {
+                Op::ConstString { value, .. } => p.str(*value).strip_prefix(MESSAGE).and_then(|r| r.strip_suffix('.')).filter(|n| !n.is_empty()).map(str::to_string),
+                _ => None,
+            })
+            .collect();
+        let message = (messages.len() == 1).then(|| messages.into_iter().next().unwrap());
+        if table.len() >= 2 {
+            out.push(Chain { table, compares: produced, from_value_of: false, message });
         }
     }
-    by_input
-        .into_iter()
-        .filter_map(|(key, t)| {
-            let table = t.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>()?;
-            (table.len() >= 2).then(|| Chain { table, compares: produced.remove(&key).unwrap_or_default(), from_value_of: false })
-        })
-        .collect()
+    out
 }
 
 /// String lookup, so the analysis runs on the pass's `Program` and on the raw model (the
@@ -247,6 +293,8 @@ pub(crate) struct Chain {
     pub compares: Vec<(u32, Reg)>,
     /// `compares` are the definitions of the values an inlined `valueOf` produces.
     pub from_value_of: bool,
+    /// For a `valueOf` chain: the canonical name in the message its failure path throws.
+    pub message: Option<String>,
 }
 
 fn name_tables(p: &impl Strs, body: &Body) -> Vec<BTreeMap<i32, String>> {
@@ -305,7 +353,7 @@ pub(crate) fn chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
         .filter(|(key, _)| nullable.contains(key))
         .filter_map(|(key, t)| {
             let table = t.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>()?;
-            (table.len() >= 2).then(|| Chain { table, compares: sites.remove(&key).unwrap_or_default(), from_value_of: false })
+            (table.len() >= 2).then(|| Chain { table, compares: sites.remove(&key).unwrap_or_default(), from_value_of: false, message: None })
         })
         .collect()
 }
@@ -345,12 +393,18 @@ pub(crate) fn recover_enums(p: &impl Strs, classes: &[eightr_ir::model::Class]) 
             // A string `switch` compiles to the same equals-then-const shape: a map is `valueOf`
             // only next to its message (one message, one map in the method). Otherwise it can
             // still corroborate an identical name chain.
-            let maps: Vec<Vec<String>> = value_of_maps(p, b).iter().filter_map(complete).collect();
-            if maps.len() == 1 && messages.len() == 1 {
-                proven.entry(maps[0].clone()).or_default().extend(messages.iter().cloned());
-                attached.extend(messages.iter().cloned());
-            } else {
-                switch_maps.extend(maps);
+            for chain in value_of_chains(p, b) {
+                let Some(t) = complete(&chain.table) else { continue };
+                match chain.message {
+                    // Its own failure path names the enum: an inlined valueOf.
+                    Some(m) => {
+                        proven.entry(t).or_default().insert(m.clone());
+                        attached.insert(m);
+                    }
+                    None => {
+                        switch_maps.insert(t);
+                    }
+                }
             }
             for t in name_tables(p, b) {
                 if let Some(t) = complete(&t) {

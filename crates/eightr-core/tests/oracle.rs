@@ -534,7 +534,7 @@ fn enum_unboxing_evidence_matches_ground_truth() {
     for fixture in fixture_names() {
         let out = outcome(&fixture, "r8");
         for e in out.report.enums.iter().filter(|e| e.proven) {
-            assert!(fixture == "r94_enum", "{fixture}: proved {:?} {:?}", e.canonical_name, e.constants);
+            assert!(fixture.starts_with("r94_enum"), "{fixture}: proved {:?} {:?}", e.canonical_name, e.constants);
         }
     }
 }
