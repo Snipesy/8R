@@ -407,6 +407,9 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
         .filter(|&id| labels.get(ItemId::Class { class: id }, Attribute::ClassName).is_some_and(|l| l.class == Class::Solved))
         .collect();
     let cx = Ctx { p, labels, s_classes };
+    // Members and classes looked up reflectively by a name string that can't be rewritten
+    // keep their names (renaming them would break the lookup).
+    let pins = eightr_ir::reflect::Pins::of(&eightr_ir::reflect::sites(&p.model));
     let class_label = class_labels(&cx);
 
     // Supertype closure within the program; library supertypes per class.
@@ -565,7 +568,7 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     let mut class_cands: Vec<(String, String, ClassId)> = Vec::new(); // (label, hint, id)
     for id in p.class_ids().filter(|id| !cx.s_class(*id)) {
         let d = p.descriptor(id);
-        if is_structural_name(simple_name_of(d)) {
+        if is_structural_name(simple_name_of(d)) || pins.class(d) {
             taken.entry(package_of(d).to_string()).or_default().insert(simple_name_of(d).to_string());
             continue;
         }
@@ -615,7 +618,10 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     let mut field_cands: Vec<(String, String, (ClassId, u32))> = Vec::new();
     for id in p.class_ids() {
         for (i, f) in p.class(id).fields.iter().enumerate() {
-            if cx.s_member(ItemId::Field { class: id, index: i as u32 }) || is_structural_name(p.str(f.name)) {
+            if cx.s_member(ItemId::Field { class: id, index: i as u32 })
+                || is_structural_name(p.str(f.name))
+                || pins.field(p.descriptor(id), p.str(f.name))
+            {
                 continue;
             }
             let ty = p.str(f.ty);
@@ -675,6 +681,7 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
                 let mm = &p.class(cid).methods[mi as usize];
                 let (name, proto) = (p.str(mm.name), p.str(mm.proto));
                 !cx.s_member(ItemId::Method { class: cid, index: mi })
+                    && !pins.method(p.descriptor(cid), name)
                     && (!is_virtual(mm)
                         || (!object_method(mm)
                             && name.len() <= PLATFORM_NAME_LIMIT

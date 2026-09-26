@@ -55,12 +55,13 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
     let s = &model.syms;
     let program: BTreeSet<String> = model.classes.iter().map(|c| s.get(c.ty).to_string()).collect();
 
+    let pins_classes = eightr_ir::reflect::Pins::of(&eightr_ir::reflect::sites(model)).classes;
     // Classes: a name is generated if R8 renamed the class and the new simple name isn't the
     // original plus a collision suffix. Permute tails within (package, outer prefix) groups.
     let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
     for cm in &mapping.classes {
         let obf = dotted_to_desc(&cm.obfuscated);
-        if cm.obfuscated == cm.original || !program.contains(&obf) {
+        if cm.obfuscated == cm.original || !program.contains(&obf) || pins_classes.contains(&obf) {
             continue;
         }
         let orig = dotted_to_desc(&cm.original);
@@ -120,6 +121,11 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
             }
         }
     }
+    // Names looked up reflectively through strings that can't be rewritten must stay put,
+    // exactly as R8 would have kept them consistent.
+    let pins = eightr_ir::reflect::Pins::of(&eightr_ir::reflect::sites(model));
+    kept.extend(pins.fields.iter().map(|(_, n)| n.clone()));
+    kept.extend(pins.methods.iter().map(|(_, n)| n.clone()));
     let pool: Vec<String> = renamed.difference(&kept).cloned().collect();
     let mut shuffled = pool.clone();
     rng.shuffle(&mut shuffled);

@@ -327,7 +327,39 @@ impl Renaming {
     pub fn apply(&self, p: &mut Program) {
         let program = p.classes.iter().map(|c| p.syms.get(c.ty).to_string()).collect();
         let hierarchy = (!self.fields.is_empty() || !self.methods.is_empty()).then(|| Hierarchy::of(p));
+        // Reflective name strings that R8 rewrote with its renames; keep them in sync.
+        let sites = crate::reflect::sites(p);
+        let mut string_rewrites: Vec<(usize, usize, u32, String)> = Vec::new();
+        for x in &sites {
+            let Some(insn) = x.string_insn else { continue };
+            let new = match x.kind {
+                crate::reflect::Kind::Class => {
+                    let desc = format!("L{};", x.name.replace('.', "/"));
+                    self.classes.get(&desc).map(|n| n.strip_prefix('L').and_then(|n| n.strip_suffix(';')).unwrap_or(n).replace('/', "."))
+                }
+                crate::reflect::Kind::UpdaterField | crate::reflect::Kind::DeclaredField => {
+                    let Some(owner) = &x.owner else { continue };
+                    let Some(ci) = p.classes.iter().position(|c| p.syms.get(c.ty) == owner) else { continue };
+                    let mut matching = p.classes[ci].fields.iter().filter(|f| p.syms.get(f.name) == x.name);
+                    let (Some(f), None) = (matching.next(), matching.next()) else { continue };
+                    let key = (owner.clone(), x.name.clone(), p.syms.get(f.ty).to_string());
+                    self.fields.get(&key).cloned().or_else(|| self.members.get(&x.name).cloned())
+                }
+                _ => None,
+            };
+            if let Some(new) = new.filter(|n| *n != x.name) {
+                string_rewrites.push((x.class, x.method, insn, new));
+            }
+        }
         let mut syms = std::mem::take(&mut p.syms);
+        for (ci, mi, insn, new) in &string_rewrites {
+            let sym = syms.intern(new);
+            if let Some(b) = p.classes[*ci].methods[*mi].code.as_mut() {
+                if let Op::ConstString { value, .. } = &mut b.insns[*insn as usize].op {
+                    *value = sym;
+                }
+            }
+        }
         let mut cx = Ctx { r: self, program, hierarchy, syms: &mut syms };
         for c in &mut p.classes {
             let owner = cx.syms.get(c.ty).to_string();

@@ -9,6 +9,6 @@ fun main(args: Array<String>) {
     println(parse(args.firstOrNull() ?: "beta")); println(area(if (args.isEmpty()) Shape.Circle(2.0) else Shape.Square))
     println(useInline(listOf(1, args.size))); println(lambdas(listOf("ab"))[0]()); println(fnRef()("abc"))
     println(template(User("b", 2), args.size)); println(r.ext("q")); println(notNullParam("a", listOf())); println(Singleton.inc())
-    println(Repo.shared); println(Repo.plain()); println(r.find(makeId(4)))
-    println(Color.entries.size); println(suspendLambda()); println(r::load)
+    println(Repo.shared === Repo.shared); println(Repo.plain()); println(r.find(makeId(4)))
+    println(Color.entries.size); println(suspendLambda() != null); println(r::load)
 }

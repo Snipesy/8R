@@ -333,7 +333,10 @@ fn solved_coverage_ratchet() {
             }
         }
     }
-    assert!(regressions.is_empty(), "S coverage regressed: {regressions:?}");
+    // EIGHTR_UPDATE_METRICS=1 records the current numbers even if they dropped: for
+    // intentional changes (e.g. a fixture's source changed). Review the diff of metrics.json.
+    let update = std::env::var_os("EIGHTR_UPDATE_METRICS").is_some();
+    assert!(update || regressions.is_empty(), "S coverage regressed: {regressions:?}");
     if std::env::var_os("EIGHTR_UPDATE_METRICS").is_some() || recorded.is_empty() {
         fs::write(&path, serde_json::to_string_pretty(&current).unwrap() + "\n").unwrap();
     } else if current != recorded {

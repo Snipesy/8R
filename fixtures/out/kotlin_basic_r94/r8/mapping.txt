@@ -3,8 +3,8 @@
 # min_api: 24
 # common_typos_disable
 # {"id":"com.android.tools.r8.mapping","version":"2.2"}
-# pg_map_id: 02352e20b3f2001ffa5af8ddd922e7c3a2083ef762331e42b45b7dba48b5a13d
-# pg_map_hash: SHA-256 02352e20b3f2001ffa5af8ddd922e7c3a2083ef762331e42b45b7dba48b5a13d
+# pg_map_id: ee5d8a53db4b21c0d8d35334f224e77b6978113701d56161a25027d7c8591174
+# pg_map_hash: SHA-256 ee5d8a53db4b21c0d8d35334f224e77b6978113701d56161a25027d7c8591174
 com.example.Color -> i:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     kotlin.enums.EnumEntries $ENTRIES -> a
@@ -169,74 +169,64 @@ com.example.MainKt -> com.example.MainKt:
     77:77:void main(java.lang.String[]):13 -> main
       # {"id":"com.android.tools.r8.rewriteFrame","conditions":["throws(Ljava/lang/NullPointerException;)"],"actions":["removeInnerFrames(2)"]}
     78:78:void main(java.lang.String[]):13:13 -> main
-    79:79:kotlin.jvm.functions.Function2 com.example.SamplesFacade.suspendLambda():56:56 -> main
+    79:79:void com.example.MainKt$main$1.<init>(java.lang.Object):0:0 -> main
     79:79:void main(java.lang.String[]):13 -> main
-    80:80:void kotlin.coroutines.jvm.internal.BaseContinuationImpl.<init>(kotlin.coroutines.Continuation):14:14 -> main
-    80:80:void kotlin.coroutines.jvm.internal.ContinuationImpl.<init>(kotlin.coroutines.Continuation,kotlin.coroutines.CoroutineContext):97 -> main
-    80:80:void kotlin.coroutines.jvm.internal.ContinuationImpl.<init>(kotlin.coroutines.Continuation):103 -> main
-    80:80:void kotlin.coroutines.jvm.internal.SuspendLambda.<init>(int,kotlin.coroutines.Continuation):155 -> main
-    80:80:void com.example.SamplesFacade$suspendLambda$1.<init>(kotlin.coroutines.Continuation):0 -> main
-    80:80:kotlin.jvm.functions.Function2 com.example.SamplesFacade.suspendLambda():56 -> main
+    80:80:void kotlin.jvm.internal.FunctionReference.<init>(int,java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):27:27 -> main
+    80:80:void kotlin.jvm.internal.FunctionReferenceImpl.<init>(int,java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):29 -> main
+    80:80:void com.example.MainKt$main$1.<init>(java.lang.Object):0 -> main
     80:80:void main(java.lang.String[]):13 -> main
     81:81:void main(java.lang.String[]):13:13 -> main
-    82:82:void com.example.MainKt$main$1.<init>(java.lang.Object):0:0 -> main
-    82:82:void main(java.lang.String[]):13 -> main
-    83:83:void kotlin.jvm.internal.FunctionReference.<init>(int,java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):27:27 -> main
-    83:83:void kotlin.jvm.internal.FunctionReferenceImpl.<init>(int,java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):29 -> main
-    83:83:void com.example.MainKt$main$1.<init>(java.lang.Object):0 -> main
-    83:83:void main(java.lang.String[]):13 -> main
-    84:84:void main(java.lang.String[]):13:13 -> main
-    85:85:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54:54 -> main
-    85:85:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
-    85:85:java.lang.String com.example.Repo.getDb():16 -> main
-    85:85:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
-    85:85:void main(java.lang.String[]):12 -> main
-    86:86:void kotlin.UninitializedPropertyAccessException.<init>(java.lang.String):11:11 -> main
-    86:86:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
-    86:86:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
-    86:86:java.lang.String com.example.Repo.getDb():16 -> main
-    86:86:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
-    86:86:void main(java.lang.String[]):12 -> main
-    87:87:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253:253 -> main
+    82:82:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54:54 -> main
+    82:82:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
+    82:82:java.lang.String com.example.Repo.getDb():16 -> main
+    82:82:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
+    82:82:void main(java.lang.String[]):12 -> main
+    83:83:void kotlin.UninitializedPropertyAccessException.<init>(java.lang.String):11:11 -> main
+    83:83:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
+    83:83:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
+    83:83:java.lang.String com.example.Repo.getDb():16 -> main
+    83:83:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
+    83:83:void main(java.lang.String[]):12 -> main
+    84:84:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253:253 -> main
+    84:84:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
+    84:84:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
+    84:84:java.lang.String com.example.Repo.getDb():16 -> main
+    84:84:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
+    84:84:void main(java.lang.String[]):12 -> main
+    85:86:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):257:258 -> main
+    85:86:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253 -> main
+    85:86:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
+    85:86:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
+    85:86:java.lang.String com.example.Repo.getDb():16 -> main
+    85:86:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
+    85:86:void main(java.lang.String[]):12 -> main
+    87:87:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):262:262 -> main
+    87:87:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253 -> main
     87:87:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
     87:87:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
     87:87:java.lang.String com.example.Repo.getDb():16 -> main
     87:87:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
     87:87:void main(java.lang.String[]):12 -> main
-    88:89:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):257:258 -> main
+    88:89:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):267:268 -> main
     88:89:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253 -> main
     88:89:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
     88:89:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
     88:89:java.lang.String com.example.Repo.getDb():16 -> main
     88:89:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
     88:89:void main(java.lang.String[]):12 -> main
-    90:90:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):262:262 -> main
-    90:90:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253 -> main
-    90:90:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
+    90:90:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54:54 -> main
     90:90:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
     90:90:java.lang.String com.example.Repo.getDb():16 -> main
     90:90:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
     90:90:void main(java.lang.String[]):12 -> main
-    91:92:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable,java.lang.String):267:268 -> main
-    91:92:java.lang.Throwable kotlin.jvm.internal.Intrinsics.sanitizeStackTrace(java.lang.Throwable):253 -> main
-    91:92:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54 -> main
-    91:92:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
-    91:92:java.lang.String com.example.Repo.getDb():16 -> main
-    91:92:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
-    91:92:void main(java.lang.String[]):12 -> main
-    93:93:void kotlin.jvm.internal.Intrinsics.throwUninitializedProperty(java.lang.String):54:54 -> main
-    93:93:void kotlin.jvm.internal.Intrinsics.throwUninitializedPropertyAccessException(java.lang.String):58 -> main
-    93:93:java.lang.String com.example.Repo.getDb():16 -> main
-    93:93:java.lang.String com.example.Repo.find-liAVW5U(long):19 -> main
-    93:93:void main(java.lang.String[]):12 -> main
-    94:94:double com.example.SamplesFacade.area(com.example.Shape):49:49 -> main
-    94:94:void main(java.lang.String[]):9 -> main
-    95:95:void kotlin.NoWhenBranchMatchedException.<init>():9:9 -> main
-    95:95:double com.example.SamplesFacade.area(com.example.Shape):49 -> main
-    95:95:void main(java.lang.String[]):9 -> main
-    96:96:double com.example.SamplesFacade.area(com.example.Shape):49:49 -> main
-    96:96:void main(java.lang.String[]):9 -> main
-com.example.MainKt$main$1 -> j0:
+    91:91:double com.example.SamplesFacade.area(com.example.Shape):49:49 -> main
+    91:91:void main(java.lang.String[]):9 -> main
+    92:92:void kotlin.NoWhenBranchMatchedException.<init>():9:9 -> main
+    92:92:double com.example.SamplesFacade.area(com.example.Shape):49 -> main
+    92:92:void main(java.lang.String[]):9 -> main
+    93:93:double com.example.SamplesFacade.area(com.example.Shape):49:49 -> main
+    93:93:void main(java.lang.String[]):9 -> main
+com.example.MainKt$main$1 -> i0:
 # {"id":"sourceFile","fileName":"Main.kt"}
     4:7:boolean kotlin.jvm.internal.FunctionReference.equals(java.lang.Object):81:81 -> equals
     8:9:boolean kotlin.jvm.internal.FunctionReference.equals(java.lang.Object):82:82 -> equals
@@ -280,19 +270,17 @@ com.example.MainKt$main$1 -> j0:
     13:17:java.lang.String kotlin.jvm.internal.FunctionReference.toString():104:104 -> toString
     18:37:java.lang.String kotlin.jvm.internal.FunctionReference.toString():108:108 -> toString
     38:50:java.lang.String kotlin.jvm.internal.FunctionReference.toString():110:110 -> toString
-com.example.Repo -> t0:
+com.example.Repo -> s0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     java.lang.String db -> a
     kotlin.Lazy lazyName$delegate -> b
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Ly0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lw0;"}
     kotlin.properties.ReadWriteProperty observed$delegate -> c
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Ls0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lr0;"}
     com.example.Repo$Companion Companion -> d
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lz0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lx0;"}
     kotlin.reflect.KProperty[] $$delegatedProperties -> e
-      # {"id":"com.android.tools.r8.residualsignature","signature":"[Lo0;"}
-    com.example.Repo shared -> f
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lt0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"[Ln0;"}
     7:12:void kotlin.jvm.internal.MutablePropertyReference.<init>(java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):23:23 -> <clinit>
     7:12:void kotlin.jvm.internal.MutablePropertyReference1.<init>(java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):26 -> <clinit>
     7:12:void kotlin.jvm.internal.MutablePropertyReference1Impl.<init>(java.lang.Class,java.lang.String,java.lang.String,int):24 -> <clinit>
@@ -301,7 +289,7 @@ com.example.Repo -> t0:
     22:24:void com.example.Repo$Companion.<init>():35:35 -> <clinit>
     22:24:void com.example.Repo$Companion.<init>(kotlin.jvm.internal.DefaultConstructorMarker):0 -> <clinit>
     22:24:void <clinit>():0 -> <clinit>
-    25:34:void <clinit>():0:0 -> <clinit>
+    25:32:void <clinit>():0:0 -> <clinit>
     1:3:void <init>():15:15 -> <init>
     4:9:void <init>():17:17 -> <init>
     10:14:kotlin.Lazy kotlin.LazyKt__LazyJVMKt.lazy(kotlin.jvm.functions.Function0):26:26 -> <init>
@@ -316,7 +304,7 @@ com.example.Repo -> t0:
     26:27:void com.example.Repo$special$$inlined$observable$1.<init>(java.lang.Object):33 -> <init>
     26:27:void <init>():63 -> <init>
     28:30:void <init>():18:18 -> <init>
-com.example.Repo$0 -> r0:
+com.example.Repo$0 -> q0:
 # {"id":"sourceFile","fileName":"R8$$SyntheticClass"}
 # {"id":"com.android.tools.r8.synthesized"}
     byte Repo$0.$r8$classId -> a
@@ -392,14 +380,14 @@ com.example.Repo$0 -> r0:
     81:82:java.lang.String com.example.Repo.getDb():16 -> a
     81:82:java.lang.String com.example.Repo.lazyName_delegate$lambda$0(com.example.Repo):17 -> a
     81:82:java.lang.Object Repo$0.invoke():0 -> a
-com.example.Repo$special$$inlined$observable$1 -> s0:
+com.example.Repo$special$$inlined$observable$1 -> r0:
 # {"id":"sourceFile","fileName":"Delegates.kt"}
     java.lang.Object kotlin.properties.ObservableProperty.value -> a
       # {"id":"com.android.tools.r8.residualsignature","signature":"Ljava/lang/Integer;"}
     1:22:java.lang.String kotlin.properties.ObservableProperty.toString():44:44 -> toString
 com.example.SamplesFacade -> R8$$REMOVED$$CLASS$$0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
-com.example.SamplesFacade$fnRef$1 -> u0:
+com.example.SamplesFacade$fnRef$1 -> t0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     int $r8$clinit -> h
       # {"id":"com.android.tools.r8.synthesized"}
@@ -411,32 +399,22 @@ com.example.SamplesFacade$fnRef$1 -> u0:
     7:12:void <clinit>():0 -> <clinit>
     1:6:kotlin.reflect.KProperty1 kotlin.jvm.internal.Reflection.property1(kotlin.jvm.internal.PropertyReference1):104:104 -> a
     1:6:kotlin.reflect.KCallable kotlin.jvm.internal.PropertyReference1.computeReflected():30 -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"()Li0;"}
-com.example.SamplesFacade$suspendLambda$1 -> v0:
-# {"id":"sourceFile","fileName":"Samples.kt"}
-    1:5:java.lang.String kotlin.jvm.internal.Reflection.renderLambdaToString(kotlin.jvm.internal.FunctionBase):84:84 -> toString
-    1:5:java.lang.String kotlin.coroutines.jvm.internal.SuspendLambda.toString():165 -> toString
-    6:18:java.lang.String kotlin.jvm.internal.ReflectionFactory.renderLambdaToString(kotlin.jvm.internal.FunctionBase):44:44 -> toString
-    6:18:java.lang.String kotlin.jvm.internal.Reflection.renderLambdaToString(kotlin.jvm.internal.FunctionBase):84 -> toString
-    6:18:java.lang.String kotlin.coroutines.jvm.internal.SuspendLambda.toString():165 -> toString
-    19:33:java.lang.String kotlin.jvm.internal.ReflectionFactory.renderLambdaToString(kotlin.jvm.internal.FunctionBase):45:45 -> toString
-    19:33:java.lang.String kotlin.jvm.internal.Reflection.renderLambdaToString(kotlin.jvm.internal.FunctionBase):84 -> toString
-    19:33:java.lang.String kotlin.coroutines.jvm.internal.SuspendLambda.toString():165 -> toString
-com.example.Shape$Circle -> w0:
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lh0;"}
+com.example.Shape$Circle -> u0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     4:20:boolean equals(java.lang.Object):0:0 -> equals
     3:7:int hashCode():0:0 -> hashCode
     1:3:java.lang.String toString():0:0 -> toString
-com.example.Shape$Square -> x0:
+com.example.Shape$Square -> v0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     com.example.Shape$Square INSTANCE -> c
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lx0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lv0;"}
     3:5:void com.example.Shape.<init>():45:45 -> <clinit>
     3:5:void com.example.Shape.<init>(kotlin.jvm.internal.DefaultConstructorMarker):0 -> <clinit>
     3:5:void <init>():45 -> <clinit>
     3:5:void <clinit>():0 -> <clinit>
     6:8:void <clinit>():0:0 -> <clinit>
-com.example.User -> a1:
+com.example.User -> y0:
 # {"id":"sourceFile","fileName":"Samples.kt"}
     java.lang.String name -> a
     int age -> b
@@ -447,9 +425,9 @@ com.example.User -> a1:
     1:42:java.lang.String toString():0:0 -> toString
 kotlin.LazyKt__LazyJVMKt -> R8$$REMOVED$$CLASS$$1:
 # {"id":"sourceFile","fileName":"LazyJVM.kt"}
-kotlin.NoWhenBranchMatchedException -> l0:
+kotlin.NoWhenBranchMatchedException -> k0:
 # {"id":"sourceFile","fileName":"NoWhenBranchMatchedException.kt"}
-kotlin.Pair -> n0:
+kotlin.Pair -> m0:
 # {"id":"sourceFile","fileName":"Tuples.kt"}
     java.lang.Object first -> a
     java.lang.Object second -> b
@@ -462,15 +440,15 @@ kotlin.Pair -> n0:
     26:35:boolean equals(java.lang.Object):0 -> equals
     1:20:int hashCode():0:0 -> hashCode
     1:32:java.lang.String toString():35:35 -> toString
-kotlin.SynchronizedLazyImpl -> y0:
+kotlin.SynchronizedLazyImpl -> w0:
 # {"id":"sourceFile","fileName":"LazyJVM.kt"}
     kotlin.jvm.functions.Function0 initializer -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lr0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lq0;"}
     java.lang.Object _value -> b
     java.lang.Object lock -> c
     1:3:void <init>(kotlin.jvm.functions.Function0,java.lang.Object):63:63 -> <init>
     1:3:void <init>(kotlin.jvm.functions.Function0,java.lang.Object,int,kotlin.jvm.internal.DefaultConstructorMarker):63 -> <init>
-      # {"id":"com.android.tools.r8.residualsignature","signature":"(Lr0;)V"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(Lq0;)V"}
     4:5:void <init>(kotlin.jvm.functions.Function0,java.lang.Object):64:64 -> <init>
     4:5:void <init>(kotlin.jvm.functions.Function0,java.lang.Object,int,kotlin.jvm.internal.DefaultConstructorMarker):63 -> <init>
     6:9:void <init>(kotlin.jvm.functions.Function0,java.lang.Object):67:67 -> <init>
@@ -490,10 +468,10 @@ kotlin.SynchronizedLazyImpl -> y0:
     7:18:java.lang.String toString():96:96 -> toString
 kotlin.TuplesKt -> R8$$REMOVED$$CLASS$$2:
 # {"id":"sourceFile","fileName":"Tuples.kt"}
-kotlin.UNINITIALIZED_VALUE -> z0:
+kotlin.UNINITIALIZED_VALUE -> x0:
 # {"id":"sourceFile","fileName":"Lazy.kt"}
     kotlin.UNINITIALIZED_VALUE INSTANCE -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lz0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lx0;"}
     3:5:void <init>():90:90 -> <clinit>
     3:5:void <clinit>():0 -> <clinit>
     6:8:void <clinit>():0:0 -> <clinit>
@@ -717,9 +695,7 @@ kotlin.collections.MapsKt__MapsJVMKt -> R8$$REMOVED$$CLASS$$10:
 # {"id":"sourceFile","fileName":"MapsJVM.kt"}
 kotlin.collections.MapsKt__MapsKt -> R8$$REMOVED$$CLASS$$11:
 # {"id":"sourceFile","fileName":"Maps.kt"}
-kotlin.coroutines.jvm.internal.SuspendLambda -> R8$$REMOVED$$CLASS$$12:
-# {"id":"sourceFile","fileName":"ContinuationImpl.kt"}
-kotlin.enums.EnumEntriesKt -> R8$$REMOVED$$CLASS$$13:
+kotlin.enums.EnumEntriesKt -> R8$$REMOVED$$CLASS$$12:
 # {"id":"sourceFile","fileName":"EnumEntries.kt"}
 kotlin.enums.EnumEntriesList -> k:
 # {"id":"sourceFile","fileName":"EnumEntries.kt"}
@@ -783,32 +759,30 @@ kotlin.jvm.functions.Function18 -> t:
 # {"id":"sourceFile","fileName":"Functions.kt"}
 kotlin.jvm.functions.Function19 -> u:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function2 -> z:
-# {"id":"sourceFile","fileName":"Functions.kt"}
 kotlin.jvm.functions.Function20 -> w:
 # {"id":"sourceFile","fileName":"Functions.kt"}
 kotlin.jvm.functions.Function21 -> x:
 # {"id":"sourceFile","fileName":"Functions.kt"}
 kotlin.jvm.functions.Function22 -> y:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function3 -> a0:
+kotlin.jvm.functions.Function3 -> z:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function4 -> b0:
+kotlin.jvm.functions.Function4 -> a0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function5 -> c0:
+kotlin.jvm.functions.Function5 -> b0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function6 -> d0:
+kotlin.jvm.functions.Function6 -> c0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function7 -> e0:
+kotlin.jvm.functions.Function7 -> d0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function8 -> f0:
+kotlin.jvm.functions.Function8 -> e0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
-kotlin.jvm.functions.Function9 -> g0:
+kotlin.jvm.functions.Function9 -> f0:
 # {"id":"sourceFile","fileName":"Functions.kt"}
 kotlin.jvm.internal.CallableReference -> f:
 # {"id":"sourceFile","fileName":"CallableReference.java"}
     kotlin.reflect.KCallable reflected -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Li0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lh0;"}
     java.lang.Object receiver -> b
     java.lang.Class owner -> c
     java.lang.String name -> d
@@ -822,7 +796,7 @@ kotlin.jvm.internal.CallableReference -> f:
     12:14:void <init>(java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,boolean):76:76 -> <init>
     1:6:kotlin.reflect.KFunction kotlin.jvm.internal.Reflection.function(kotlin.jvm.internal.FunctionReference):90:90 -> a
     1:6:kotlin.reflect.KCallable kotlin.jvm.internal.FunctionReference.computeReflected():45 -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"()Li0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lh0;"}
     1:6:kotlin.reflect.KDeclarationContainer getOwner():113:113 -> b
       # {"id":"com.android.tools.r8.residualsignature","signature":"()Lg;"}
     7:11:kotlin.reflect.KDeclarationContainer kotlin.jvm.internal.Reflection.getOrCreateKotlinPackage(java.lang.Class):51:51 -> b
@@ -917,9 +891,9 @@ kotlin.jvm.internal.ClassReference -> h:
     6:7:java.lang.Class getJClass():11:11 -> toString
     6:7:java.lang.String toString():100 -> toString
     8:24:java.lang.String toString():100:100 -> toString
-kotlin.jvm.internal.FunctionReferenceImpl -> R8$$REMOVED$$CLASS$$14:
+kotlin.jvm.internal.FunctionReferenceImpl -> R8$$REMOVED$$CLASS$$13:
 # {"id":"sourceFile","fileName":"FunctionReferenceImpl.java"}
-kotlin.jvm.internal.Intrinsics -> h0:
+kotlin.jvm.internal.Intrinsics -> g0:
 # {"id":"sourceFile","fileName":"Intrinsics.java"}
     java.lang.Object[] kotlin.jvm.internal.CollectionToArray.EMPTY -> a
     int com.example.Singleton.counter -> b
@@ -950,14 +924,14 @@ kotlin.jvm.internal.Intrinsics -> h0:
     117:119:java.lang.Class kotlin.jvm.JvmClassMappingKt.getJavaObjectType(kotlin.reflect.KClass):67:67 -> c
     120:128:java.lang.Class kotlin.jvm.JvmClassMappingKt.getJavaObjectType(kotlin.reflect.KClass):62:62 -> c
     129:132:java.lang.Class kotlin.jvm.JvmClassMappingKt.getJavaObjectType(kotlin.reflect.KClass):70:70 -> c
-kotlin.jvm.internal.MutablePropertyReference1 -> R8$$REMOVED$$CLASS$$15:
+kotlin.jvm.internal.MutablePropertyReference1 -> R8$$REMOVED$$CLASS$$14:
 # {"id":"sourceFile","fileName":"MutablePropertyReference1.java"}
-kotlin.jvm.internal.MutablePropertyReference1Impl -> k0:
+kotlin.jvm.internal.MutablePropertyReference1Impl -> j0:
 # {"id":"sourceFile","fileName":"MutablePropertyReference1Impl.java"}
     1:6:kotlin.reflect.KMutableProperty1 kotlin.jvm.internal.Reflection.mutableProperty1(kotlin.jvm.internal.MutablePropertyReference1):108:108 -> a
     1:6:kotlin.reflect.KCallable kotlin.jvm.internal.MutablePropertyReference1.computeReflected():31 -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"()Li0;"}
-kotlin.jvm.internal.PackageReference -> m0:
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lh0;"}
+kotlin.jvm.internal.PackageReference -> l0:
 # {"id":"sourceFile","fileName":"PackageReference.kt"}
     java.lang.Class jClass -> a
     1:3:void <init>(java.lang.Class,java.lang.String):10:10 -> <init>
@@ -975,14 +949,14 @@ kotlin.jvm.internal.PackageReference -> m0:
     6:7:java.lang.Class getJClass():12:12 -> toString
     6:7:java.lang.String toString():25 -> toString
     8:24:java.lang.String toString():25:25 -> toString
-kotlin.jvm.internal.PropertyReference -> o0:
+kotlin.jvm.internal.PropertyReference -> n0:
 # {"id":"sourceFile","fileName":"PropertyReference.java"}
     boolean syntheticJavaProperty -> g
     8:11:void <init>(java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):31:31 -> <init>
       # {"id":"com.android.tools.r8.residualsignature","signature":"(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;)V"}
     12:14:void <init>(java.lang.Object,java.lang.Class,java.lang.String,java.lang.String,int):33:33 -> <init>
     1:5:kotlin.reflect.KCallable compute():48:48 -> c
-      # {"id":"com.android.tools.r8.residualsignature","signature":"()Li0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lh0;"}
     6:9:kotlin.reflect.KCallable kotlin.jvm.internal.CallableReference.compute():88:88 -> c
     6:9:kotlin.reflect.KCallable compute():48 -> c
     10:13:kotlin.reflect.KCallable kotlin.jvm.internal.CallableReference.compute():90:90 -> c
@@ -1020,25 +994,25 @@ kotlin.jvm.internal.PropertyReference -> o0:
     19:20:java.lang.String kotlin.jvm.internal.CallableReference.getName():122:122 -> toString
     19:20:java.lang.String toString():91 -> toString
     21:33:java.lang.String toString():91:91 -> toString
-kotlin.jvm.internal.PropertyReference1Impl -> R8$$REMOVED$$CLASS$$16:
+kotlin.jvm.internal.PropertyReference1Impl -> R8$$REMOVED$$CLASS$$15:
 # {"id":"sourceFile","fileName":"PropertyReference1Impl.java"}
-kotlin.jvm.internal.Reflection -> p0:
+kotlin.jvm.internal.Reflection -> o0:
 # {"id":"sourceFile","fileName":"Reflection.java"}
     kotlin.jvm.internal.ReflectionFactory factory -> a
-      # {"id":"com.android.tools.r8.residualsignature","signature":"Lq0;"}
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lp0;"}
     2:7:void <clinit>():26:26 -> <clinit>
     8:17:void <clinit>():27:27 -> <clinit>
     18:19:void <clinit>():34:34 -> <clinit>
     20:22:void kotlin.jvm.internal.ReflectionFactory.<init>():14:14 -> <clinit>
     20:22:void <clinit>():34 -> <clinit>
     23:25:void <clinit>():34:34 -> <clinit>
-kotlin.jvm.internal.ReflectionFactory -> q0:
+kotlin.jvm.internal.ReflectionFactory -> p0:
 # {"id":"sourceFile","fileName":"ReflectionFactory.java"}
-kotlin.properties.ObservableProperty -> R8$$REMOVED$$CLASS$$17:
+kotlin.properties.ObservableProperty -> R8$$REMOVED$$CLASS$$16:
 # {"id":"sourceFile","fileName":"ObservableProperty.kt"}
-kotlin.reflect.KCallable -> i0:
+kotlin.reflect.KCallable -> h0:
 # {"id":"sourceFile","fileName":"KCallable.kt"}
-kotlin.text.StringsKt__AppendableKt -> R8$$REMOVED$$CLASS$$18:
+kotlin.text.StringsKt__AppendableKt -> R8$$REMOVED$$CLASS$$17:
 # {"id":"sourceFile","fileName":"Appendable.kt"}
-kotlin.text.StringsKt__StringsJVMKt -> R8$$REMOVED$$CLASS$$19:
+kotlin.text.StringsKt__StringsJVMKt -> R8$$REMOVED$$CLASS$$18:
 # {"id":"sourceFile","fileName":"StringsJVM.kt"}
