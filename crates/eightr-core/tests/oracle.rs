@@ -105,7 +105,7 @@ fn solved_names_match_held_back_mapping() {
     let mut checked = 0;
     let mut unverifiable = 0;
     for fixture in fixture_names() {
-        let mapping = Mapping::parse(&fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")).unwrap()).unwrap();
+        let mapping = Mapping::parse_normalized(&fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")).unwrap()).unwrap();
         let by_obf = mapping.by_obfuscated();
         let out = outcome(&fixture, "r8");
         let p = &out.program;
@@ -230,7 +230,7 @@ fn solved_names_match_held_back_mapping() {
 #[test]
 fn solved_names_exist_in_d8_ground_truth() {
     for fixture in fixture_names() {
-        let mapping = Mapping::parse(&fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")).unwrap()).unwrap();
+        let mapping = Mapping::parse_normalized(&fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")).unwrap()).unwrap();
         let by_obf = mapping.by_obfuscated();
         let o = outcome(&fixture, "r8");
         let g = outcome(&fixture, "d8").program;
@@ -391,7 +391,7 @@ fn outline_detection_matches_mapping() {
     let (mut checked, mut bottom_up_truth) = (0, 0);
     for fixture in fixture_names() {
         let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
-        let mapping = Mapping::parse(&text).unwrap();
+        let mapping = Mapping::parse_normalized(&text).unwrap();
         let out = outcome(&fixture, "r8");
         let plain = run(&load(&fixture, "r8"), &Config { no_rewrites: true, ..Default::default() }).unwrap();
         let detected: std::collections::BTreeSet<(String, String)> = out
@@ -456,7 +456,7 @@ fn merged_class_detection_matches_mapping() {
     let (mut truth_total, mut found, mut checked) = (0, 0, 0);
     for fixture in fixture_names() {
         let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
-        let mapping = Mapping::parse(&text).unwrap();
+        let mapping = Mapping::parse_normalized(&text).unwrap();
         let truth: std::collections::BTreeSet<String> = mapping
             .classes
             .iter()
@@ -489,7 +489,7 @@ fn enum_unboxing_evidence_matches_ground_truth() {
     let mut graded = 0;
     for fixture in fixture_names() {
         let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
-        let mapping = Mapping::parse(&text).unwrap();
+        let mapping = Mapping::parse_normalized(&text).unwrap();
         let by_obf = mapping.by_obfuscated();
         let out = outcome(&fixture, "r8");
         let p = &out.program;
@@ -562,7 +562,7 @@ fn inlining_hints_precision_recall() {
     for fixture in fixture_names() {
         let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
         graded.push(fixture.clone());
-        let mapping = Mapping::parse(&text).unwrap();
+        let mapping = Mapping::parse_normalized(&text).unwrap();
         let version = text.lines().find_map(|l| l.strip_prefix("# compiler_version: ")).map_or("?", |v| if v.starts_with("9.") { "9" } else { "8" }).to_string();
         let by_obf = mapping.by_obfuscated();
         let bytes = fs::read(fixtures_root().join(&fixture).join("r8/classes.dex")).unwrap();

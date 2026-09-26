@@ -81,6 +81,72 @@ pub fn parse(text: &str) -> Result<Mapping, ParseError> {
     Ok(m)
 }
 
+/// [`parse`], then with R8's quirks normalized away (see [`normalize`]). Loses the exact
+/// round-trip; for consumers of the mapping's meaning (test oracles).
+pub fn parse_normalized(text: &str) -> Result<Mapping, ParseError> {
+    let mut m = parse(text)?;
+    for c in &mut m.classes {
+        normalize(c);
+    }
+    Ok(m)
+}
+
+const PRIMITIVES: [&str; 9] = ["void", "boolean", "byte", "char", "short", "int", "long", "float", "double"];
+
+/// R8 ≥ 9 quirks, normalized away:
+/// * frames it synthesizes (for methods it moved, bridged or merged) name owners and types
+///   *relative to the class block's package* (`Account$0.invoke()` in a `com.example.model`
+///   block): qualify them;
+/// * `residualsignature` is written once, after a method's first line range, but applies to all
+///   of its ranges: copy it to the others.
+pub(crate) fn normalize(c: &mut crate::ClassMapping) {
+    let pkg = c.original.rsplit_once('.').map(|(p, _)| p.to_string());
+    let qualify = |name: &mut String| {
+        let Some(pkg) = &pkg else { return };
+        let base = name.trim_end_matches("[]");
+        if !base.contains('.') && !PRIMITIVES.contains(&base) && !base.is_empty() {
+            *name = format!("{pkg}.{name}");
+        }
+    };
+    for mm in &mut c.members {
+        match &mut mm.kind {
+            MemberKind::Method(m) => {
+                if let Some(o) = &mut m.original_owner {
+                    qualify(o);
+                }
+                for t in &mut m.params {
+                    qualify(t);
+                }
+                qualify(&mut m.return_type);
+            }
+            MemberKind::Field(f) => {
+                if let Some(o) = &mut f.original_owner {
+                    qualify(o);
+                }
+                qualify(&mut f.ty);
+            }
+        }
+    }
+    // residualsignature: per (obfuscated name, original signature), carried to every range.
+    let mut residual: Vec<(String, String, MetadataLine)> = Vec::new();
+    for mm in &c.members {
+        if let MemberKind::Method(m) = &mm.kind {
+            if let Some(md) = mm.metadata.iter().find(|x| matches!(x.parsed, crate::Metadata::ResidualSignature(_))) {
+                residual.push((m.obfuscated.clone(), m.signature(), md.clone()));
+            }
+        }
+    }
+    for mm in &mut c.members {
+        if let MemberKind::Method(m) = &mm.kind {
+            if !mm.metadata.iter().any(|x| matches!(x.parsed, crate::Metadata::ResidualSignature(_))) {
+                if let Some((_, _, md)) = residual.iter().find(|(o, s, _)| *o == m.obfuscated && *s == m.signature()) {
+                    mm.metadata.push(md.clone());
+                }
+            }
+        }
+    }
+}
+
 fn parse_u32(s: &str, what: &str) -> Result<u32, String> {
     s.parse().map_err(|_| format!("invalid {what}: {s:?}"))
 }
@@ -148,4 +214,21 @@ fn parse_member(t: &str) -> Result<MemberKind, String> {
         original_range,
         obfuscated,
     }))
+}
+
+#[cfg(test)]
+mod quirk_tests {
+    use crate::{Mapping, MemberKind, Metadata};
+
+    #[test]
+    fn relative_frames_and_residual_signatures_are_normalized() {
+        let text = "com.example.model.Account$0 -> c:\n    7:13:java.lang.Object Account$0.invoke():0 -> a\n      # {\"id\":\"com.android.tools.r8.residualsignature\",\"signature\":\"()I\"}\n    14:21:java.lang.Object Account$0.invoke():0 -> a\n    1:2:SharedFlowImpl Other.flow(int,Holder[]):0 -> b\n";
+        let m = Mapping::parse_normalized(text).unwrap();
+        let methods: Vec<_> = m.classes[0].members.iter().filter_map(|mm| match &mm.kind { MemberKind::Method(x) => Some((x, &mm.metadata)), _ => None }).collect();
+        assert_eq!(methods[0].0.original_owner.as_deref(), Some("com.example.model.Account$0"));
+        assert!(methods[1].1.iter().any(|x| matches!(x.parsed, Metadata::ResidualSignature(_))), "second range gets the residual signature");
+        assert_eq!(methods[2].0.return_type, "com.example.model.SharedFlowImpl");
+        assert_eq!(methods[2].0.params, vec!["int".to_string(), "com.example.model.Holder[]".to_string()]);
+        assert_eq!(methods[0].0.return_type, "java.lang.Object");
+    }
 }
