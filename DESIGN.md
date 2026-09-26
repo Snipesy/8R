@@ -822,6 +822,27 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   real app (Gretio): 132 outlines, 12441 of 12567 call sites inlined, all classes verify. The
   renamer now parses generic signatures properly (`types::signature_class_ranges`; it used to
   miss class types after primitives, e.g. `(ILa/B<…>;)V`).
+- **Merged classes (Phase 2):** `r8/split-merged-class` (D, with S facts) splits classes R8's
+  horizontal merger combined (merged siblings, lambda groups) into an abstract base plus one
+  final subclass per class id; each overrides the id-dispatching methods with its own arm
+  (`edit::fold_constant_branches`). Detection: a synthetic final byte/short/int id stored in
+  the constructors' entry block, read only as a dispatch key, constant at every instantiation;
+  refused on identity observations (class literals, annotations, handles, used `getClass()` on
+  values syntactically typed as the class), Serializable, program subclasses. Moved arms keep
+  access (private helpers widened, `invoke-super`/foreign-protected arms stay in the base).
+  Oracle: 58 splits, no false ones against `$r8$classId`; recall ≥ 85%. Gretio: 1274 classes
+  split into 7553, all classes verify.
+- **Enum unboxing (Phases 3A/3B):** `r8/enum-unboxing-utility` (S) names the shared utility's
+  `$VALUES`/`ordinal`/`values` by exact fingerprints. `report.enums` recovers enums R8
+  removed: constant names are *proven* only by an inlined `valueOf` (literal → the value it
+  yields) with its own failure message (the canonical name), or by an equals map agreeing with a
+  `name()` chain; `name()` chains alone are unproven (a String field's per-value strings look
+  identical); string switches prove nothing. `r8/rebox-enum` (D) re-creates proven enums in
+  javac's shape and converts webs of their values (seeded by name chains and `valueOf` results,
+  closed within a method over copies and merges, sourced only from constants and `values(N)`)
+  back to objects; other int uses read the exact adapter `$8r$unboxed(e)` = e == null ? 0 :
+  e.ordinal() + 1. Fixtures `r94_enum`, `r94_enum_rebox` run identically on ART. Gretio:
+  `SVG$Unit`, `SVG$GradientSpread`, `StorageHelper$TokenType` (+1 unnamed) re-boxed.
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every
