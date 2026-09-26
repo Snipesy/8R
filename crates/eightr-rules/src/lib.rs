@@ -104,6 +104,7 @@ pub const OUTLINE_INLINE: &str = "r8/outline-inline";
 pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
 pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
 pub const ENUM_UNBOXING_UTILITY: &str = "r8/enum-unboxing-utility";
+pub const REBOX_ENUM: &str = "r8/rebox-enum";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
@@ -247,6 +248,20 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["r94_outline", "kotlin_serialization", "r94_desugar"],
+    },
+    Rule {
+        id: REBOX_ENUM,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::Body],
+        summary: "Re-create an enum R8 unboxed (proven constant names, canonical name when recovered) and turn a method's web of its values back into enum objects; other int uses read the exact adapter `$8r$unboxed(e)` = e == null ? 0 : e.ordinal() + 1.",
+        preconditions: &[
+            "The enum's constants are proven by an inlined valueOf (or an equals map agreeing with a name() chain).",
+            "A web is seeded by the value an inlined name() chain compares and closed over copies and merges within the method; its values only come from constants 0..N and elements of the utility's values(N) array.",
+            "Free registers exist for the materialized constants and adapters, and every instruction stays encodable; otherwise the method is left as is.",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["r94_enum"],
     },
     Rule {
         id: SPLIT_MERGED_CLASS,

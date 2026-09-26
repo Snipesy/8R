@@ -32,20 +32,99 @@ pub struct EnumUnboxing;
 /// An enum R8 unboxed, as far as the program still shows it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct RecoveredEnum {
-    /// Fully qualified name, from `valueOf`'s message.
+    /// Canonical name (`a.b.Outer.Inner`, not a binary name), from `valueOf`'s message.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fqn: Option<String>,
+    pub canonical_name: Option<String>,
     /// Constant names by ordinal (empty when only the name is known).
     pub constants: Vec<String>,
+    /// Whether `constants` are proven names: an inlined `valueOf` maps each literal to its
+    /// value. Otherwise they are the strings an inlined chain yields per value — `name()`'s,
+    /// or those of a `String` field — indistinguishable without `valueOf`.
+    pub proven: bool,
 }
 
 const MESSAGE: &str = "No enum constant ";
 
+/// A compared value: its register and the definitions reaching it.
+type ValueKey = (Reg, Vec<usize>);
+
+/// `valueOf` maps in one method: per tested string value, literal → the value `k` the success
+/// branch yields (`"NAME".equals(s)` then `const k` / a copy of one).
+fn value_of_maps(p: &impl Strs, body: &Body) -> Vec<BTreeMap<i32, String>> {
+    value_of_chains(p, body).into_iter().map(|c| c.table).collect()
+}
+
+/// Like [`value_of_maps`], with each success branch's defining instruction (the value `k`
+/// produced): as `compares`' instruction, with its register.
+pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
+    let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
+    let rd = ReachingDefs::compute(body, &cfg);
+    let mut by_input: BTreeMap<ValueKey, BTreeMap<i32, Option<String>>> = BTreeMap::new();
+    let mut produced: BTreeMap<ValueKey, Vec<(u32, Reg)>> = BTreeMap::new();
+    for (i, insn) in body.insns.iter().enumerate() {
+        let Op::Invoke { method, args, .. } = &insn.op else { continue };
+        if p.str(method.name) != "equals" || p.str(method.proto) != "(Ljava/lang/Object;)Z" || args.len() != 2 {
+            continue;
+        }
+        let i = i as u32;
+        let lit = |r: Reg| string_at(p, body, &rd, i, r, 1).filter(|s| is_constant_name(s));
+        let (name, input) = match (lit(args[0]), lit(args[1])) {
+            (Some(n), None) => (n, args[1]),
+            (None, Some(n)) => (n, args[0]),
+            _ => continue,
+        };
+        let Some(Op::MoveResult { dst: r, .. }) = body.insns.get(i as usize + 1).map(|x| &x.op) else { continue };
+        let success = match body.insns.get(i as usize + 2).map(|x| &x.op) {
+            Some(Op::IfZ { cond: Cond::Eq, a, .. }) if a == r => i + 3,
+            Some(Op::IfZ { cond: Cond::Ne, a, target }) if a == r => *target,
+            _ => continue,
+        };
+        let (k, dst) = match body.insns.get(success as usize).map(|x| &x.op) {
+            Some(Op::Const { value: Const::Narrow(k), dst }) => (Some(*k), *dst),
+            Some(Op::Move { src, dst, .. }) => (const_at(body, &rd, success, *src), *dst),
+            _ => (None, 0),
+        };
+        let Some(k) = k.filter(|k| *k >= 1) else { continue };
+        let defs = rd.uses[i as usize].as_ref().and_then(|u| u.iter().find(|(x, _)| *x == input)).map(|(_, d)| d.clone()).unwrap_or_default();
+        produced.entry((input, defs.clone())).or_default().push((success, dst));
+        let slot = by_input.entry((input, defs)).or_default().entry(k).or_insert_with(|| Some(name.clone()));
+        if slot.as_deref() != Some(name.as_str()) {
+            *slot = None;
+        }
+    }
+    by_input
+        .into_iter()
+        .filter_map(|(key, t)| {
+            let table = t.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>()?;
+            (table.len() >= 2).then(|| Chain { table, compares: produced.remove(&key).unwrap_or_default(), from_value_of: false })
+        })
+        .collect()
+}
+
+/// String lookup, so the analysis runs on the pass's `Program` and on the raw model (the
+/// re-boxing rewrite runs before labels exist).
+pub(crate) trait Strs {
+    fn str(&self, s: eightr_ir::sym::Sym) -> &str;
+}
+
+impl Strs for Program {
+    fn str(&self, s: eightr_ir::sym::Sym) -> &str {
+        Program::str(self, s)
+    }
+}
+
+impl Strs for eightr_ir::model::Program {
+    fn str(&self, s: eightr_ir::sym::Sym) -> &str {
+        self.syms.get(s)
+    }
+}
+
 /// `$VALUES`: a static final `int[]` set in `<clinit>` to exactly `{1, 2, .., N}`.
-fn values_field(p: &Program, c: &eightr_ir::model::Class) -> Option<usize> {
+pub(crate) fn values_field(p: &impl Strs, c: &eightr_ir::model::Class) -> Option<usize> {
     let clinit = c.methods.iter().find(|m| p.str(m.name) == "<clinit>")?.code.as_ref()?;
     let cfg = Cfg::build(clinit).ok()?;
     let rd = ReachingDefs::compute(clinit, &cfg);
+    let mut found = Vec::new();
     for (i, insn) in clinit.insns.iter().enumerate() {
         let Op::StaticPut { src, field, .. } = &insn.op else { continue };
         if field.class != c.ty || p.str(field.ty) != "[I" {
@@ -53,14 +132,16 @@ fn values_field(p: &Program, c: &eightr_ir::model::Class) -> Option<usize> {
         }
         let Some(index) = c.fields.iter().position(|f| f.name == field.name && f.ty == field.ty && f.access & access::STATIC != 0) else { continue };
         if array_is_one_to_n(clinit, &rd, i as u32, *src) {
-            return Some(index);
+            found.push(index);
         }
     }
-    None
+    // Exactly one: two such arrays (merged utilities) leave the roles ambiguous.
+    found.dedup();
+    (found.len() == 1).then(|| found[0])
 }
 
 /// The narrow constant every definition of `reg` at `at` gives.
-fn const_at(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Option<i32> {
+pub(crate) fn const_at(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> Option<i32> {
     let uses = rd.uses.get(at as usize)?.as_ref()?;
     let (_, defs) = uses.iter().find(|(r, _)| *r == reg)?;
     let mut v = None;
@@ -88,31 +169,41 @@ fn array_is_one_to_n(body: &Body, rd: &ReachingDefs, at: u32, reg: Reg) -> bool 
 }
 
 /// `ordinal`: static `(I)I` = `if (x == 0) throw null; return x - 1;`.
-fn is_ordinal(body: &Body) -> bool {
+pub(crate) fn is_ordinal(body: &Body) -> bool {
     let p0 = body.registers - body.ins;
     let ops: Vec<&Op> = body.insns.iter().map(|i| &i.op).collect();
-    let has = |f: &dyn Fn(&Op) -> bool| ops.iter().any(|o| f(o));
-    ops.len() <= 6
-        && has(&|o| matches!(o, Op::IfZ { a, .. } if *a == p0))
-        && has(&|o| matches!(o, Op::Binop { op: BinOp::Add, a, b: Operand::Lit(-1), .. } if *a == p0))
-        && has(&|o| matches!(o, Op::Throw { .. }))
-        && has(&|o| matches!(o, Op::Return { .. }))
-        && ops.iter().all(|o| matches!(o, Op::IfZ { .. } | Op::Binop { .. } | Op::Return { .. } | Op::Throw { .. } | Op::Const { value: Const::Narrow(0), .. }))
+    match ops.as_slice() {
+        [Op::IfZ { cond: Cond::Eq, a, target: 3 }, Op::Binop { op: BinOp::Add, dst: r, a: x, b: Operand::Lit(-1), .. }, Op::Return { src, .. }, Op::Const { dst: t, value: Const::Narrow(0) }, Op::Throw { src: u }] => {
+            *a == p0 && *x == p0 && src == r && t == u
+        }
+        _ => false,
+    }
 }
 
 /// `values`: static `(I)[I` copying the first `n` of `$VALUES` with `System.arraycopy`.
-fn is_values(p: &Program, body: &Body, owner: eightr_ir::sym::Sym, field: eightr_ir::sym::Sym) -> bool {
-    let reads = body.insns.iter().any(|i| matches!(&i.op, Op::StaticGet { field: f, .. } if f.class == owner && f.name == field));
-    let copies = body.insns.iter().any(|i| {
-        matches!(&i.op, Op::Invoke { kind: InvokeKind::Static, method, .. }
-            if p.str(method.class) == "Ljava/lang/System;" && p.str(method.name) == "arraycopy")
-    });
-    let news = body.insns.iter().any(|i| matches!(&i.op, Op::NewArray { .. }));
-    reads && copies && news && body.insns.len() <= 8
+pub(crate) fn is_values(p: &impl Strs, body: &Body, owner: eightr_ir::sym::Sym, field: eightr_ir::sym::Sym) -> bool {
+    // new int[n]; System.arraycopy($VALUES, 0, copy, 0, n); return copy — straight-line.
+    let p0 = body.registers - body.ins;
+    let (mut copy, mut vals, mut zero) = (None, None, None);
+    for insn in &body.insns {
+        match &insn.op {
+            Op::NewArray { dst, size, ty } if *size == p0 && p.str(*ty) == "[I" => copy = Some(*dst),
+            Op::StaticGet { dst, field: f, .. } if f.class == owner && f.name == field => vals = Some(*dst),
+            Op::Const { dst, value: Const::Narrow(0) } => zero = Some(*dst),
+            Op::Invoke { kind: InvokeKind::Static, method, args } if p.str(method.class) == "Ljava/lang/System;" && p.str(method.name) == "arraycopy" => {
+                if args.as_slice() != [vals.unwrap_or(u16::MAX), zero.unwrap_or(u16::MAX), copy.unwrap_or(u16::MAX), zero.unwrap_or(u16::MAX), p0] {
+                    return false;
+                }
+            }
+            Op::Return { src, .. } => return Some(*src) == copy && body.insns.len() <= 6,
+            _ => return false,
+        }
+    }
+    false
 }
 
 /// The string constant `reg` holds at `at`, following one register copy.
-fn string_at(p: &Program, body: &Body, rd: &ReachingDefs, at: u32, reg: Reg, depth: u32) -> Option<String> {
+fn string_at(p: &impl Strs, body: &Body, rd: &ReachingDefs, at: u32, reg: Reg, depth: u32) -> Option<String> {
     let uses = rd.uses.get(at as usize)?.as_ref()?;
     let (_, defs) = uses.iter().find(|(r, _)| *r == reg)?;
     let mut v: Option<String> = None;
@@ -133,7 +224,7 @@ fn string_at(p: &Program, body: &Body, rd: &ReachingDefs, at: u32, reg: Reg, dep
 
 /// The string a block yields first: its first instruction is a `const-string`, or a move
 /// from a register holding one.
-fn block_string(p: &Program, body: &Body, rd: &ReachingDefs, start: u32) -> Option<String> {
+fn block_string(p: &impl Strs, body: &Body, rd: &ReachingDefs, start: u32) -> Option<String> {
     match &body.insns.get(start as usize)?.op {
         Op::ConstString { value, .. } => Some(p.str(*value).to_string()),
         Op::Move { src, .. } => string_at(p, body, rd, start, *src, 1),
@@ -141,7 +232,7 @@ fn block_string(p: &Program, body: &Body, rd: &ReachingDefs, start: u32) -> Opti
     }
 }
 
-fn is_constant_name(s: &str) -> bool {
+pub(crate) fn is_constant_name(s: &str) -> bool {
     let b = s.as_bytes();
     !b.is_empty() && (b[0].is_ascii_alphabetic() || b[0] == b'_' || b[0] == b'$') && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_' || *c == b'$')
 }
@@ -149,12 +240,26 @@ fn is_constant_name(s: &str) -> bool {
 /// Name tables in one method: per compared value, unboxed value `k` → constant name, from
 /// `if-eq x, k → "NAME"` and `if-ne x, k` falling through to `"NAME"`, for values whose chain
 /// treats 0 as null (default arm `throw null` or `"null"`).
-fn name_tables(p: &Program, body: &Body) -> Vec<BTreeMap<i32, String>> {
+/// A name chain: unboxed value → constant name, and the `if` instructions comparing the value
+/// (instruction index, compared register).
+pub(crate) struct Chain {
+    pub table: BTreeMap<i32, String>,
+    pub compares: Vec<(u32, Reg)>,
+    /// `compares` are the definitions of the values an inlined `valueOf` produces.
+    pub from_value_of: bool,
+}
+
+fn name_tables(p: &impl Strs, body: &Body) -> Vec<BTreeMap<i32, String>> {
+    chains(p, body).into_iter().map(|c| c.table).collect()
+}
+
+pub(crate) fn chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
     let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
     let rd = ReachingDefs::compute(body, &cfg);
     // Keyed by the value compared (register and its reaching definitions): R8 reuses registers.
-    let mut by_reg: BTreeMap<(Reg, Vec<usize>), BTreeMap<i32, Option<String>>> = BTreeMap::new();
-    let mut nullable: BTreeSet<(Reg, Vec<usize>)> = BTreeSet::new();
+    let mut by_reg: BTreeMap<ValueKey, BTreeMap<i32, Option<String>>> = BTreeMap::new();
+    let mut sites: BTreeMap<ValueKey, Vec<(u32, Reg)>> = BTreeMap::new();
+    let mut nullable: BTreeSet<ValueKey> = BTreeSet::new();
     for (i, insn) in body.insns.iter().enumerate() {
         let i = i as u32;
         let Op::If { cond, a, b, target } = insn.op else { continue };
@@ -176,6 +281,9 @@ fn name_tables(p: &Program, body: &Body) -> Vec<BTreeMap<i32, String>> {
         // or yields "null" (string conversion).
         let null_default = match body.insns.get(other as usize).map(|x| &x.op) {
             Some(Op::Throw { src }) => const_at(body, &rd, other, *src) == Some(0),
+            Some(Op::Const { dst, value: Const::Narrow(0) }) => {
+                matches!(body.insns.get(other as usize + 1).map(|x| &x.op), Some(Op::Throw { src }) if src == dst)
+            }
             Some(_) => block_string(p, body, &rd, other).is_some_and(|s| s == "null"),
             None => false,
         };
@@ -186,6 +294,7 @@ fn name_tables(p: &Program, body: &Body) -> Vec<BTreeMap<i32, String>> {
         // switches on the same value: skip them. Conflicting names cancel the table.
         let Some(name) = block_string(p, body, &rd, arm) else { continue };
         let name = Some(name).filter(|s| is_constant_name(s));
+        sites.entry((x, defs.clone())).or_default().push((i, x));
         let slot = by_reg.entry((x, defs)).or_default().entry(k).or_insert_with(|| name.clone());
         if *slot != name {
             *slot = None; // conflicting names for one value: not a name table
@@ -194,16 +303,80 @@ fn name_tables(p: &Program, body: &Body) -> Vec<BTreeMap<i32, String>> {
     by_reg
         .into_iter()
         .filter(|(key, _)| nullable.contains(key))
-        .map(|(_, t)| t)
-        .filter_map(|t| t.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>())
-        .filter(|t| t.len() >= 2)
+        .filter_map(|(key, t)| {
+            let table = t.into_iter().map(|(k, n)| n.map(|n| (k, n))).collect::<Option<BTreeMap<i32, String>>>()?;
+            (table.len() >= 2).then(|| Chain { table, compares: sites.remove(&key).unwrap_or_default(), from_value_of: false })
+        })
         .collect()
 }
 
 /// A table covering exactly `1..=N` with distinct names, as names by ordinal.
-fn complete(t: &BTreeMap<i32, String>) -> Option<Vec<String>> {
+pub(crate) fn complete(t: &BTreeMap<i32, String>) -> Option<Vec<String>> {
     let names: BTreeSet<&String> = t.values().collect();
     (t.keys().copied().eq(1..=t.len() as i32) && names.len() == t.len()).then(|| t.values().cloned().collect())
+}
+
+/// Enums R8 unboxed, recovered from inlined `valueOf` (proven constant names, and the canonical
+/// name from its message) and inlined `name()`/`toString()` chains (unproven unless they
+/// match a `valueOf` map).
+pub(crate) fn recover_enums(p: &impl Strs, classes: &[eightr_ir::model::Class]) -> Vec<RecoveredEnum> {
+    // Proven tables → canonical names seen with them (one method, one message, one map).
+    let mut proven: BTreeMap<Vec<String>, BTreeSet<String>> = BTreeMap::new();
+    let mut chains_seen: BTreeSet<Vec<String>> = BTreeSet::new();
+    let mut switch_maps: BTreeSet<Vec<String>> = BTreeSet::new();
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    let mut attached: BTreeSet<String> = BTreeSet::new();
+    for c in classes {
+        for m in &c.methods {
+            let Some(b) = &m.code else { continue };
+            let messages: BTreeSet<String> = b
+                .insns
+                .iter()
+                .filter_map(|i| match &i.op {
+                    Op::ConstString { value, .. } => p.str(*value).strip_prefix(MESSAGE).and_then(|r| r.strip_suffix('.')).filter(|n| !n.is_empty()).map(str::to_string),
+                    _ => None,
+                })
+                .collect();
+            let compares = b.insns.iter().any(|i| matches!(&i.op, Op::If { .. } | Op::IfZ { .. }));
+            if !compares && messages.is_empty() {
+                continue;
+            }
+            names.extend(messages.iter().cloned());
+            // A string `switch` compiles to the same equals-then-const shape: a map is `valueOf`
+            // only next to its message (one message, one map in the method). Otherwise it can
+            // still corroborate an identical name chain.
+            let maps: Vec<Vec<String>> = value_of_maps(p, b).iter().filter_map(complete).collect();
+            if maps.len() == 1 && messages.len() == 1 {
+                proven.entry(maps[0].clone()).or_default().extend(messages.iter().cloned());
+                attached.extend(messages.iter().cloned());
+            } else {
+                switch_maps.extend(maps);
+            }
+            for t in name_tables(p, b) {
+                if let Some(t) = complete(&t) {
+                    chains_seen.insert(t);
+                }
+            }
+        }
+    }
+    // A name chain agreeing exactly (value by value) with an equals map is proven too.
+    for t in chains_seen.intersection(&switch_maps) {
+        proven.entry(t.clone()).or_default();
+    }
+    let mut enums: Vec<RecoveredEnum> = Vec::new();
+    for (t, n) in &proven {
+        let canonical_name = (n.len() == 1).then(|| n.iter().next().unwrap().clone());
+        enums.push(RecoveredEnum { canonical_name, constants: t.clone(), proven: true });
+    }
+    for t in chains_seen.iter().filter(|t| !proven.contains_key(*t)) {
+        enums.push(RecoveredEnum { canonical_name: None, constants: t.clone(), proven: false });
+    }
+    for n in names.difference(&attached) {
+        enums.push(RecoveredEnum { canonical_name: Some(n.clone()), constants: Vec::new(), proven: false });
+    }
+    enums.sort();
+    enums.dedup();
+    enums
 }
 
 impl Pass for EnumUnboxing {
@@ -239,77 +412,82 @@ impl Pass for EnumUnboxing {
                     _ => {}
                 }
             }
-            // The array alone could be anything: require one of the methods using it.
-            if found.len() >= 2 {
+            // The array alone could be anything: require one of the methods using it, and one
+            // method per role (two would both get the name: a duplicate method).
+            let count = |n: &str| found.iter().filter(|(_, x)| *x == n).count();
+            if found.len() >= 2 && count("ordinal") <= 1 && count("values") <= 1 {
                 labels.extend(found);
             }
         }
-        // Evidence: name tables and valueOf messages.
-        let mut tables: BTreeSet<Vec<String>> = BTreeSet::new();
-        let mut named: BTreeMap<Vec<String>, BTreeSet<String>> = BTreeMap::new(); // tested names → fqns
-        let mut fqns: BTreeSet<String> = BTreeSet::new();
-        for c in &p.model.classes {
-            for m in &c.methods {
-                let Some(b) = &m.code else { continue };
-                let message = b.insns.iter().find_map(|i| match &i.op {
-                    Op::ConstString { value, .. } => p.str(*value).strip_prefix(MESSAGE).and_then(|r| r.strip_suffix('.')).map(str::to_string),
-                    _ => None,
-                });
-                let compares = b.insns.iter().any(|i| matches!(&i.op, Op::If { .. }));
-                if !compares && message.is_none() {
-                    continue;
-                }
-                for t in name_tables(p, b) {
-                    if let Some(names) = complete(&t) {
-                        tables.insert(names);
-                    }
-                }
-                if let Some(fqn) = message.filter(|f| !f.is_empty()) {
-                    fqns.insert(fqn.clone());
-                    // Names `valueOf` tests with `String.equals` (one side a literal).
-                    let mut tested: Vec<String> = Vec::new();
-                    if let Ok(cfg) = Cfg::build(b) {
-                        let rd = ReachingDefs::compute(b, &cfg);
-                        for (i, insn) in b.insns.iter().enumerate() {
-                            let Op::Invoke { method, args, .. } = &insn.op else { continue };
-                            if p.str(method.name) != "equals" || args.len() != 2 {
-                                continue;
-                            }
-                            for &r in args {
-                                if let Some(s) = string_at(p, b, &rd, i as u32, r, 1).filter(|s| is_constant_name(s)) {
-                                    tested.push(s);
-                                }
-                            }
-                        }
-                    }
-                    tested.sort();
-                    tested.dedup();
-                    if !tested.is_empty() {
-                        named.entry(tested).or_default().insert(fqn);
-                    }
-                }
-            }
-        }
-        let mut enums: Vec<RecoveredEnum> = Vec::new();
-        let mut used_fqns = BTreeSet::new();
-        for t in &tables {
-            let mut key = t.clone();
-            key.sort();
-            let fqn = named.get(&key).filter(|f| f.len() == 1).and_then(|f| f.iter().next().cloned());
-            if let Some(f) = &fqn {
-                used_fqns.insert(f.clone());
-            }
-            enums.push(RecoveredEnum { fqn, constants: t.clone() });
-        }
-        for f in fqns.difference(&used_fqns) {
-            enums.push(RecoveredEnum { fqn: Some(f.clone()), constants: Vec::new() });
-        }
-        enums.sort();
-        enums.dedup();
         for (item, name) in labels {
             cx.labels.record_value(item, Attribute::MemberName, ENUM_UNBOXING_UTILITY, None, Some(name.to_string()))?;
         }
-        cx.enums.extend(enums);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eightr_ir::lift::Insn;
+    use eightr_ir::op::{MethodRef, Width};
+    use eightr_ir::sym::Interner;
+
+    struct S(Interner);
+    impl Strs for S {
+        fn str(&self, s: eightr_ir::sym::Sym) -> &str {
+            self.0.get(s)
+        }
+    }
+
+    fn body(registers: u16, ins: u16, ops: Vec<Op>) -> Body {
+        Body { registers, ins, outs: 0, insns: ops.into_iter().enumerate().map(|(i, op)| Insn { pc: i as u32, op }).collect(), tries: vec![], positions: vec![], locals: vec![], parameter_names: vec![] }
+    }
+
+    #[test]
+    fn ordinal_fingerprint_is_exact() {
+        let ok = body(2, 1, vec![
+            Op::IfZ { cond: Cond::Eq, a: 1, target: 3 },
+            Op::Binop { op: BinOp::Add, ty: eightr_ir::op::NumType::Int, dst: 1, a: 1, b: Operand::Lit(-1) },
+            Op::Return { width: Width::Single, src: 1 },
+            Op::Const { dst: 0, value: Const::Narrow(0) },
+            Op::Throw { src: 0 },
+        ]);
+        assert!(is_ordinal(&ok));
+        // `if-nez` (throws for every value but 0) has the same ops but isn't `ordinal`.
+        let mut bad = ok.clone();
+        bad.insns[0].op = Op::IfZ { cond: Cond::Ne, a: 1, target: 3 };
+        assert!(!is_ordinal(&bad));
+    }
+
+    /// `name()` whose null default is its own `const 0; throw` block (R8's usual shape; review
+    /// finding), and a string switch (no valueOf message) that must not prove anything.
+    #[test]
+    fn chain_with_throw_block_default_and_string_switch() {
+        let mut syms = Interner::default();
+        let [a, b, c] = ["A", "B", "C"].map(|n| syms.intern(n));
+        // switch-like chain on p0: 1 → "A", 2 → "B", else (3) → "C"; 0 → const 0; throw.
+        let chain = body(3, 1, vec![
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::If { cond: Cond::Eq, a: 2, b: 0, target: 9 },
+            Op::Const { dst: 0, value: Const::Narrow(2) },
+            Op::If { cond: Cond::Eq, a: 2, b: 0, target: 11 },
+            Op::Const { dst: 0, value: Const::Narrow(3) },
+            Op::If { cond: Cond::Ne, a: 2, b: 0, target: 13 },
+            Op::ConstString { dst: 1, value: c },
+            Op::Return { width: Width::Object, src: 1 },
+            Op::Nop,
+            Op::ConstString { dst: 1, value: a },
+            Op::Return { width: Width::Object, src: 1 },
+            Op::ConstString { dst: 1, value: b },
+            Op::Return { width: Width::Object, src: 1 },
+            Op::Const { dst: 1, value: Const::Narrow(0) },
+            Op::Throw { src: 1 },
+        ]);
+        let s = S(syms);
+        let t = name_tables(&s, &chain);
+        assert_eq!(t.len(), 1, "{t:?}");
+        assert_eq!(complete(&t[0]), Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]));
+        let _ = MethodRef { class: a, name: a, proto: a };
     }
 }

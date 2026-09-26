@@ -43,6 +43,8 @@ const NEVER_GENERATED: &[&str] = &["it", "by", "do"];
 const SYNTHETIC_MARKERS: &[&str] = &[
     "$$ExternalSynthetic", "$$InternalSynthetic", "-$$Nest$", "$r8$", "$-CC", "-IA", "$EnumUnboxing",
     "$Wrapper", "$VivifiedWrapper",
+    // Invented by 8R itself (e.g. re-boxed enums' adapters).
+    "$8r$",
 ];
 
 /// Smallest length whose cumulative lowercase-generator capacity reaches `count`. Lowercase
