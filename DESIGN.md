@@ -881,6 +881,15 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   - On `sigdb_app` (same versions): 95% precise, 59% recall of library methods, constructors aside (`tests/sigdb.rs`, ratcheted; about the same across versions).
 - **Library versions (M6):** `report.libraries` from `META-INF/*.version`, root `*.properties`, `name/x.y.z`
   strings, registrar id/version pairs, and the Compose key version sets. Gretio: 176 entries.
+- **SDK extractors (M7):**
+  - `kotlinc/data-class-name` and `-property` (S): a data class's `toString` template plus the
+    `hashCode`/`equals` ensemble. Recovered S class simple names are applied in their package.
+    Gretio: 129 classes, 402 properties.
+  - `r8/protobuf-message-name` (S): kept `*_FIELD_NUMBER` constants matched to the APK's bundled
+    `.proto` sources (a unique match of ≥3 fields). Gretio: 21 messages.
+  - kotlinx.serialization descriptors: serial names give D hints for the class and its serializer;
+    `report.serialization`. Gretio: 317.
+  - Room entity FQNs from schema validation messages (`report.room_entities`). Gretio: 9.
 - **Idempotence:** 8R on its own output is byte-identical, fixtures and Gretio alike.
   - Rewrites run to a fixpoint.
   - The kept-name bound counts only generator-shaped names.

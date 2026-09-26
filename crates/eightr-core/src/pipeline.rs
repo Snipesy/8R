@@ -189,6 +189,19 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     if config.verbose_labels {
         report.inline_hints = inline_hints;
     }
+    let descriptors = crate::passes::kxs::descriptors(&program.model);
+    report.serialization_descriptors = descriptors.len() as u64;
+    if config.verbose_labels {
+        report.serialization = descriptors
+            .into_iter()
+            .map(|(xi, serial_name, elements, _)| crate::report::SerialDescriptor {
+                serializer: program.descriptor(crate::program::ClassId(xi as u32)).to_string(),
+                serial_name,
+                elements,
+            })
+            .collect();
+    }
+    report.room_entities = crate::passes::kxs::room_entities(&program.model);
     report.libraries.extend(crate::libraries::from_resources(&config.resources));
     report.libraries.extend(crate::libraries::from_code(&program.model));
     if let Some(c) = crate::compose::find(&program.model) {
@@ -343,6 +356,9 @@ fn build_report(
         inlining: Default::default(),
         inline_hints: Vec::new(),
         compose: None,
+        serialization: Vec::new(),
+        serialization_descriptors: 0,
+        room_entities: Vec::new(),
         libraries: Vec::new(),
         composables: Vec::new(),
         summary,
