@@ -83,15 +83,16 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
             Error::DuplicateClass { descriptor, inputs: inputs.map(|i| dexes[i].0.clone()) }
         }
     })?;
+    // Evidence about the input (the re-boxing rewrite consumes what it's recovered from).
+    let enums = crate::passes::enum_unboxing::recover_enums(&model, &model.classes);
     let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
     let mut program = Program { model };
     let name_stats = name_stats(&dexes, &program);
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
 
     let mut labels = Labels::default();
-    let mut enums = Vec::new();
     for pass in passes::all() {
-        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings, enums: &mut enums })?;
+        pass.run(&mut Context { program: &mut program, evidence: &evidence, labels: &mut labels, findings: &mut findings })?;
     }
 
     let naming = crate::naming::name(&program, &mut labels, &mut findings)?;

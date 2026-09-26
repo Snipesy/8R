@@ -20,8 +20,6 @@ pub struct Context<'a> {
     pub evidence: &'a Evidence,
     pub labels: &'a mut Labels,
     pub findings: &'a mut Vec<crate::report::Finding>,
-    /// Enums R8 unboxed (evidence for a class that no longer exists).
-    pub enums: &'a mut Vec<enum_unboxing::RecoveredEnum>,
 }
 
 pub trait Pass {

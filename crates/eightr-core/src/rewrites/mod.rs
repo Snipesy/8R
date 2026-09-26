@@ -10,6 +10,7 @@ use crate::error::{Error, Result};
 
 mod merged;
 mod outlines;
+mod rebox;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct RewriteRecord {
@@ -28,7 +29,7 @@ pub trait Rewrite {
 
 /// All rewrites, in undo order.
 pub fn all() -> Vec<Box<dyn Rewrite>> {
-    let mut v: Vec<Box<dyn Rewrite>> = vec![Box::new(outlines::OutlineInline), Box::new(merged::SplitMerged)];
+    let mut v: Vec<Box<dyn Rewrite>> = vec![Box::new(outlines::OutlineInline), Box::new(rebox::Rebox), Box::new(merged::SplitMerged)];
     v.sort_by_key(|r| (r.source(), r.name()));
     v
 }

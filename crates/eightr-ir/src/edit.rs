@@ -82,6 +82,39 @@ pub fn splice(body: &mut Body, at: u32, remove: u32, insert: Vec<Op>, pc: u32) {
     body.insns.splice(at as usize..end as usize, new);
 }
 
+/// Inserts `prefix` (straight-line code, no branch targets) before instruction `at`, so that
+/// everything that reached `at` (branches, fallthrough, handlers) runs the prefix first. The
+/// prefix gets `at`'s position and try coverage.
+pub fn insert_before(body: &mut Body, at: u32, prefix: Vec<Op>) {
+    let n = prefix.len() as u32;
+    if n == 0 {
+        return;
+    }
+    let f = |i: u32| if i <= at { i } else { i + n };
+    // An exclusive end at `at` stops before the prefix; later ends move with the code.
+    let g = |e: u32| if e <= at { e } else { e + n };
+    for insn in &mut body.insns {
+        insn.op.map_targets(&mut |t| f(t));
+    }
+    for t in &mut body.tries {
+        t.start = f(t.start);
+        t.end = g(t.end);
+        for h in &mut t.handlers {
+            h.target = f(h.target);
+        }
+    }
+    for pos in &mut body.positions {
+        pos.0 = f(pos.0);
+    }
+    for l in &mut body.locals {
+        l.start = f(l.start);
+        l.end = g(l.end);
+    }
+    let pc = body.insns[at as usize].pc;
+    let new: Vec<Insn> = prefix.into_iter().map(|op| Insn { pc, op }).collect();
+    body.insns.splice(at as usize..at as usize, new);
+}
+
 /// Deletes instructions no path reaches (e.g. the default `return` R8 left after a call it
 /// knew always throws). Returns how many were removed. Leaves the body unchanged if its CFG
 /// can't be built.
@@ -322,6 +355,20 @@ mod tests {
         assert!(fold_constant_branches(&mut b));
         let ops: Vec<&Op> = b.insns.iter().map(|i| &i.op).collect();
         assert_eq!(ops, vec![&Op::Const { dst: 1, value: Const::Narrow(11) }, &Op::Return { width: Width::Single, src: 1 }]);
+    }
+
+    #[test]
+    fn inserted_prefix_runs_for_branches_into_the_instruction() {
+        // 0: if-eqz v0 -> 2 ; 1: nop ; 2: return-void (prefix inserted before 2)
+        let mut b = body(vec![Op::IfZ { cond: Cond::Eq, a: 0, target: 2 }, Op::Nop, Op::ReturnVoid]);
+        b.tries.push(TryRange { start: 2, end: 3, handlers: vec![Handler { ty: None, target: 2 }] });
+        b.positions = vec![(0, 1), (2, 3)];
+        insert_before(&mut b, 2, vec![Op::Const { dst: 1, value: Const::Narrow(7) }]);
+        assert_eq!(b.insns[0].op, Op::IfZ { cond: Cond::Eq, a: 0, target: 2 });
+        assert_eq!(b.insns[2].op, Op::Const { dst: 1, value: Const::Narrow(7) });
+        assert_eq!(b.insns[3].op, Op::ReturnVoid);
+        assert_eq!((b.tries[0].start, b.tries[0].end, b.tries[0].handlers[0].target), (2, 4, 2));
+        assert_eq!(b.positions, vec![(0, 1), (2, 3)]);
     }
 
     #[test]

@@ -36,6 +36,12 @@ fn outcome(fixture: &str, variant: &str) -> Outcome {
     run(&load(fixture, variant), &Config { verbose_labels: true, ..Default::default() }).unwrap()
 }
 
+/// A class `r8/rebox-enum` re-created: an enum class absent from the input.
+fn reboxed(p: &Program, class: eightr_core::program::ClassId) -> bool {
+    let c = p.class(class);
+    c.access & eightr_dex::class::access::ENUM != 0 && c.superclass.is_some_and(|s| p.str(s) == "Ljava/lang/Enum;")
+}
+
 /// A class `r8/split-merged-class` added (`<base>$$Split<id>;`) holds copies of its base's
 /// members, so it's graded against the base's mapping entry.
 fn split_base(desc: &str) -> String {
@@ -115,6 +121,13 @@ fn solved_names_match_held_back_mapping() {
             };
             let class = p.class(class_id);
             let obf = dotted(&split_base(p.descriptor(class_id)));
+            // An enum `r8/rebox-enum` re-created (R8 removed the class): its recovered name must
+            // be one the mapping lists as an original; its members are graded by the D8 build.
+            if !by_obf.contains_key(obf.as_str()) && reboxed(p, class_id) {
+                assert!(mapping.classes.iter().any(|c| c.original == obf), "{ctx}: re-boxed enum name isn't an original class");
+                checked += 1;
+                continue;
+            }
             let cm = &mapping.classes[*by_obf.get(obf.as_str()).unwrap_or_else(|| panic!("{ctx}: class not in mapping"))];
             // A synthesized class's own name is never original. Its *members* can't be graded
             // by the mapping: R8 hides synthetic frames, so a lambda bridge like `compare` shows
@@ -230,7 +243,8 @@ fn solved_names_exist_in_d8_ground_truth() {
             let (ItemId::Class { class } | ItemId::Field { class, .. } | ItemId::Method { class, .. }) = *item;
             let c = o.program.class(class);
             let c_desc = &split_base(o.program.descriptor(class));
-            let original = by_obf.get(dotted(c_desc).as_str()).map(|&i| mapping.classes[i].original.clone());
+            let rebox = !by_obf.contains_key(dotted(c_desc).as_str()) && reboxed(&o.program, class);
+            let original = by_obf.get(dotted(c_desc).as_str()).map(|&i| mapping.classes[i].original.clone()).or_else(|| rebox.then(|| dotted(c_desc)));
             let Some(original) = original else { panic!("{ctx}: class not in mapping") };
             let g_desc = format!("L{};", original.replace('.', "/"));
             // The D8 build holds only the app's own classes. Library classes (shrunk into the
@@ -239,7 +253,8 @@ fn solved_names_exist_in_d8_ground_truth() {
             // Horizontal/vertical merging folds several original classes into one residual
             // class; its members may come from any of them. The mapping names every original
             // owner it folded in.
-            let cm = &mapping.classes[by_obf[dotted(c_desc).as_str()]];
+            let empty = eightr_mapping::ClassMapping { line: 0, original: String::new(), obfuscated: String::new(), metadata: vec![], members: vec![] };
+            let cm = by_obf.get(dotted(c_desc).as_str()).map_or(&empty, |&i| &mapping.classes[i]);
             let mut owners = vec![gid];
             for mm in &cm.members {
                 let owner = match &mm.kind {
@@ -506,10 +521,20 @@ fn enum_unboxing_evidence_matches_ground_truth() {
     assert!(graded >= 3, "only {graded} enum-utility names graded");
 
     let out = outcome("r94_enum", "r8");
-    let got: Vec<(Option<&str>, Vec<&str>)> = out.report.enums.iter().map(|e| (e.fqn.as_deref(), e.constants.iter().map(String::as_str).collect())).collect();
+    // Color: inlined valueOf proves the names and gives the name. Planet and Op: only name()
+    // chains, whose strings could equally be a String field's values (unproven).
+    let got: Vec<(Option<&str>, Vec<&str>, bool)> =
+        out.report.enums.iter().map(|e| (e.canonical_name.as_deref(), e.constants.iter().map(String::as_str).collect(), e.proven)).collect();
     assert_eq!(got, vec![
-        (None, vec!["ADD", "MUL", "SUB"]),
-        (None, vec!["MERCURY", "VENUS", "EARTH", "MARS"]),
-        (Some("com.example.enums.Color"), vec!["RED", "GREEN", "BLUE"]),
+        (None, vec!["ADD", "MUL", "SUB"], false),
+        (None, vec!["MERCURY", "VENUS", "EARTH", "MARS"], false),
+        (Some("com.example.enums.Color"), vec!["RED", "GREEN", "BLUE"], true),
     ]);
+    // No fixture proves a table that isn't an enum (string switches look like valueOf).
+    for fixture in fixture_names() {
+        let out = outcome(&fixture, "r8");
+        for e in out.report.enums.iter().filter(|e| e.proven) {
+            assert!(fixture == "r94_enum", "{fixture}: proved {:?} {:?}", e.canonical_name, e.constants);
+        }
+    }
 }
