@@ -1,37 +1,111 @@
 {
   "coverage": {
-    "fn": 18324,
-    "fp": 0,
-    "precision": 1.0,
-    "recall": 0.032,
-    "tp": 597
+    "inlined_occurrences": 21355,
+    "recall": 0.034,
+    "touched": 720
   },
   "discarded-getclass": {
-    "fn": 0,
-    "fp": 196,
-    "precision": 0.698,
-    "recall": 1.0,
-    "tp": 452
+    "hints": 539,
+    "precision": 0.777
   },
+  "discarded-getclass@r8-8": {
+    "base_rate": 0.518,
+    "hints": 135,
+    "lift": 1.601,
+    "precision": 0.83
+  },
+  "discarded-getclass@r8-9": {
+    "base_rate": 0.522,
+    "hints": 404,
+    "lift": 1.456,
+    "precision": 0.76
+  },
+  "fixtures": [
+    "compose_basic",
+    "compose_basic_r94",
+    "dontobfuscate",
+    "hello",
+    "kotlin_basic",
+    "kotlin_basic_r94",
+    "kotlin_serialization",
+    "kotlin_serialization_r94",
+    "names_stress",
+    "opcodes",
+    "r94_desugar",
+    "r94_enum",
+    "r94_enum_probe",
+    "r94_enum_rebox",
+    "r94_merging",
+    "r94_outline",
+    "r94_reflect_names",
+    "shapes"
+  ],
   "idiom:areEqual": {
-    "fn": 13,
-    "fp": 10,
-    "precision": 0.905,
-    "recall": 0.88,
-    "tp": 95
+    "hints": 105,
+    "occurrences": 102,
+    "precision": 0.848,
+    "recall": 0.873
+  },
+  "idiom:areEqual@r8-8": {
+    "base_rate": 0.518,
+    "hints": 51,
+    "lift": 1.627,
+    "precision": 0.843
+  },
+  "idiom:areEqual@r8-9": {
+    "base_rate": 0.522,
+    "hints": 54,
+    "lift": 1.632,
+    "precision": 0.852
   },
   "idiom:collectionSizeOrDefault": {
-    "fn": 8,
-    "fp": 1,
-    "precision": 0.8,
-    "recall": 0.333,
-    "tp": 4
+    "hints": 5,
+    "occurrences": 10,
+    "precision": 0.4,
+    "recall": 0.3
+  },
+  "idiom:collectionSizeOrDefault@r8-8": {
+    "base_rate": 0.518,
+    "hints": 2,
+    "lift": 0.965,
+    "precision": 0.5
+  },
+  "idiom:collectionSizeOrDefault@r8-9": {
+    "base_rate": 0.522,
+    "hints": 3,
+    "lift": 0.639,
+    "precision": 0.333
   },
   "inlined-instance-call": {
-    "fn": 0,
-    "fp": 43,
-    "precision": 0.797,
-    "recall": 1.0,
-    "tp": 169
+    "hints": 178,
+    "precision": 0.865
+  },
+  "inlined-instance-call@r8-8": {
+    "base_rate": 0.518,
+    "hints": 62,
+    "lift": 1.743,
+    "precision": 0.903
+  },
+  "inlined-instance-call@r8-9": {
+    "base_rate": 0.522,
+    "hints": 116,
+    "lift": 1.619,
+    "precision": 0.845
+  },
+  "param-null-check": {
+    "hints": 109,
+    "precision": 0.303
+  },
+  "param-null-check@r8-8": {
+    "base_rate": 0.518,
+    "hints": 1,
+    "lift": 0.0,
+    "precision": 0.0
+  },
+  "param-null-check@r8-9": {
+    "base_rate": 0.522,
+    "hints": 108,
+    "lift": 0.585,
+    "precision": 0.306
   }
 }
