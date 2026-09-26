@@ -114,6 +114,101 @@ pub fn remove_unreachable(body: &mut Body) -> usize {
     removed
 }
 
+/// The value of `reg` read at `at` when every definition reaching it is the same narrow
+/// constant (following register copies).
+fn constant_at(body: &Body, rd: &crate::defs::ReachingDefs, at: u32, reg: crate::op::Reg) -> Option<i32> {
+    use crate::defs::DefSite;
+    use crate::op::Const;
+    let mut value = None;
+    let mut stack = vec![(at, reg)];
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some((i, r)) = stack.pop() {
+        if !seen.insert((i, r)) {
+            continue;
+        }
+        let uses = rd.uses.get(i as usize)?.as_ref()?;
+        let (_, defs) = uses.iter().find(|(u, _)| *u == r)?;
+        for &d in defs {
+            let DefSite::Insn(j) = rd.defs[d].site else { return None };
+            match &body.insns[j as usize].op {
+                Op::Const { value: Const::Narrow(k), .. } => {
+                    if value.is_some_and(|v| v != *k) {
+                        return None;
+                    }
+                    value = Some(*k);
+                }
+                Op::Move { width: crate::op::Width::Single, src, .. } => stack.push((j, *src)),
+                _ => return None,
+            }
+        }
+    }
+    value
+}
+
+/// Folds branches on constants (a `switch` or `if` whose operands are the same constant on
+/// every path) into gotos, then removes what became unreachable, gotos to the next
+/// instruction, and narrow constants nothing reads. Used after specializing a body to one
+/// value of a dispatch key. Returns whether anything changed.
+pub fn fold_constant_branches(body: &mut Body) -> bool {
+    use crate::op::Cond;
+    let eval = |c: Cond, a: i32, b: i32| match c {
+        Cond::Eq => a == b,
+        Cond::Ne => a != b,
+        Cond::Lt => a < b,
+        Cond::Ge => a >= b,
+        Cond::Gt => a > b,
+        Cond::Le => a <= b,
+    };
+    let mut changed_any = false;
+    loop {
+        let mut changed = false;
+        let Ok(cfg) = crate::cfg::Cfg::build(body) else { return changed_any };
+        let rd = crate::defs::ReachingDefs::compute(body, &cfg);
+        for i in 0..body.insns.len() {
+            let at = i as u32;
+            let target = match &body.insns[i].op {
+                Op::Switch { src, cases, .. } => constant_at(body, &rd, at, *src)
+                    .map(|v| cases.iter().find(|(k, _)| *k == v).map_or(at + 1, |(_, t)| *t)),
+                Op::IfZ { cond, a, target } => constant_at(body, &rd, at, *a).map(|v| if eval(*cond, v, 0) { *target } else { at + 1 }),
+                Op::If { cond, a, b, target } => match (constant_at(body, &rd, at, *a), constant_at(body, &rd, at, *b)) {
+                    (Some(x), Some(y)) => Some(if eval(*cond, x, y) { *target } else { at + 1 }),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(t) = target {
+                body.insns[i].op = Op::Goto { target: t };
+                changed = true;
+            }
+        }
+        changed |= remove_unreachable(body) > 0;
+        // Gotos to the next instruction, highest first (indices below stay valid).
+        for i in (0..body.insns.len()).rev() {
+            if body.insns.len() > 1 && matches!(body.insns[i].op, Op::Goto { target } if target == i as u32 + 1) {
+                splice(body, i as u32, 1, Vec::new(), 0);
+                changed = true;
+            }
+        }
+        // Narrow constants nothing reads.
+        if let Ok(cfg) = crate::cfg::Cfg::build(body) {
+            let live = crate::liveness::Liveness::compute(body, &cfg);
+            let dead: Vec<usize> = (0..body.insns.len())
+                .filter(|&i| matches!(body.insns[i].op, Op::Const { dst, value: crate::op::Const::Narrow(_) } if !live.across(body, &cfg, i as u32).contains(dst)))
+                .collect();
+            for &i in dead.iter().rev() {
+                if body.insns.len() > 1 {
+                    splice(body, i as u32, 1, Vec::new(), 0);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return changed_any;
+        }
+        changed_any = true;
+    }
+}
+
 /// Recomputes `outs`: the most argument words any call in the body passes.
 pub fn recompute_outs(body: &mut Body) {
     let outs = body
@@ -208,6 +303,25 @@ mod tests {
         assert_eq!(remove_unreachable(&mut b), 2);
         assert!(b.tries.is_empty());
         assert_eq!(b.insns.len(), 2);
+    }
+
+    #[test]
+    fn folds_a_switch_on_a_constant() {
+        use crate::op::Width;
+        // v0 = 1; switch v0 {0 -> @4, 1 -> @6}; (fallthrough) v1 = 9; return v1
+        let mut b = body(vec![
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::Switch { src: 0, packed: true, cases: vec![(0, 4), (1, 6)] },
+            Op::Const { dst: 1, value: Const::Narrow(9) },
+            Op::Return { width: Width::Single, src: 1 },
+            Op::Const { dst: 1, value: Const::Narrow(10) },
+            Op::Return { width: Width::Single, src: 1 },
+            Op::Const { dst: 1, value: Const::Narrow(11) },
+            Op::Return { width: Width::Single, src: 1 },
+        ]);
+        assert!(fold_constant_branches(&mut b));
+        let ops: Vec<&Op> = b.insns.iter().map(|i| &i.op).collect();
+        assert_eq!(ops, vec![&Op::Const { dst: 1, value: Const::Narrow(11) }, &Op::Return { width: Width::Single, src: 1 }]);
     }
 
     #[test]

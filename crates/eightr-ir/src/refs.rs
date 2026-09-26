@@ -139,3 +139,13 @@ pub fn class_types(p: &Program, c: &Class, f: impl FnMut(&str)) {
         }
     }
 }
+
+/// Calls `f` with every class descriptor one instruction mentions.
+pub fn op_types(p: &Program, op: &Op, f: impl FnMut(&str)) {
+    V { s: &p.syms, f }.op(op);
+}
+
+/// Calls `f` with every class descriptor an encoded value mentions.
+pub fn value_types(p: &Program, v: &Value, f: impl FnMut(&str)) {
+    V { s: &p.syms, f }.value(v);
+}

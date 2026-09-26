@@ -337,3 +337,127 @@ fn every_program_reference_resolves() {
     assert!(checked > 1000, "only {checked} references checked");
 }
 
+
+fn package(desc: &str) -> &str {
+    let inner = desc.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(desc);
+    inner.rsplit_once('/').map_or("", |(p, _)| p)
+}
+
+/// The program class declaring the method `class`→`name proto` resolves to (superclasses, then
+/// interfaces), with its flags; `None` if resolution leaves the program.
+fn resolve_method(p: &Model, class: &str, name: &str, proto: &str, depth: u32) -> Option<(String, u32)> {
+    let c = &p.classes[p.find(class)?];
+    if let Some(m) = c.methods.iter().find(|m| p.syms.get(m.name) == name && p.syms.get(m.proto) == proto) {
+        return Some((class.to_string(), m.access));
+    }
+    if depth > 64 {
+        return None;
+    }
+    c.superclass.iter().chain(&c.interfaces).find_map(|s| resolve_method(p, p.syms.get(*s), name, proto, depth + 1))
+}
+
+fn is_subclass(p: &Model, class: &str, of: &str) -> bool {
+    let mut cur = Some(class.to_string());
+    while let Some(c) = cur {
+        if c == of {
+            return true;
+        }
+        cur = p.find(&c).and_then(|i| p.classes[i].superclass).map(|s| p.syms.get(s).to_string());
+    }
+    false
+}
+
+/// Every program member the output references is accessible from where it's referenced
+/// (private: same class; package-private: same package; protected: same package or a
+/// subclass). Rewrites that move code between classes must keep this (IllegalAccessError).
+#[test]
+fn every_program_reference_is_accessible() {
+    let mut checked = 0usize;
+    for (name, bytes) in fixtures() {
+        let (_, out) = undo(&bytes);
+        let p = load(&out_files(&out));
+        for c in &p.classes {
+            let from = p.syms.get(c.ty);
+            for insn in c.methods.iter().filter_map(|m| m.code.as_ref()).flat_map(|b| &b.insns) {
+                let eightr_ir::op::Op::Invoke { method, .. } = &insn.op else { continue };
+                let owner = p.syms.get(method.class);
+                let Some((declaring, flags)) = resolve_method(&p, owner, p.syms.get(method.name), p.syms.get(method.proto), 0) else { continue };
+                let ok = if flags & access::PUBLIC != 0 {
+                    true
+                } else if flags & access::PRIVATE != 0 {
+                    declaring == from
+                } else if flags & access::PROTECTED != 0 {
+                    package(&declaring) == package(from) || is_subclass(&p, from, &declaring)
+                } else {
+                    package(&declaring) == package(from)
+                };
+                assert!(ok, "{name}: {from} can't access {declaring}->{}{} (flags {flags:#x})", p.syms.get(method.name), p.syms.get(method.proto));
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 1000, "only {checked} references checked");
+}
+
+/// Distinct abstract methods some concrete subclass doesn't implement, and `invoke-super` calls
+/// that reach an abstract method (both AbstractMethodError when executed).
+fn abstract_violations(p: &Model) -> (Vec<String>, Vec<String>) {
+    // The implementation a concrete instance of `class` runs: first declaration up the
+    // superclass chain (library: assumed present).
+    let implemented = |class: &str, mname: &str, proto: &str| -> bool {
+        let mut cur = Some(class.to_string());
+        while let Some(c) = cur {
+            let Some(i) = p.find(&c) else { return true };
+            let k = &p.classes[i];
+            if let Some(m) = k.methods.iter().find(|m| p.syms.get(m.name) == mname && p.syms.get(m.proto) == proto && m.access & access::STATIC == 0) {
+                return m.access & access::ABSTRACT == 0;
+            }
+            cur = k.superclass.map(|s| p.syms.get(s).to_string());
+        }
+        true
+    };
+    let (mut missing, mut supers) = (Vec::new(), Vec::new());
+    for c in &p.classes {
+        let from = p.syms.get(c.ty);
+        if c.access & (access::ABSTRACT | access::INTERFACE) == 0 {
+            let mut sup = c.superclass.map(|s| p.syms.get(s).to_string());
+            while let Some(s) = sup {
+                let Some(i) = p.find(&s) else { break };
+                for m in p.classes[i].methods.iter().filter(|m| m.access & access::ABSTRACT != 0) {
+                    let (mn, mp) = (p.syms.get(m.name), p.syms.get(m.proto));
+                    if !implemented(from, mn, mp) {
+                        missing.push(format!("{s}->{mn}{mp}"));
+                    }
+                }
+                sup = p.classes[i].superclass.map(|t| p.syms.get(t).to_string());
+            }
+        }
+        for insn in c.methods.iter().filter_map(|m| m.code.as_ref()).flat_map(|b| &b.insns) {
+            if let eightr_ir::op::Op::Invoke { kind: eightr_ir::op::InvokeKind::Super, method, .. } = &insn.op {
+                let Some(sup) = c.superclass.map(|s| p.syms.get(s)) else { continue };
+                let (mn, mp) = (p.syms.get(method.name), p.syms.get(method.proto));
+                if !implemented(sup, mn, mp) {
+                    supers.push(format!("{from} invoke-super {mn}{mp} reaches an abstract method"));
+                }
+            }
+        }
+    }
+    missing.sort();
+    missing.dedup();
+    (missing, supers)
+}
+
+/// Rewrites never make an abstract method reachable: no `invoke-super` may reach one, and no
+/// more abstract methods may lack an implementation than without rewrites (R8 itself leaves
+/// never-called abstract methods unimplemented; a split repeats that in each subclass).
+#[test]
+fn no_abstract_method_is_reachable() {
+    for (name, bytes) in fixtures() {
+        let (_, named) = undo_names(&bytes);
+        let (_, out) = undo(&bytes);
+        let (base_missing, _) = abstract_violations(&load(&out_files(&named)));
+        let (missing, supers) = abstract_violations(&load(&out_files(&out)));
+        assert!(supers.is_empty(), "{name}: {supers:?}");
+        assert!(missing.len() <= base_missing.len(), "{name}: rewrites left abstract methods unimplemented:\n{}\nwithout rewrites:\n{}", missing.join("\n"), base_missing.join("\n"));
+    }
+}

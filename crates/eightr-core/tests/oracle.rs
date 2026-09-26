@@ -36,6 +36,15 @@ fn outcome(fixture: &str, variant: &str) -> Outcome {
     run(&load(fixture, variant), &Config { verbose_labels: true, ..Default::default() }).unwrap()
 }
 
+/// A class `r8/split-merged-class` added (`<base>$$Split<id>;`) holds copies of its base's
+/// members, so it's graded against the base's mapping entry.
+fn split_base(desc: &str) -> String {
+    match desc.split_once("$$Split") {
+        Some((head, _)) => format!("{head};"),
+        None => desc.to_string(),
+    }
+}
+
 /// `java.lang.String[]` → `[Ljava/lang/String;`
 fn java_to_descriptor(t: &str) -> String {
     let (base, dims) = {
@@ -105,7 +114,7 @@ fn solved_names_match_held_back_mapping() {
                 ItemId::Method { class, index } => (class, Some((true, index))),
             };
             let class = p.class(class_id);
-            let obf = dotted(p.descriptor(class_id));
+            let obf = dotted(&split_base(p.descriptor(class_id)));
             let cm = &mapping.classes[*by_obf.get(obf.as_str()).unwrap_or_else(|| panic!("{ctx}: class not in mapping"))];
             // A synthesized class's own name is never original. Its *members* can't be graded
             // by the mapping: R8 hides synthetic frames, so a lambda bridge like `compare` shows
@@ -114,7 +123,10 @@ fn solved_names_match_held_back_mapping() {
             // counted as unverifiable otherwise.
             if cm.is_synthesized() {
                 assert!(member.is_some(), "{ctx}: S label on a synthesized class");
-                unverifiable += 1;
+                // Split subclasses repeat their base's members: count those once, on the base.
+                if !p.descriptor(class_id).contains("$$Split") {
+                    unverifiable += 1;
+                }
                 continue;
             }
             match (attr, member) {
@@ -217,7 +229,7 @@ fn solved_names_exist_in_d8_ground_truth() {
             let recovered = label.value.clone();
             let (ItemId::Class { class } | ItemId::Field { class, .. } | ItemId::Method { class, .. }) = *item;
             let c = o.program.class(class);
-            let c_desc = o.program.descriptor(class);
+            let c_desc = &split_base(o.program.descriptor(class));
             let original = by_obf.get(dotted(c_desc).as_str()).map(|&i| mapping.classes[i].original.clone());
             let Some(original) = original else { panic!("{ctx}: class not in mapping") };
             let g_desc = format!("L{};", original.replace('.', "/"));
@@ -418,4 +430,39 @@ fn ends_in_throw(model: &eightr_ir::model::Program, class: &str, name: &str) -> 
                 && m.code.as_ref().and_then(|b| b.insns.last()).is_some_and(|x| matches!(x.op, eightr_ir::op::Op::Throw { .. }))
         })
     })
+}
+
+/// Merged-class detection (`r8/split-merged-class`) against the mapping: every split class must
+/// hold a `$r8$classId` field per the mapping (precision), and most of those must be split
+/// (recall; the rest are refused on purpose: abstract merged classes, class literals of the
+/// group, constructors that store the id twice).
+#[test]
+fn merged_class_detection_matches_mapping() {
+    let (mut truth_total, mut found, mut checked) = (0, 0, 0);
+    for fixture in fixture_names() {
+        let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
+        let mapping = Mapping::parse(&text).unwrap();
+        let truth: std::collections::BTreeSet<String> = mapping
+            .classes
+            .iter()
+            .filter(|c| c.fields().any(|f| f.original_name == "$r8$classId"))
+            .map(|c| format!("L{};", c.obfuscated.replace('.', "/")))
+            .collect();
+        let out = outcome(&fixture, "r8");
+        let split: std::collections::BTreeSet<&str> =
+            out.report.rewrites.iter().filter(|r| r.rule == eightr_rules::SPLIT_MERGED_CLASS).map(|r| r.item.as_str()).collect();
+        for s in &split {
+            // With -dontobfuscate, R8 lists no unrenamed field: the input names it itself.
+            let named = out.program.model.find(s).is_some_and(|i| {
+                let m = &out.program.model;
+                m.classes[i].fields.iter().any(|f| m.syms.get(f.name) == "$r8$classId")
+            });
+            assert!(truth.contains(*s) || named, "{fixture}: {s} was split but R8 didn't merge into it");
+            checked += 1;
+        }
+        truth_total += truth.len();
+        found += truth.iter().filter(|t| split.contains(t.as_str())).count();
+    }
+    assert!(checked >= 50, "only {checked} splits checked");
+    assert!(found * 100 >= truth_total * 85, "merged-class recall {found}/{truth_total} below 85%");
 }

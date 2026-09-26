@@ -576,13 +576,27 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
         let simple = simple_name_of(d);
         let tail = simple.rsplit('$').next().unwrap_or(simple);
         let from_name = (!may_be_minified(tail, 64)).then(|| sanitize(tail)).flatten();
-        let from_super = c
-            .superclass
-            .iter()
-            .chain(&c.interfaces)
-            .map(|t| p.str(*t))
-            .find(|t| *t != "Ljava/lang/Object;" && cx.stable_type(t))
-            .and_then(|t| sanitize(simple_name_of(t).rsplit('$').next().unwrap_or("")));
+        // The nearest stable supertype (breadth-first through program supertypes), e.g. the
+        // functional interface of a lambda whose direct superclass is an app class.
+        let from_super = {
+            let mut queue: std::collections::VecDeque<&str> = c.superclass.iter().chain(&c.interfaces).map(|t| p.str(*t)).collect();
+            let mut seen = BTreeSet::new();
+            let mut found = None;
+            while let Some(t) = queue.pop_front() {
+                if !seen.insert(t) || seen.len() > 64 {
+                    continue;
+                }
+                if t != "Ljava/lang/Object;" && cx.stable_type(t) {
+                    found = Some(t);
+                    break;
+                }
+                if let Some(sid) = p.find(t) {
+                    let k = p.class(sid);
+                    queue.extend(k.superclass.iter().chain(&k.interfaces).map(|x| p.str(*x)));
+                }
+            }
+            found.and_then(|t| sanitize(simple_name_of(t).rsplit('$').next().unwrap_or("")))
+        };
         let kind = if c.access & access::ANNOTATION != 0 {
             "Annotation"
         } else if c.access & access::INTERFACE != 0 {

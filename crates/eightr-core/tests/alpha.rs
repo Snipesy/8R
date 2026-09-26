@@ -163,10 +163,18 @@ impl Inverse {
     }
     fn desc(&self, d: &str) -> String {
         let dims = d.bytes().take_while(|&b| b == b'[').count();
-        match self.classes.get(&d[dims..]) {
-            Some(o) => format!("{}{}", &d[..dims], o),
-            None => d.to_string(),
+        let base = &d[dims..];
+        if let Some(o) = self.classes.get(base) {
+            return format!("{}{}", &d[..dims], o);
         }
+        // Classes a rewrite added are named after the class they came from (`<base>$$Split<id>;`,
+        // a placeholder naming later replaces): map the base part.
+        if let Some((head, tail)) = base.split_once("$$Split") {
+            if let Some(o) = self.classes.get(&format!("{head};")) {
+                return format!("{}{}$$Split{tail}", &d[..dims], o.trim_end_matches(';'));
+            }
+        }
+        d.to_string()
     }
     fn proto(&self, p: &str) -> String {
         let (params, ret) = eightr_ir::types::parse_proto(p).expect("valid proto");
