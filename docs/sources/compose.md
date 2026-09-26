@@ -13,6 +13,10 @@ Status: research notes · Undo order: 3 (after `r8/` and `desugar/`, before `kxs
 | `androidx.compose.compiler:compiler-hosted:1.5.14` sources jar (Google Maven) | last androidx-hosted release | "old" compiler (Kotlin 1.9, K1) |
 | `androidx/androidx` `compose/runtime/runtime` | HEAD `c772ca87cac06fbf47d34f86ab0b1202c71fb559` (2026-09-25) | runtime API and consumer keep rules |
 | `JetBrains/kotlin` `libraries/tools/kotlin-compose-compiler` | same HEAD | Gradle plugin defaults |
+| `docs/research/compose-app.md` | 2026-09-25 | R8 9.4 corrections (C1–C13), role/slot/default binding measured on Gretio and a 201-method library truth |
+| `docs/research/compose-keys.md` | 2026-09-25 | key stability over 103 library jars (compose 1.5–1.12, material3 1.1–1.4), collisions, R8 survival, version resolution |
+| `docs/research/compiler-eras.md` | 2026-09-25 | `compose_shapes` compiled with Kotlin 2.1.21 / 2.2.21 / 2.3.10 / 2.4.20: era markers, key identity |
+| `docs/research/PLAN-compose-sigdb.md` | 2026-09-25 | implementation plan (M0–M7) |
 
 **What was run (experiment).** `kotlinc` 2.3.20 with `kotlin-compose-compiler-plugin-embeddable` 2.3.20,
 `sourceInformation=true` and trace markers on (both are Gradle-plugin defaults), against
@@ -33,7 +37,17 @@ lambdas) lived in the scratchpad. §6 turns it into fixtures.
 `LLT` = `lower/LiveLiteralTransformer.kt`, `CIGE` = `ComposeIrGenerationExtension.kt`,
 `RT/` = androidx `compose/runtime/runtime/src/`.
 
-**Legend.** **[src]** = verified by reading source. **[exp]** = verified by the compile/R8 experiment.
+**Later experiments (2026-09-25).** Fixtures `compose_basic`, `compose_basic_r94` and `compose_shapes` (kotlinc 2.4.20,
+runtime 1.10.6; `compose_shapes` with `sourceInformation=true`; R8 9.4.24 with runtime consumer rules), a probe app using
+material3 1.4.0 / compose 1.10.6 shrunk by R8 9.4.24 with its mapping as oracle, and **Gretio** (a real R8 9.4.24
+full-mode app, compose 1.12.1, material3 1.4.0, no mapping; α-invariant structural analysis only). Several §1–§3 claims
+from the R8 8.10.9 run did not hold on 9.4; they are corrected in place and tagged.
+
+**Legend.** **[src]** = verified by reading source. **[exp]** = verified by the original compile/R8 8.10.9 experiment.
+**[exp 9.4.24]** = verified on the 2.4.20 / R8 9.4.24 fixtures, the probe app, compose-app's unminified D8 library dex, or
+compose-keys' library-jar scans. **[exp Gretio]** = measured on Gretio
+(counts are α-invariant; library truth = the 201 composables whose key matches a library key DB).
+**[exp eras]** = the Kotlin 2.1.21–2.4.20 comparison in `docs/research/compiler-eras.md`.
 **[inf]** = inferred, not verified; treat it as a hypothesis for a fixture to confirm.
 
 **Two contract notes for the rule registry.**
@@ -82,7 +96,10 @@ d = defaultParamCount(n)    = ceil(n / 31)   (only if requiresDefaultParameter()
 - `requiresDefaultParameter()` ([src] `CPT` 545–557): true for regular functions with any default,
   for default stubs, and for legacy open functions. **False for open/abstract virtual functions**, which instead
   get a static wrapper `<name>$default` in a nested `ComposeDefaultImpls` class ([src]
-  `lower/ComposableDefaultParamLowering.kt` 30–80, 233, 294; `ComposeNames.DefaultImpls`).
+  `lower/ComposableDefaultParamLowering.kt` 30–80, 233, 294; `ComposeNames.DefaultImpls`). The wrapper is itself
+  **restartable**; it takes the receiver as a trailing regular param (null-checked as `"$this$"`; `Render$default(I, Base, Composer, I, I)`,
+  `this` in slot 1), carries `C(Render$default)N(depth)` and the trace string `"….Base.ComposeDefaultImpls.Render$default (Shapes.kt:-1)"`
+  (line **−1**), and its key is the fallback hash (§1.5) [exp 9.4.24].
 - `$composer` has type `androidx/compose/runtime/Composer` (nullable at IR level). Regular param names are
   sanitized with `dexSafeName` ([src] `ACL` 1215–1224, `CPT` 688).
 - Composable **property getters** get `@JvmName("getX")` added, so the name is unchanged even with extra params ([src] `CPT` 668–680).
@@ -94,8 +111,10 @@ d = defaultParamCount(n)    = ceil(n / 31)   (only if requiresDefaultParameter()
   `Many(int×11,String,Composer,int,int,int)` (n=12, c=2, d=1);
   `Screens.Member(Point,Wrapper,Composer,int)` (instance member: t=1, c=1).
 
-**`$changed` encoding** ([src] `CFBT` 66–115, 4575–4700). Bit 0 is the "force/restart" bit. Slot *s*
-(receivers first, then regular params, 10 slots per int) uses bits `3s+1 .. 3s+3`:
+**`$changed` encoding** ([src] `CFBT` 66–115, 4575–4700). Bit 0 is the "force/restart" bit. Slot order is
+extension/context receivers, then regular params, then the **dispatch receiver `this` in the LAST slot** (10 slots per int)
+[exp 9.4.24: `Card.Show(times, suffix)` tests `times` with `&6`, `suffix` with `&48`, `this` with `&384`, skip mask
+`147/146`; D8 library dex: 363/365 members; not yet checked against `CFBT`]. Slot *s* uses bits `3s+1 .. 3s+3`:
 low two bits `ParamState` = Uncertain `00` / Same `01` / Different `10` / Static `11`, and the high bit
 `0b100` = Unstable. The body copies it into `$dirty` and fills uncertain slots with
 `if ($changed & (0b110<<(3s+1)) == 0) $dirty |= $composer.changed(p) ? 0b100<<(3s) : 0b010<<(3s)`. The
@@ -107,7 +126,8 @@ site ("comparison propagation").
 
 **`$default` encoding** ([src] `CFBT` 219–236 doc, 1337–1420). Bit *i* (= regular-param index,
 `defaultIndexForSlotIndex = slot − valueArgsStart`, [src] `CFBT` 4196) is 1 when the caller omitted
-argument *i*. The prologue emits `if ($default & (1<<i) != 0) p_i = <default expr>`. For a static default in a
+argument *i*. Receivers have no bit, so for a param bound both ways `slot − bit` = number of leading
+extension/context receivers (D8 library dex: 3223/3425 bindings have shift ∈ {0,1} [exp 9.4.24]). The prologue emits `if ($default & (1<<i) != 0) p_i = <default expr>`. For a static default in a
 skippable function it also emits `$dirty |= Static<<slot`. For non-static defaults
 (e.g. `remember {}`, theme reads) the prologue is wrapped in
 `$composer.startDefaults(); if ($changed&1==0 || $composer.defaultsInvalid) {…} else {skipToGroupEnd; …}; $composer.endDefaults()`
@@ -130,15 +150,19 @@ $composer.endRestartGroup()?.updateScope { c, _ -> Fn(p…, c, updateChangedFlag
 ```
 
 - **Restart lambda.** In K2 it is an indy lambda over a private static synthetic `Fn$lambda$N(captures…, $changed…, $default…, Composer, int)`.
-  D8/R8 desugar it to `…$$ExternalSyntheticLambdaN` [exp]. In K1 (androidx ≤1.5.x) it is an inner class extending
-  `kotlin.jvm.internal.Lambda` [inf]. Its body passes every captured param through unchanged, puts
+  D8/R8 8.10 desugar it to `…$$ExternalSyntheticLambdaN` [exp]; D8/R8 9.4 name it `Outer$N` (from
+  `Outer$$InternalSyntheticLambda$<k>$<hash>$<i>`; e.g. `Card$0` for `Card.Show$lambda$1`) [exp 9.4.24]. In K1 (androidx ≤1.5.x)
+  it is an inner class extending `kotlin.jvm.internal.Lambda` [inf]. Its body passes every captured param through unchanged, puts
   its own Composer arg in the `$composer` slot, `updateChangedFlags(x|1)` in every `$changed` slot, and the
   captured `$default` unchanged ([src] `CFBT` 1710–1770; [exp] javap of `Greeting$lambda$1`).
   `updateChangedFlags` ([src] `RT/commonMain/.../RecomposeScopeImpl.kt` 44–60) uses the masks
-  `0x12492492`, `0x24924924`, `~0x36DB6DB6`. After R8 inlines it, these constants appear literally [exp].
+  `0x12492492`, `0x24924924`, `~0x36DB6DB6`. **R8 does not inline it**: it stays a static call, and with a constant
+  `$changed` the argument is folded (`ucf(7)`) [exp 9.4.24: `r.f` in `compose_shapes`; exp Gretio: 596/596 sites]. The
+  earlier "constants appear literally" claim was not reproduced on 8.10 or 9.4 fixtures.
 - Members: `this` is saved to a temp and captured ([src] `CFBT` 1703–1708).
 - `shouldExecute(boolean,int)` replaced `(diff) || !skipping` when the runtime has it and
-  `PausableComposition` is on ([src] `CFBT` 476–487, 1805–1822). See §1.14 for defaults by version.
+  `PausableComposition` is on ([src] `CFBT` 476–487, 1805–1822). Observed: 2.1.21 uses `getSkipping()`, 2.2.21+ use
+  `shouldExecute(ZI)Z` [exp eras]. See §1.14 for defaults by version.
 
 ### 1.3 Non-restartable, read-only, inline, lambdas  [src, exp]
 
@@ -146,7 +170,11 @@ $composer.endRestartGroup()?.updateScope { c, _ -> Fn(p…, c, updateChangedFlag
   ([src] `CFBT` 722–870). With `OptimizeNonSkippingGroups` (default on since 2.2.0, §1.14) it gets **no outer
   group**, only `sourceInformationMarkerStart(composer, KEY_fn, "C(Name)…")`/`…End` when source info is on.
   Without it, it gets `startReplaceGroup(KEY_fn)` … `endReplaceGroup()`. `@ReadOnlyComposable` gets markers only.
-  [exp]: `NonRestart`, `readOnly` and `rememberDouble` have only marker calls.
+  [exp]: `NonRestart`, `readOnly` and `rememberDouble` have only marker calls. 2.1.21 still wraps them in
+  `startReplaceGroup(KEY_fn)` [exp eras].
+  **Exception: virtual (open/override) composables** are non-restartable but keep `startReplaceGroup(KEY_fn)` …
+  `endReplaceGroup()` in 2.4.20, and that key survives R8 (`Base.Render` `0x5d098203`, `Derived.Render` `0x756f888b`)
+  [exp 9.4.24].
 - **Composable lambdas** get no root group, because `ComposableLambdaImpl.invoke` owns it. They get
   `sourceInformation(c,"C<locs>:File#pkg")` (no name), skipping logic and trace markers ([src] `CFBT` 875–1050; [exp]).
 - **Inline composables** (`CC(Name)`) get only markers, and no trace markers ([src] `CFBT` 752–754; [exp] `InlineRow`).
@@ -182,7 +210,13 @@ node.key ∈ { "class-<Name>", "pkg-<fqName or <root>>", "file-<basename>", "fun
 ```
 
 (`DFKT` 128–145; `DKT` 57–363; `DKV` 19–185 [src]). `jvmFriendly` turns specials into `$…$` (`<anonymous>` → `$anonymous$`).
-`simpleName` is the classifier's **simple** name. In K2, composable function types are named `ComposableFunctionN`.
+`simpleName` is the classifier's **simple** name. In K2, composable function types are named `ComposableFunctionN`;
+the **K1 frontend names them `FunctionN` of the pre-lowering arity**. So every composable with a composable-lambda
+parameter has two keys, one per frontend (material3 `Button`: `…,Function1)Unit/…` = 650121315 in 1.3.2,
+`…,ComposableFunction1)Unit/…` = −1310015664 in 1.4.0; recomputed). Non-composable function params (`onClick: () -> Unit`)
+keep their key. The androidx libraries switched frontend at compose 1.9 / material3 1.4 [exp 9.4.24, compose-keys §3].
+Within one frontend the key is identical across Kotlin 2.1.21–2.4.20 for all 13 restartables of `compose_shapes` [exp eras].
+Other key breaks: a **file rename** (`X.kt` → `X.android.kt`) or a function rename. The JVM facade name is not in the key.
 Verified by recomputation [exp]:
 
 | key string | hash | where seen |
@@ -194,20 +228,28 @@ Verified by recomputation [exp]:
 | `fun-$anonymous$()Unit/arg-0/call-Foo:1/fun-Bar()Unit/pkg-<root>/file-Test.kt` | 511230191 | same (2nd sibling call) |
 | `fun-Greeting(String,Int,Boolean)Unit/pkg-com.example.app/file-Main.kt` | −1918547072 | experiment, javap **and R8 dex** |
 | `fun-Member(Point,Wrapper)Unit/class-Screens/pkg-com.example.app/file-Main.kt` | 1115589987 (`0x427e8d63`) | experiment, **R8 dex** |
+| `fun-Defaults(Int,String,Int)Unit/pkg-com.example.shapes/file-Shapes.kt` | `0xdf96e8a4` | `compose_shapes`, 2.1.21–2.4.20 [exp eras] |
+| `fun-Show(Int,String)Unit/class-Card/pkg-com.example.shapes/file-Shapes.kt` | `0x1b645be2` | `compose_shapes` D8 and R8 9.4 dex [exp 9.4.24] |
+| `fun-Render(Int)Unit/class-Base/pkg-com.example.shapes/file-Shapes.kt` | `0x5d098203` | open fn, `startReplaceGroup`, R8 9.4 dex [exp 9.4.24] |
+| `fun-$anonymous$()Unit/arg-0/call-Slot/fun-Lambdas(String)Unit/pkg-com.example.shapes/file-Shapes.kt` | −1188304595 | singleton field `lambda$-1188304595` [exp 9.4.24] |
 
 The key is **α-invariant evidence that commits to the original simple name, simple parameter-type names,
 enclosing class chain, package and file basename**. It is a 32-bit hash, so it can confirm candidates but it cannot be inverted.
 
 **Element key** (inner groups, markers) ([src] `CFBT` 1969–1991):
 `h = 31*(31*KEY_fn + (start−fnStart)) + (end−fnStart)`, then `31*h + value.hashCode()` for `IrConst`,
-`+2` for `IrBlock`, `+3` for `IrComposite`. Offsets are file char offsets.
+`+2` for `IrBlock`, `+3` for `IrComposite`. Offsets are file char offsets, so any edit earlier in the file changes
+them. Across library minors only ~40–80% of inner/lambda keys are kept; across patches 100%. Inner keys are therefore
+useless for identity but are a **minor-version fingerprint** (§3 `compose/lib-key`) [exp 9.4.24, compose-keys §3, §7].
 
 **Lambda key** = the durable key of the lambda's function. It is passed as the first int to
 `composableLambdaInstance`/`rememberComposableLambda`/`ComposableLambdaImpl(<init>)` ([src] `CLM` 996–1003).
 
 **Old keys.** If no durable key exists (external functions, or configurations that skip the transformer),
-the fallback is `"$fqName$jvmDescriptorWithoutName".hashCode()` of the *pre-lowering* descriptor ([src] `ACL`
-1264–1275; the same code is in 1.5.14 `AbstractComposeLowering.kt` 1203–1216).
+the fallback is `"$fqName$jvmDescriptorWithoutName".hashCode()` ([src] `ACL` 1264–1275; the same code is in 1.5.14
+`AbstractComposeLowering.kt` 1203–1216). For the generated `ComposeDefaultImpls.<name>$default` wrapper the descriptor is
+the **post-lowering** one: `"com.example.shapes.Base.ComposeDefaultImpls.Render$default(ILcom/example/shapes/Base;Landroidx/compose/runtime/Composer;II)V"`
+→ `0xb51dcc9e` [exp 9.4.24]. Which descriptor is used for external callees (e.g. the `remember` key) is unverified.
 
 ### 1.6 `sourceInformation*` strings  [src, exp]
 
@@ -219,13 +261,15 @@ Strings are filled in late by `applySourceFixups` ([src] `CFBT` 1300–1321). Gr
 ```
 function-info := call-info [param-info] [locations] ":" file ["#" base36(abs(pkgHash))]
 call-info     := "C" ["C"] ["(" simpleName ")"]            // "CC" = inline fn; no "(…)" for lambdas
-param-info    := "P(" sorted-index-encoding ")"            // compiler ≤2.2.x or runtime <1.9
-               | "N(" name[":" inlineClassFqn] ("," …)* ")" // ≥2.3.0 && runtime ≥1.9 (JVM only)
+param-info    := "P(" sorted-index-encoding ")"            // compiler ≤2.1.x or runtime <1.9
+               | "N(" name[":" inlineClassFqn] ("," …)* ")" // compiler ≥2.2.2x (seen 2.2.21) && runtime ≥1.9 (JVM only)
 locations     := loc ("," loc)*        loc := ["*"] line0 "@" offset ["L" length]   // line0 is 0-based
 block-info    := [locations]                                // inner groups: e.g. "12@314L38"
 pkgHash       := fold(0){h,c -> h*31 + c.code} over the package FqName; "c#" abbreviates "androidx.compose."
 ```
 
+- `N(...)` era: absent in 2.1.21 (`P(i)`), present in 2.2.21, 2.3.10, 2.4.20 [exp eras]. The earlier reading of the tag
+  diff (≥2.3.0) was wrong; 2.2.0–2.2.20 were not compiled, so the exact first version is open.
 - Example [exp]: `C(Greeting)N(name,times,enabled)10@256L30:Main.kt#bw24ds`. Here `bw24ds` = base36 hash of `com.example.app`,
   offset 256 = `remember { mutableStateOf(0) }`, line 10 (0-based) = source line 11.
 - `N(...)`/`P(...)` drop params whose name starts with `$`. So anonymous `_` lambda params, which are sanitized to `$…`,
@@ -256,6 +300,9 @@ Gradle default `includeTraceMarkers = true` ([src] `ComposeCompilerGradlePluginE
   that ([src] `CLM` 835–846; tag diff §1.14). The internal getter is `getLambda$<KEY>$<module>`, which leaks the Gradle
   module name ([exp] `getLambda$-1495921124$main`). The old name is still emitted for public inline scopes ([src] `CLM` 893–910).
 - `tracked` = "has captures" ([src] `CLM` 1001–1002).
+- Lambda **body** codegen: 2.1.21 emits anonymous classes (`ComposableSingletons$FileKt$lambda$K$1`); 2.2.21+ emit indy
+  lambdas over static bodies named `lambda__K$lambda$0` (`-` in the key becomes `_`, e.g. `lambda__1188304595$lambda$0`)
+  [exp eras; exp 9.4.24]. The `lambda$K` field and `getLambda$K$<module>` getter appear in all of 2.1.21–2.4.20 [exp eras].
 
 ### 1.9 Non-composable lambda memoization  [src]
 
@@ -306,18 +353,20 @@ getter per literal, annotated `@LiveLiteralInfo(key, offset)` (RUNTIME). The get
 
 ### 1.14 Version matrix (compiler × runtime)
 
-| Feature | androidx 1.0–1.5.x (K1, Kotlin ≤1.9) | Kotlin 2.0.x | 2.1.0–2.1.x | 2.2.x | 2.3.x / HEAD |
+| Feature | androidx 1.0–1.5.x (K1, Kotlin ≤1.9) | Kotlin 2.0.x | 2.1.0–2.1.x | 2.2.x | 2.3.x / 2.4.x / HEAD |
 |---|---|---|---|---|---|
-| Durable `KEY_fn` string scheme | same scheme [src 1.5.14] | same | same | same | same [exp] |
+| Durable `KEY_fn` string scheme | same scheme [src 1.5.14], but K1 frontend names composable fn types `FunctionN` (§1.5) | same | same; keys identical 2.1.21→2.4.20 [exp eras] | same | same [exp] |
 | Replace groups | `startReplaceableGroup` | `startReplaceGroup` if runtime has it, else fallback [src] | same | same | same |
 | Composable lambda factory | `composableLambda(c,KEY,…)` | `rememberComposableLambda` if runtime has it [src] | same | same | same |
-| Singleton field names | `lambda-<i>` [src] | `lambda-<i>` [src] | `lambda-<i>` (2.1.0) / **`lambda$KEY` (2.1.20+)** [src] | `lambda$KEY` | `lambda$KEY` |
-| Skip condition | `(dirty&M1!=M2) \|\| !skipping` | same [src] | `shouldExecute(…)` if flag on (default **off**) [src] | flag default **on** [src] | on |
-| OptimizeNonSkippingGroups | n/a | default off | default off | **default on** [src] | on |
+| Composable lambda body | anonymous class [inf] | ? | anonymous class `…$lambda$K$1` [exp eras] | indy, static `lambda__K$lambda$0` [exp eras] | same [exp 9.4.24] |
+| Singleton field names | `lambda-<i>` [src] | `lambda-<i>` [src] | `lambda-<i>` (2.1.0) / **`lambda$KEY` (2.1.20+)** [src; exp eras 2.1.21] | `lambda$KEY` | `lambda$KEY` |
+| Skip condition | `(dirty&M1!=M2) \|\| !skipping` | same [src] | `shouldExecute(…)` if flag on (default **off**) [src]; `getSkipping()` seen in 2.1.21 [exp eras] | flag default **on** [src]; `shouldExecute(ZI)Z` seen in 2.2.21 [exp eras] | on |
+| OptimizeNonSkippingGroups | n/a | default off | default off (non-restartables wrapped in `startReplaceGroup(KEY_fn)` [exp eras]) | **default on** [src] (markers only [exp eras]) | on; virtual fns keep a replace group [exp 9.4.24] |
 | Strong skipping | opt-in | option; flag default on at 2.0.20 [src] | always | always | always (flag removed) |
-| Param info | `P(...)` | `P(...)` | `P(...)` | `P(...)` | **`N(names)`** when runtime ≥1.9 [src] |
-| Restart lambda codegen | inner class (K1) [inf] | indy → D8 synthetic [inf] | same | same | indy → `$$ExternalSyntheticLambdaN` [exp] |
-| Trace string | `fq (File:line0)` [src] | same | same | same | same |
+| Param info | `P(...)` | `P(...)` | `P(...)` [exp eras] | **`N(names)`** when runtime ≥1.9; seen in 2.2.21 [exp eras] | `N(names)` [exp] |
+| Restart lambda codegen | inner class (K1) [inf] | indy → D8 synthetic [inf] | same [inf] | same [inf] | indy → `$$ExternalSyntheticLambdaN` (D8/R8 8.10) [exp]; `Outer$N` (D8/R8 9.4) [exp 9.4.24] |
+| Trace string | `fq (File:line0)` [src] | same | same | same | same; `:-1` for generated `$default` wrappers [exp 9.4.24] |
+| Library AARs (observed) | compose ≤1.6, material3 ≤1.2: non-restartables have `startReplaceableGroup(KEY_fn)` | | | | compose ≥1.7, material3 ≥1.3: markers only; compose ≥1.9, material3 ≥1.4: K2 keys [exp 9.4.24, compose-keys §2–3] |
 
 "Runtime has it" matters: the **runtime version on the compile classpath** selects the shape, not just the compiler version
 ([src] `ACL` 1479–1495; `CFBT` 476–487, 545–552, 586–590). A single APK can mix shapes, because libraries were compiled by
@@ -327,42 +376,55 @@ different compilers.
 
 ## 2. What survives R8 (no mapping)
 
-Experiment results ([exp], R8 8.10.9, runtime 1.10.6, consumer rules applied):
+Experiment results ([exp], R8 8.10.9, runtime 1.10.6, consumer rules applied), re-checked on R8 9.4.24 fixtures
+([exp 9.4.24]) and on Gretio (R8 9.4.24, runtime 1.12.1, [exp Gretio]). The same fingerprints hold on runtime 1.12.1.
 
 | Transformation | After R8 | Evidence |
 |---|---|---|
-| `sourceInformation*` calls and strings | **Removed in all three variants, including `-dontoptimize`.** | runtime `proguard.txt` has `-assumenosideeffects` on the three `ComposerKt.sourceInformation*` ([src] `RT/androidMain/keepRules/rules.keep` 1–5). 0 hits for `bw24ds`/`C(` in all dumps. |
-| Trace `info` strings | **Removed** when `compositionTracer` is never written (R8 folds `isTraceInProgress()` → false). **Kept** when anything reachable calls `Composer.setTracer` (e.g. `runtime-tracing`'s initializer [inf]) or with `-dontoptimize`. | `base`: 0 strings; `trace` and `noopt`: all 12 `"… (Main.kt:N)"` strings present, each next to `const KEY_fn`. |
-| `KEY_fn`, `KEY_elem`, lambda keys | **Survive as `const` ints.** `startRestartGroup` is renamed (e.g. `Ld/k;.B:(I)Ld/k;`). | `const #427e8d63` in `Member`; lambda keys in `new ComposableLambdaImpl(IZ…)` and `<clinit>` sequences. |
-| Bitmask constants (`$changed`/`$dirty`/`$default`) | Survive. Masks index the *original* slots. | `and-int/lit8 …,#19` / `#18`, `0x36db6db6` (inlined `updateChangedFlags`). |
-| Synthetic params | Present but **R8 may remove or reorder params**: `Greeting (String,int,boolean,C,int,int)` → `(I I Ld/k; Z)V`; `Many` lost the 10 constant-arg params → `(ILjava/lang/String;Ld/k;III)V`. | mapping `residualsignature`. |
-| `Composer` type | Renamed. The interface gets **merged into `ComposerImpl`** (`Ld/k;`), as the keep rule intends ([src] rules.keep 7–15). | every residual signature has `Ld/k;` |
+| `sourceInformation*` calls and strings | **Removed in all three variants, including `-dontoptimize`.** | runtime `proguard.txt` has `-assumenosideeffects` on the three `ComposerKt.sourceInformation*` ([src] `RT/androidMain/keepRules/rules.keep` 1–5). 0 hits for `bw24ds`/`C(` in all dumps. Gretio: 0 `C(`/`N(`/`P(` strings [exp Gretio]. |
+| Trace `info` strings | **Removed** when `compositionTracer` is never written (R8 folds `isTraceInProgress()` → false). **Kept** when anything reachable calls `Composer.setTracer` (e.g. `runtime-tracing`'s initializer [inf]) or with `-dontoptimize`. | `base`: 0 strings; `trace` and `noopt`: all 12 `"… (Main.kt:N)"` strings present, each next to `const KEY_fn`. Gretio (no runtime-tracing): 0 [exp Gretio]. |
+| `KEY_fn` of **restartable** fns, `KEY_elem`, lambda keys | **Survive as `const` ints.** `startRestartGroup` is renamed (e.g. `Ld/k;.B:(I)Ld/k;`). The entry key is the const argument of the method's first `C.x(I)C` call. | `const #427e8d63` in `Member`; lambda keys in `new ComposableLambdaImpl(IZ…)` and `<clinit>` sequences. Probe app: 96/96 reachable restartable library composables keep it; Gretio: 552 restartables, all keys distinct [exp 9.4.24; exp Gretio]. |
+| `KEY_fn` of **non-restartable / inline** fns | **Lost**: with OptimizeNonSkippingGroups the only carrier is `sourceInformationMarkerStart`, which the consumer rule strips. Exceptions: virtual (open/override) composables keep `startReplaceGroup(KEY_fn)`; code compiled without OptimizeNonSkippingGroups (≤2.1.x default [src; exp eras]) keeps `startReplace(able)Group(KEY_fn)`; so do compose ≤1.6 / material3 ≤1.2 AARs [exp 9.4.24] (compose 1.7/1.8 AARs are already markers-only, presumably because androidx enabled the flag before the 2.2 default [inf]). | Gretio: 167 non-restartables with a Composer param, no key [exp Gretio]; `NonRestart` key gone, `Render` key kept [exp 9.4.24]; ~30–80% of current library composables per artifact are marker-only [exp 9.4.24, compose-keys §2]. |
+| Bitmask constants (`$changed`/`$dirty`/`$default`) | Survive. Masks index the *original* slots. | `and-int/lit8 …,#19` / `#18`; `0x36db6db6` sits in the static `updateChangedFlags`, which is **not inlined** (§1.2). |
+| Synthetic params | Present but **R8 removes or reorders params**, including synthetic ones: `$default` is removed when constant at every call site (73/120 = 61%), a `$changedK` int in 5.5%, and the defaults prologue becomes unconditional. ≥1 real param removed in 40%. Residual order ≠ `real* C ch+ df*` in 26/552. `Greeting (String,int,boolean,C,int,int)` → `(I I Ld/k; Z)V` (8.10) / `(IILq0;Z)V` (9.4); `Many` → `(ILjava/lang/String;Ld/k;III)V`. | mapping `residualsignature` [exp]; library truth n=201 [exp Gretio]; `compose_shapes`: `Ten`/`Eleven`/`Constants`/`Remembers`/`Lambdas` → `(I, C)V` [exp eras]. |
+| `Composer` type | Renamed. The interface gets **merged into `ComposerImpl`** (`Ld/k;`), as the keep rule intends ([src] rules.keep 7–15). Runtime methods can have **reordered params** (`shouldExecute` is `(ZI)Z` in the fixture, `(IZ)Z` on Gretio). | every residual signature has `Ld/k;`; Gretio `Lbl4;` (super `Object`, no interfaces) [exp Gretio]. |
+| `startRestartGroup` / `endRestartGroup` / `updateScope` | R8 9.4 **discards the `startRestartGroup` result** (0/552 `move-result`) and inlines `updateScope` into `iput-object lambda, Scope.<field>` after `endRestartGroup` + `if-eqz` (584 of ~590 sites). 8.10 kept the `updateScope(Function2)` call. | `compose_shapes` `Card.Show` [exp 9.4.24]; [exp Gretio]. |
 | Non-restartable composables | Often **inlined** into callers (`rememberDouble`, `NonRestart`, `readOnly` → into `Screen`). | mapping inline frames |
-| Restartable composables | Survived as methods (≥2 call sites: caller plus own restart lambda) [exp; generalization inf] but **moved to unrelated host classes** (MainKt statics → `ComposableSingletons$EntryKt`). | mapping |
-| Restart lambdas | `$$ExternalSyntheticLambdaN` classes, **horizontally merged** (`m.c` = 3 lambdas). | mapping |
-| `ComposableSingletons$FileKt` | Lambda body classes merged with runtime synthetics; `composableLambdaInstance` inlined to `new ComposableLambdaImpl(key, false, block)` in some class's `<clinit>`. | dump `m.a.<clinit>` |
-| `$stable` fields | **Removed** (never read). | `Static fields -` on all app classes |
+| Restartable composables | Survive as methods (≥2 call sites: caller plus own restart lambda); **never R8-inlined** in practice (0/96 probe, 0/552 Gretio: every `startRestartGroup` is on the Composer param at the entry), but **moved to unrelated host classes** (MainKt statics → `ComposableSingletons$EntryKt`, 8.10; `kotlin.jvm.internal.TypeIntrinsics`, `ContinuationInterceptor$Key`, 9.4). | mapping [exp; exp 9.4.24; exp Gretio] |
+| Restart lambdas | 8.10: `$$ExternalSyntheticLambdaN` classes, **horizontally merged** (`m.c` = 3 lambdas). 9.4: `Outer$N`, merged **together with composable-lambda bodies and ordinary lambdas**: ctor `(Object…, I, B)` with a byte class id, `invoke` switches on it; the own int arg gets only a `getClass()` null check. Gretio: 290 classes, 91 merged groups serving 2–23 composables. | mapping [exp]; [exp 9.4.24]; [exp Gretio] |
+| `ComposableSingletons$FileKt` | Lambda body classes merged with runtime synthetics; `composableLambdaInstance` inlined to `new ComposableLambdaImpl(key, false, block)` in some class's `<clinit>`. On 9.4 the fields and `<clinit>`s land in **mixed host classes** (Gretio: 152 fields in 55 hosts, 1 pure holder), so the class is **not recoverable**; only the field name `lambda$K` is. | dump `m.a.<clinit>` [exp]; [exp Gretio] |
+| `$stable` fields | **Removed** (never read). | `Static fields -` on all app classes. Gretio: no field named `$stable`, but R8 renames fields anyway [exp Gretio]. |
 | `@StabilityInferred`, `@FunctionKeyMeta`, `@Composable` | Not in DEX at all (BINARY). | [src] |
 | Live literals | `LiveLiterals$…` and key strings folded away when `isLiveLiteralsEnabled` is never set [inf]. The `@LiveLiteralInfo` annotations are RUNTIME but go with their removed methods [inf]. | — |
 | Kotlin metadata | Stripped unless kept; if kept, it holds the **pre-lowering** signature [inf]. | — |
 
 **Structural fingerprints that survive** (all α-invariant):
 
-1. **Composer class `C`.** The unique class type that appears as a parameter in many app methods, right after the "real"
-   parameters, followed by `int` params. Methods begin with `invoke-* C.x(I)C` whose result is written back to the same
-   parameter register (`startRestartGroup`). Almost every such method ends with `invoke C.y()LS;` + null-check +
-   `S.z(LFunction2;)V` (`endRestartGroup`/`updateScope`). A runtime SigDB (§5.4 of DESIGN) can also pin `ComposerImpl` by
-   body shape.
-2. **Restartable composable.** An entry `startRestartGroup(const)` on a `C`-typed parameter, plus exactly one
-   restart-lambda class whose invoke calls this method back with the pass-through pattern (§1.2).
+1. **Composer class `C`.** The class `T` with the most `T.x(I)T` calls made with a constant on a `T`-typed parameter
+   (Gretio: 552 vs 15 for the runner-up) [exp Gretio]. An equivalent check is the type most often followed by trailing
+   `int` params (579 vs 263). Parameter **position is not reliable** (R8 reorders, e.g. `(IILze;…Lbl4;…Z)V`). The
+   `startRestartGroup` result is **not** written back on 9.4. Restartable methods end with `invoke C.y()LS;` + `if-eqz` +
+   `new-instance L` / `<init>` + either `S.z(LFunction2;)V` (8.10) or `iput-object L, S.<field>` (9.4)
+   (`endRestartGroup`/`updateScope`). A runtime SigDB (§5.4 of DESIGN) can also pin `ComposerImpl` by body shape.
+   Detection by the name `Landroidx/compose/runtime/Composer;` fails on real R8 apps (Gretio is not detected today).
+2. **Restartable composable.** An entry `startRestartGroup(const)` on a `C`-typed parameter, plus a restart-lambda
+   (switch case) whose invoke calls this method back with the pass-through pattern (§1.2). Found for 552/552 on Gretio.
+   In 38 cases the (merged) lambda class calls `M` more than once; the restart call is the one with `updateChangedFlags`
+   args [exp Gretio].
 3. **Composable lambda.** `new ComposableLambdaImpl(const int, const boolean, <lambda>)` (inlined
    `composableLambdaInstance`) or the `rememberedValue`/`Empty`/`new ComposableLambdaImpl`/`updateRememberedValue` sequence
-   (inlined `rememberComposableLambda`) [exp].
-4. **Group constants.** `startReplaceGroup(const)`, `startMovableGroup(const, x)`, `C.shouldExecute(Z,I)Z`, `skipToGroupEnd`.
-5. **`$changed` slot masks** of the forms `0b110<<(3s+1)`, `4<<3s|2<<3s`, `0x12492492…`, and **`$default` single-bit tests** guarding a store to a parameter register.
+   (inlined `rememberComposableLambda`) [exp]. Gretio: 259 sites, 152 in `<clinit>` (`false`), 107 inlined remember (`true`).
+4. **Group constants.** `startReplaceGroup(const)`, `startMovableGroup(const, x)`, `C.shouldExecute(Z,I)Z` (any param
+   order), `skipToGroupEnd`.
+5. **`$changed` slot masks** of the forms `0b110<<(3s+1)`, `4<<3s|2<<3s`, `0x12492492…`, and **`$default` single-bit tests**
+   selecting a parameter's value. After R8 the selection is a **phi** (`v = bit ? <default> : p` into a fresh register; one
+   arm is `move r, p`), not a store into the parameter register [exp Gretio].
+6. **`updateChangedFlags`**: a static `(I)I` holding the masks `0x12492492`/`0x24924924`, called from every restart lambda.
 
 **What does not survive.** Function names, file names and lines (except via trace strings when they survive),
-`N()`/`P()` param info, the `$stable` stability table, and the Kotlin-level arity if R8 removed params.
+`N()`/`P()` param info, the `$stable` stability table, the Kotlin-level arity if R8 removed params, and any function key of a
+non-virtual non-restartable composable (above). On Gretio the only app-level name evidence for composables was Kotlin
+function-reference signature strings (`"DashboardPages$lambda$33$pageShiftOf(…)I"`, a `kotlinc/` concern) [exp Gretio].
 
 **Non-minified builds** (D8 only, `~~D8{…}` marker): everything in §1 survives, including all strings, names and
 `$stable`. The `compose/` rules still apply and are mostly S there.
@@ -374,22 +436,32 @@ Experiment results ([exp], R8 8.10.9, runtime 1.10.6, consumer rules applied):
 Preconditions are checked per item at runtime. "roles" means `$composer`/`$changed`/`$default` identified by dataflow
 (R-roles below), not by position.
 
-**R-roles (shared analysis, D).**
-- `$composer` = the `C`-typed param that receives `startRestartGroup`/`startReplaceGroup`/marker calls, or is passed on as the composer to other composables.
-- `$changed` = the int params that flow into bit tests of slot-mask form, into `shouldExecute(_, x&1)`/`x&1`, into trace dirty args,
-  and in the restart lambda into `updateChangedFlags(x|1)` (or its inlined mask expression).
-- `$default` = the int params used only in single-bit tests `x & (1<<i)` whose true branch stores into a parameter
-  register (or ORs Static bits into `$dirty`), and which the restart lambda passes through unchanged.
+**R-roles (shared analysis).** The **restart-lambda callback is the proof** (S for restartables). In the lambda
+(switch case) instantiated after `endRestartGroup`, take the call back to the method `M` whose argument list contains
+`updateChangedFlags(…)` results (a merged lambda class may call `M` more than once; the restart call is the one with `ucf`):
+- `$composer` = the parameter of `M` receiving the lambda's own Composer arg (a `check-cast` of an `invoke` param).
+- `$changed` = each parameter of `M` receiving `updateChangedFlags(x|1)`, or `updateChangedFlags(const)` when R8 folded `x|1`.
+- `$default` = a parameter receiving a pass-through int (instance-field read, or a constant after R8 propagation) that is
+  used in `M` only in single-bit tests `x & (1<<i)` which **select a value** (phi, fingerprint 5) or OR Static bits into `$dirty`.
+- Remaining pass-through params are real params.
+
+Gretio: `$composer` and `$changed` for 552/552 restartables (596 ints), `$default` for 95; on the 201-method library truth
+0 over-counts and 0 real params misclassified [exp Gretio]. In-method dataflow alone (slot masks, `&1` into
+`shouldExecute`) agrees exactly in only 480/552 (87%) and is **not** proof. In particular **`x & 1` is ambiguous**: it is
+the force bit of `$changed` *and* bit 0 of `$default` (same instruction); only the lambda signal, or "feeds
+`shouldExecute`/`$dirty`" versus "selects a value", separates them. Non-restartable composables and lambda bodies have no
+restart lambda: their roles are D (dataflow only).
 
 Classification is by role, so it does not care about R8 argument reordering. It is α-invariant because it uses no names.
 
 | id | class | preconditions | evidence / proof |
 |---|---|---|---|
-| `compose/detect` | D | ≥1 method matches fingerprint 2, and C is unique | positive structural evidence (DESIGN §1.1) |
-| `compose/composable-marker` | **S** (restartable) / D (others) | fingerprint 2 holds for this method | only the Compose compiler emits `startRestartGroup(K)` + a self-calling restart lambda. Output: report flag and optional marker annotation. |
-| `compose/synthetic-param-names` | **S** | roles identified; count of `$changed` = c and of `$default` ∈ {0, d} for n = remaining params (ordered by role, index) | names are compiler constants `$composer`, `$changed`, `$changedK`, `$default`, `$defaultK` ([src] `CPT` 705–723). Written as parameter names / debug-info names. |
+| `compose/detect` | D | C found structurally (fingerprint 1: argmax of `T.x(I)T` const-on-`T`-param, with a clear margin) and ≥1 method matches fingerprint 2 | positive structural evidence (DESIGN §1.1). **Must not** depend on the name `Landroidx/compose/runtime/Composer;` (R8 renames it; Gretio undetected today). Also identifies `endRestartGroup`, `updateChangedFlags` (masks), `ComposableLambdaImpl` (`<init>(IZ…)` const/const) and `shouldExecute` (`Z` return, `dirty&1` arg) by shape, never by descriptor. |
+| `compose/composable-marker` | **S** (restartable) / D (others) | fingerprint 2 holds for this method | only the Compose compiler emits `startRestartGroup(K)` + a self-calling restart lambda. Output: report flag and a build-visibility annotation sharing the `@eightr.Inlined` plumbing, e.g. `@eightr.Composable(key=K, restartable=true, changed=[…], defaults=[…], removedParams≥n)`. Gretio: 552 S + ~534 D lambda bodies [exp Gretio]. |
+| `compose/synthetic-param-names` | **S** (role names); index `K` of `$changedK` D unless fixed by `param-slot` | roles proven by the restart-lambda callback (R-roles) | names are compiler constants `$composer`, `$changed`, `$changedK`, `$default`, `$defaultK` ([src] `CPT` 705–723). Written as parameter names / debug-info names. The count formula (`c = ceil((n+t)/10)`, `d`) is **not** a precondition: R8 removes constant `$default` (61%) and `$changedK` (5.5%) [exp Gretio], so the count check rejects correct cases; it is only a consistency check. With two `$changed` ints the residual order does not prove which is `$changed1` (44 Gretio methods) unless a slot binding and a default binding meet on one param (`10K+s = i+recv`). |
 | `compose/source-signature` | **S** if an `N(...)` string is bound to the method and its count equals the remaining real params (after removing receivers); **D** otherwise | roles identified | `N()` lists every named param ([src] `CFBT` 4964–4990). Without it R8 may have removed params (seen [exp]), so arity is not provable. D output = remaining params in residual order, with names from other rules. Recorded in the mapping/report; **`dex'` keeps the synthetic params** (§0 note 2). |
-| `compose/original-arity-bound` | D (annotation) | roles identified | the highest slot referenced by any `$changed` mask in the body or in callers' constant `$changed` args, and the highest `$default` bit, give a **lower bound** on the original slot/param count. A gap (slot with no live param) proves R8 removed a param at that position. |
+| `compose/original-arity-bound` | D (annotation) | roles identified | lower bound on the original slot count = max of `10·(c−1)+1` for `c` `$changed` ints, the top slot of the skip mask (incl. `const`+`and-int/2addr` masks like `0x12492493`), and top `$default` bit + 1 + receivers. A gap (slot with no live param) proves R8 removed a param at that position. Sound on the library truth (0 violations / 201; detects 57 of 80 true removals); Gretio: 109/552 provably lost params [exp Gretio]. Fixture: `Greeting` gap 1, `Many` gap 10, exact [exp 9.4.24]. |
+| `compose/param-slot` (new) | **D** per bound param; S only under a unique-window precondition once measured at 100% | roles identified | **slot binding:** `if (($changed_q & (6<<3s \| 14<<3s)) == 0) dirty \|= changed(p) ? 4<<3s : 2<<3s` ties residual param `p` to original slot `10·k(q)+s` (dispatch `this` = last slot, §1.1). **Default binding:** the phi `bit = $default & (1<<i); v = bit ? <default> : p` ties `p` to original regular index `i`. `slot − bit` = receiver count (resolves §5.3). Precision: D8 library slots 99.2% (members only with `this` last), defaults 94% (error mode: duplicate bindings from overlapping windows); Gretio vs library truth 96.5% / 158 of 160. Gretio coverage: 46% of residual real params placed, 134 methods fully placed [exp 9.4.24; exp Gretio]. Output: Kotlin-shaped signature sidecar (`fun ?(p0: T, /*removed*/, p2: T = …)`). |
 | `compose/fn-name/sourceinfo` | **S** | a `sourceInformation(C, s)` or `sourceInformationMarkerStart(C, K, s)` call is the **first** such call after the method's entry group, `s` parses as function-info, has `(Name)`, and **for markers `K` equals the method's own entry key** | compiler-emitted exact simple name ([src] `CFBT` 4866–4875). Later `CC(Name)` strings in the body belong to **inlined inline composables** (kotlinc inlining). They must not name the method, but they label regions (`compose/inline-region`). |
 | `compose/fn-name/trace` | **S** (simple name) | `traceEventStart(K, …, s)` with `K` == the method's entry-group key, and `s` parses uniquely (see `compose/trace-parse`) | `kotlinFqName` last segment ([src] `CFBT` 2107–2138). For lambdas the last segment is `<anonymous>`, which gives no name but does give the **enclosing function's fq name**. |
 | `compose/trace-parse` | N→S | trace string present | Regex `^(.+) \((.+):(-?\d+)\)$` is ambiguous when the file name or a backticked function name contains `" ("`. **Enumerate** every split at each `" ("` occurrence whose suffix matches `(.+):(\d+)\)$`, ordered by split position. The set is exhaustive because the true split is one of those occurrences. **Filter**: file ∈ {sourceInfo file, SourceFile attr}, or the `KEY_fn` hash check. One survivor → S. Otherwise D: use the rightmost split and annotate. |
@@ -399,16 +471,28 @@ Classification is by role, so it does not care about R8 argument reordering. It 
 | `compose/source-file` | **S** per method; class-level only if all methods hosted by the class agree **and** the class is not an R8 merge/host target | file from `…:File.kt#h` or `(File.kt:L)` | compiler-emitted `file.name`. The class-level SourceFile attr is D because R8 moves statics across classes ([exp]: MainKt methods hosted by `ComposableSingletons$EntryKt`). |
 | `compose/source-line` | **S** for the function's body-start line (`L+1`); **S** for call-site lines listed in sourceInformation, D for mapping them to instructions | trace or sourceInfo | lines are 0-based ([src] `getLineNumber`; [exp]). Assigning the *k*-th location to the *k*-th composable call is D, because R8 reorders code. |
 | `compose/package` | **S** when `fqname-split` resolves, or when a candidate package's hash equals `#pkgHash` and the candidate comes from an exhaustive set | — | `pkgHash` = 31-fold of the package string, abs, base36 ([src] `CFBT` 5008–5020; [exp] `com.example.app`→`bw24ds`). The hash alone is never inverted. |
-| `compose/key-confirm` | **S** when used as a filter on an exhaustive finite candidate set with exactly one survivor. Otherwise it is only a consistency check: it can **refute** (demote S→D on mismatch). | all components of the durable key string are candidate-known (name, simple type names of params and return, receiver, class chain, package, file basename) | `KEY_fn = hash("fun-…/…/pkg-…/file-…")` (§1.5, reproduced exactly [exp]). A mismatch **proves** some component is wrong. A match on the only enumerated candidate proves it (the true string is in the set and hashes to `K`). |
-| `compose/default-args` | **S** "param *i* had a default value" when a `$default` bit-*i* test exists; **D** for the default expression (R8 may have optimized it); absence proves nothing | roles identified | the prologue exists only for params with defaults ([src] `CFBT` 1356–1410). Record `(param i → default expr region)` in the report, and in the Kotlin-signature sidecar as `= <expr>`. |
-| `compose/restart-lambda` | **S** (role) / D (name) | a synthetic lambda class whose invoke is the pass-through self-call (§1.2) | label it "restart scope of F". The K2 original body name is `F$lambda$N`, where N is the per-function lambda index, so it is D (index order is not provable after R8). |
-| `compose/singletons` | D; the **field name `lambda$K` is S** when compiler ≥2.1.20 is established (see §5) | `<clinit>` builds `ComposableLambdaImpl(K,false,…)` into a static field | the class name is `ComposableSingletons$<FileKt>` (S if the file name and package are S and every lambda in the class traces to that file); names from [src] `CLM` 317–345, 835. |
+| `compose/key-confirm` | **S** when used as a filter on an exhaustive finite candidate set with exactly one survivor. Otherwise it is only a consistency check: it can **refute** (demote S→D on mismatch). | all components of the durable key string are candidate-known (name, simple type names of params and return, receiver, class chain, package, file basename) | Applies only where a key survives: restartable and virtual composables (§2). `KEY_fn = hash("fun-…/…/pkg-…/file-…")` (§1.5, reproduced exactly [exp]). Mind the K1/K2 variant for composable-lambda params (§1.5). A mismatch **proves** some component is wrong. A match on the only enumerated candidate proves it (the true string is in the set and hashes to `K`). |
+| `compose/default-args` | **S** "param *i* had a default value" when a `$default` bit-*i* test exists; **D** for the default expression (R8 may have optimized it); absence proves nothing | roles identified (bound to a param via `param-slot`'s default binding). Recall is low on real code: R8 removed `$default` in 61% of library composables that had one (library recall 47/120); Gretio: 93 methods [exp Gretio] | the prologue exists only for params with defaults ([src] `CFBT` 1356–1410). Record `(param i → default expr region)` in the report, and in the Kotlin-signature sidecar as `= <expr>`. |
+| `compose/restart-lambda` | **S** (role) / D (name) | a synthetic lambda class, or one switch case of an R8-merged lambda class, whose invoke is the pass-through self-call with `updateChangedFlags` args (§1.2) | label it "restart scope of F"; it is also the proof for R-roles. The K2 original body name is `F$lambda$N`, where N is the per-function lambda index, so it is D (index order is not provable after R8). On 9.4 the case may stay in an unspecialized switch when `r8/split-merged-class` misses dispatch through a copy of `this` (148/552 on Gretio before that fix). |
+| `compose/singletons` | **Field names only.** `lambda$K` is S when compiler ≥2.1.20 is established (see §5.7), else D | `<clinit>` builds `ComposableLambdaImpl(K,false,…)` into a static field | Gretio: 152 fields [exp Gretio]. The class name `ComposableSingletons$<FileKt>` is recoverable only in unminified / 8.10-style output where the class is a pure holder; on R8 9.4 the fields live in mixed host classes (55 hosts, 1 pure), so the class part is dead. Names from [src] `CLM` 317–345, 835. |
 | `compose/lambda-name` | S (enclosing fq name only) | trace string of a lambda | `Outer.fn.<anonymous>` names the enclosing function. |
 | `compose/inline-region` | S (region identity), D (bounds) | `sourceInformationMarkerStart(C, K, "CC(Name)…:File#h")` … `End` inside a body | an evidence source for kotlinc `inline`-function un-inlining (a `kotlinc/` concern): exact callee simple name, file, package hash. Only present when source info survived. |
-| `compose/lib-key` | D hint; S only with key match **and** synthetic-shape match **and** body-hash match against a versioned library DB | library composables in the app (material3, foundation, ui…) | build a DB `KEY_fn → (owner, name, desc)` by scanning `startRestartGroup`/marker constants in library AARs (no hashing needed). One app-vs-DB accidental collision is ~`N_app·N_db/2³²` (~1% per app at 10³×5·10⁴), so a bare key match is not proof. |
+| `compose/lib-key` | D hint (conditions 1–4); **S for the method name** with corroboration (5) | library **restartable** composables in the app (material3, foundation, ui…). Conditions: (1) C found structurally; (2) `K` is the const argument of the method's **first `C.x(I)C` call** (not "first int const": failed 2/194 on Gretio where R8 hoisted a small const); (3) `abs(K) ≥ 2²⁰` and `K` has DB role *entry-restartable* with exactly one normalized function `F`; (4) **order-free** shape check: `\|params(M)\| ≤ arity(F) + [this] + 1 + nch + ndef`, ≥1 int param, reference-type params a sub-multiset of `F`'s (never positions: R8 reorders, 10/192 failed a positional test); (5) a second key of `F` (inner RPG/MG/LAM key, or its content lambda's key) occurs in `M` or a lambda class `M` instantiates | DB `K → (owner, name, desc, role, first/last version)` from the last patch of every minor (compose 1.5–1.12, material3 1.1–1.4: ~7k survivable keys, 1,241 distinct restartable entry keys, 0 genuine collisions), with K1 and K2 variants (§1.5). Expected false positives with 1–4: ~2·10⁻⁴ per app (574 entry-position consts × 1,241 keys / 2³²), ~10⁻³ at a 50k-key DB. The earlier "~1%" was the any-constant × any-key rate (0.011), not the entry-position rate. Recovers name, owner and Kotlin signature for the report/sidecar; **never rename the host class** after `F`'s owner (R8 re-homes composables). Version: per artifact, argmax over minors of the recall of identified functions' inner/lambda key sets (resolves the minor; patches are key-identical) [exp 9.4.24; exp Gretio]. Gretio: 194 entry keys → 167 functions with a 10-artifact multi-version DB; 201/552 with a 25-AAR single-version DB (different DB scopes). Non-restartable library composables have no key (§2). |
 | `compose/stable-field` | S (name `$stable`) where the field exists (non-minified or kept) | `public static final int` written only in `<clinit>` with `0`, `8`, or ORs of other such fields | value → stability annotation in the report (`0` stable, `8` unstable). |
 | `compose/live-literals` | S | `liveLiteral("<Type>$<path>", v)` strings or `@LiveLiteralInfo`/`@LiveLiteralFileInfo` present | durable paths (§1.5 grammar) name functions, callees, arg indices and the file path. Rare in release builds. |
-| `compose/group-offset` | N (reported only) | `KEY_fn` known **and** the function's source length `L` known (from sourceInfo offsets) | for an inner key `k` and each discriminator `c∈{none,2,3}`: `H=(k−c)·31⁻¹ mod 2³²`, `d=H−961·KEY_fn mod 2³²`; candidates `{(a,d−31a) : 0≤a≤d−31a≤L}`, ordered by `a`. Exhaustive by construction. [exp] gave 1–4 candidates per group with `L`=232. If `L` is unknown the set is unbounded, so the rule is identity. Low value. |
+| `compose/group-offset` | N (reported only; not needed for libraries, whose inner keys the DB holds verbatim) | `KEY_fn` known **and** the function's source length `L` known (from sourceInfo offsets) | for an inner key `k` and each discriminator `c∈{none,2,3}`: `H=(k−c)·31⁻¹ mod 2³²`, `d=H−961·KEY_fn mod 2³²`; candidates `{(a,d−31a) : 0≤a≤d−31a≤L}`, ordered by `a`. Exhaustive by construction. [exp] gave 1–4 candidates per group with `L`=232. If `L` is unknown the set is unbounded, so the rule is identity. Low value. |
+
+**Priorities (value per effort on R8 9.4 apps, compose-app §3; matches PLAN-compose-sigdb M1/M2/M4).** (1) `compose/detect`
+plus naming the runtime API by call shape (startRestartGroup, endRestartGroup, shouldExecute/getSkipping, skipToGroupEnd,
+replace/movable groups, rememberedValue/updateRememberedValue, changed*, updateChangedFlags, the updateScope field,
+ComposableLambdaImpl, Composer.Empty); (2) `restart-lambda` + `synthetic-param-names`; (3) `composable-marker`;
+(4) `param-slot` + `default-args` + `original-arity-bound`; (5) `lib-key`; (6) the `r8/split-merged-class` copied-`this`
+fix; (7) `singletons` field names. **Zero yield on Gretio** (no strings survive), kept for D8/debug/tracer builds only:
+`fn-name/*`, `trace-parse`, `fqname-split`, `param-names`, `param-order`, `source-file`, `source-line`, `package`,
+`inline-region`, `lambda-name`, `stable-field`, `live-literals`, `group-offset`, and `key-confirm` for app functions (no
+candidate set). App composable **names** are unrecoverable on such apps; keys only verify candidates. No code
+simplification is both behaviour-preserving and useful (re-inserting removed params is impossible; restoring canonical
+param order would affect 26/552 methods).
 
 **Output placement.** S names go into the output mapping as clean names. Parameter names go into debug info. The
 Kotlin-level signature, defaults, stability, lines and inline regions go into the report and the Kotlin-signature
@@ -420,10 +504,10 @@ sidecar. Nothing changes executable semantics.
 
 | Evidence | Carries | Survives R8? | Class |
 |---|---|---|---|
-| `sourceInformation(c,"C(Greeting)N(name,times,enabled)10@256L30:Main.kt#bw24ds")` | fn simple name, param names (≥2.3.0) or order (`P`), inline-class param type FQNs, file basename, package hash, call-site lines/offsets | **No** (assumenosideeffects) — only in D8/no-consumer-rules builds | S |
+| `sourceInformation(c,"C(Greeting)N(name,times,enabled)10@256L30:Main.kt#bw24ds")` | fn simple name, param names (≥2.2.2x, §1.6) or order (`P`), inline-class param type FQNs, file basename, package hash, call-site lines/offsets | **No** (assumenosideeffects) — only in D8/no-consumer-rules builds | S |
 | `sourceInformationMarkerStart(c, K, "CC(Column)…:Column.kt#<h>")` | inlined inline-composable name + file + package hash | No | S (region) |
 | `traceEventStart(K, d1, d2, "com.example.app.Screens.Member (Main.kt:69)")` | full Kotlin fq name (package + class chain + fn), file basename, 0-based body line; lambdas: enclosing fq name | **Yes if a tracer is ever set** (runtime-tracing, perfetto integrations) or `-dontoptimize` [exp] | S (split ambiguity §5.2) |
-| `KEY_fn` const | hash commits to simple name, param/return simple type names, receiver, class chain, package, file | **Yes** [exp] | verification only |
+| `KEY_fn` const | hash commits to simple name, *original* param/return simple type names (all 12 for `Many` although 2 survive), receiver, class chain, package, file | **Yes** for restartable and virtual composables [exp; exp 9.4.24]; **no** for other non-restartables | verification only; library names via `compose/lib-key` |
 | `KEY` of lambdas | hash commits to the enclosing fn, callee simple name, arg index, sibling index | Yes | verification only |
 | `#pkgHash` in sourceInfo | package | with sourceInfo | verification only |
 | `ComposableSingletons$<FileKt>` class name, `lambda$<K>` / `lambda-<i>` field names, `getLambda$K$<module>` getter | file facade short name, lambda key, **Gradle module name** | No (renamed) unless kept | S (when unminified) |
@@ -436,39 +520,58 @@ sidecar. Nothing changes executable semantics.
 ## 5. Ambiguity analysis
 
 1. **R8 changes composable signatures** (param removal, constant propagation, reordering, Composer→ComposerImpl merge).
-   [exp] Positional stripping is unsafe. *Resolution:* use dataflow roles (§3 R-roles), which are invariant to reordering.
-   Arity is S only via `N()`, and otherwise D with `compose/original-arity-bound`. The formula check alone is **not** proof:
-   removing one param from an 11-param function (c=2→n=10 gives c=1) can accidentally satisfy `d∈{0,1}`.
+   [exp] Positional stripping is unsafe (26/552 reordered on Gretio). R8 also removes synthetic ints (`$default` 61%,
+   `$changedK` 5.5%) [exp Gretio]. *Resolution:* roles proven by the restart lambda (§3 R-roles), which are invariant to
+   reordering and removal. Arity is S only via `N()`, and otherwise a D lower bound (`compose/original-arity-bound`); R8
+   arity is only an **upper** bound for DB shape checks. The formula check alone is **not** proof in either direction:
+   removing one param from an 11-param function (c=2→n=10 gives c=1) can accidentally satisfy `d∈{0,1}`, and removed
+   synthetic ints make correct methods fail it.
 2. **fq-name split** (package vs class vs nesting) in trace strings. There are `k+1` candidates. Filters: package hash,
    `KEY_fn`, Kotlin metadata. The Kotlin naming convention (lowercase packages) is **not** proof and is never used.
 3. **Extension receiver vs first regular param.** They are indistinguishable in the JVM descriptor and both count toward `c`.
    Candidates are {receiver, not receiver}, plus context params for Kotlin ≥2.2 (0..m leading params may be
    context/extension). *Filters:* `N()`/`P()` length (receivers excluded), `KEY_fn` (`Recv.name(...)` prefix),
-   `$default` count when `ceil(n/31)` differs, and the `$$this` path segment in lambda keys. Fallback D: treat all as
-   regular params.
+   `$default` count when `ceil(n/31)` differs, the `$$this` path segment in lambda keys, and — the one that survives R8 —
+   **`slot − bit`** for any param bound by both a slot mask and a `$default` bit (receivers have slots but no default bit;
+   `compose/param-slot`). The dispatch receiver is not a candidate here: it takes the last slot (§1.1). Fallback D: treat
+   all as regular params.
 4. **Trace-string parsing** with `" ("` in file names or backticked function names. Enumerated in `compose/trace-parse`.
 5. **Which `sourceInformation` string belongs to the method.** Kotlin inlining of library inline composables, and R8
    inlining of non-restartable composables (seen [exp]), put foreign `C(...)`/`CC(...)` strings and foreign
    `startReplaceGroup(KEY_fn')` groups into a body. *Resolution:* bind only the string attached to the method's **entry**
-   group, and require the trace/marker key to equal the entry key. R8-inlined **restartable** composables did not happen in the
-   experiment, but if one did, its `startRestartGroup(K')` would appear mid-body and would itself be proof of inlining at that
-   point (an `r8/` un-inline hint).
+   group, and require the trace/marker key to equal the entry key. R8-inlined **restartable** composables were never observed
+   (0/96 in the probe app, 0/552 on Gretio [exp 9.4.24; exp Gretio]); the restart lambda's self-call keeps a second call site.
+   If one did occur, its `startRestartGroup(K')` would appear mid-body and would itself be proof of inlining at that point
+   (an `r8/` un-inline hint; with a DB, an *entry-restartable* key found mid-body reads "inlined F here"). Inline-copied
+   library keys that survive (pre-1.7 RPLG keys, LAM keys such as `LazyDsl.items`' content lambda) likewise mark inline call
+   sites in app code (D hint).
 6. **Host class ≠ original class.** R8 moves static composables to unrelated classes and merges `Composer` into
    `ComposerImpl`. Names from trace strings name the *method*. Class names derived from them are D unless §3
    `compose/source-file` class-level conditions hold. Re-homing methods into a reconstructed `FileKt` class is a structural
-   D transform (Relocation), and it belongs in the naming phase.
+   D transform (Relocation), and it belongs in the naming phase. `lib-key` names the method, never its host class.
 7. **Compiler era** (`lambda-<i>` vs `lambda$K`, `P` vs `N`, `startReplaceableGroup` vs `startReplaceGroup`). A single
    dex can mix eras across libraries. Era is decided **per method** from positive shape evidence only: a
-   `shouldExecute` call means ≥2.1.0; an `N(` string means ≥2.3.0; `rememberComposableLambda` means runtime ≥1.7.
+   `shouldExecute` call means ≥2.1.0 (≥2.2 by default; a `getSkipping` call with the same shape means the flag was off,
+   typical of 2.1.x) [src; exp eras]; an `N(` string means ≥2.2.2x (§1.6); `rememberComposableLambda` means runtime ≥1.7;
+   non-virtual non-restartables wrapped in `startReplaceGroup(KEY_fn)` mean OptimizeNonSkippingGroups off (≤2.1.x
+   default). Composable-lambda bodies as anonymous `Lambda` subclasses (2.1.x) vs indy `lambda__K$lambda$0` (≥2.2) are an
+   era marker before R8; whether it survives R8 class merging is unverified. Since `shouldExecute` alone does not prove
+   ≥2.1.20, `lambda$K` field names on R8 9.4 apps like Gretio stay D unless ≥2.2 is otherwise established.
    Where the era is undetermined, singleton field names are N with candidates `{lambda$K} ∪ {lambda-<i> : i∈[0, #fields]}`. The
-   fallback is D (`lambda_<hash>`).
+   fallback is D (`lambda_<hash>`). The K1/K2 frontend changes keys of functions with composable-lambda params (§1.5); a
+   lib-key DB carries both variants.
 8. **Hash evidence.** 32-bit hashes (`KEY_fn`, `pkgHash`) never *invert*. They only filter an exhaustive candidate set or refute.
-   A match on a non-exhaustive guess (a SigDB hint, a name "that looks right") stays D, but is marked hash-confirmed. Cross-app
-   collisions against large DBs are realistic (~1%), see `compose/lib-key`.
+   A match on a non-exhaustive guess (a SigDB hint, a name "that looks right") stays D, but is marked hash-confirmed.
+   Accidental matches: any large app constant against any DB key ≈ 0.011 per app (6,520 × 7,060 / 2³²); an entry-position
+   constant against restartable entry keys ≈ 2·10⁻⁴ [exp Gretio]. Exclude `abs(K) < 2²⁰` (2 of 7,399 DB keys). See
+   `compose/lib-key`.
 9. **Anonymous lambda params** (`_`) are missing from `N()` ([src]), so `|N| < arity` for lambdas is expected.
    Compare `|N|` with the lambda's real arity (FunctionN − 2) before using it for arity.
 10. **Line numbers are 0-based** in both trace and sourceInfo, and the trace line is the *body* start (`{`), not the
-    `fun` keyword ([src] FIXME at `CFBT` 2114–2117). Off-by-one bugs here would silently break S.
+    `fun` keyword ([src] FIXME at `CFBT` 2114–2117). Off-by-one bugs here would silently break S. Generated
+    `$default` wrappers carry line `-1` [exp 9.4.24].
+11. **`x & 1`: `$changed` force bit or `$default` bit 0.** Same instruction. Decide by the restart-lambda role
+    (`updateChangedFlags` vs pass-through), or by use (feeds `shouldExecute`/`$dirty` vs selects a value) [exp Gretio].
 
 All filters use strings and int constants only, and ordering is by candidate string or split position. So every rule is
 α-invariant (DESIGN §0.3).
@@ -480,6 +583,18 @@ All filters use strings and int constants only, and ordering is by candidate str
 Each fixture is built at least twice: once plain D8 (the oracle for strings/names) and once R8 with runtime consumer rules
 (and a third time with `Composer.setTracer` reachable where trace strings matter). Compile with Kotlin 2.3.x, and where it matters also
 2.0.x/2.1.0 (pre-`lambda$K`, pre-`N()`) and androidx 1.5.14 (K1).
+
+**Status (2026-09-25).**
+- `compose_basic`, `compose_basic_r94` exist (kotlinc 2.4.20, runtime 1.10.6, R8 8.10.9 / 9.4.24). They are built
+  **without** `sourceInformation=true` (the kotlinc CLI default), so their D8 twin has only trace strings; they cannot
+  grade the sourceInfo rules.
+- **`compose_shapes` exists** (R8 9.4.24, `sourceInformation=true`, `main` drives a real Composition for the ART harness)
+  and covers **F1, F2, F4, F7, F9, F11, F12, F14, F19, F21**. Its D8 twin has `C(Name)N(...)` for every composable and is the
+  ground truth for roles/param names.
+- F22 (`era-mix`) was done out of tree only (compiler-eras.md: 2.1.21–2.4.20; 2.0.21 did not run on JDK 26).
+- **Planned `compose_lib`** (PLAN M0): material3/foundation composables at pinned versions with a main, the oracle for
+  `compose/lib-key` and version voting; it replaces F8 for library inline composables. Also add a restartable composable with an
+  extension receiver + defaults (F5) to test `slot − bit`.
 
 | id | program | isolates |
 |---|---|---|
@@ -526,4 +641,8 @@ updateChangedFlags(f) = (f & ~0x36DB6DB6) | (lo | (hi >> 1)) | ((lo << 1) & hi),
 - Whether AGP's own Compose configuration overrides `includeSourceInformation` for release variants
   (`isDisableIncludeSourceInformationForAgp`). [src shows the switch exists, but not its trigger]
 - Whether `runtime-tracing`'s startup initializer is the usual reason trace strings survive in production apps. [inf]
-- R8 behaviour when inlining a *restartable* composable (not seen at the sample's size).
+- R8 behaviour when inlining a *restartable* composable: not seen in 0/96 probe and 0/552 Gretio restartables (§5.5);
+  still possible for a single-call-site function whose restart lambda R8 folds away.
+- First Kotlin version emitting `N(...)` (between 2.1.21 and 2.2.21; §1.6).
+- Whether the slot order "dispatch `this` last" (§1.1) matches `CFBT` source; it is so far [exp] only.
+- Whether era markers (anonymous vs indy composable-lambda bodies) survive R8 class merging (§5.7).
