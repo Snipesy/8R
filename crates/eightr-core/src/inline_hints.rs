@@ -154,11 +154,18 @@ pub fn collect(p: &Model) -> (Vec<InlineHint>, InliningSummary) {
 /// nullChecks = 1, ...)`), so decompilers show them. Build visibility: never loaded at runtime.
 pub const ANNOTATION: &str = "Leightr/Inlined;";
 
-/// Removes 8R's own hint annotations (re-running 8R on its output must not see them).
+/// Removes 8R's own build annotations (hints, Compose records): re-running 8R on its output must
+/// not see them.
 pub fn strip(p: &mut Model) {
-    let Some(ty) = p.syms.lookup(ANNOTATION) else { return };
+    let ours: Vec<_> = [ANNOTATION, crate::passes::compose_params::COMPOSABLE, crate::passes::compose_params::RESTART_SCOPE]
+        .iter()
+        .filter_map(|t| p.syms.lookup(t))
+        .collect();
+    if ours.is_empty() {
+        return;
+    }
     for m in p.classes.iter_mut().flat_map(|c| c.methods.iter_mut()) {
-        m.annotations.retain(|a| a.annotation.ty != ty);
+        m.annotations.retain(|a| !ours.contains(&a.annotation.ty));
     }
 }
 

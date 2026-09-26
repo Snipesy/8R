@@ -161,8 +161,17 @@ fn solved_names_match_held_back_mapping() {
                         .members
                         .iter()
                         .filter_map(|mm| match &mm.kind {
+                            // The mapping gives the original type, or the residual one in a
+                            // residualsignature entry.
                             MemberKind::Field(m)
-                                if m.obfuscated == f_name && java_to_descriptor(&m.ty) == original_desc(f_ty, &mapping, &by_obf) =>
+                                if m.obfuscated == f_name
+                                    && match mm.metadata.iter().find_map(|x| match &x.parsed {
+                                        Metadata::ResidualSignature(s) => Some(s.clone()),
+                                        _ => None,
+                                    }) {
+                                        Some(r) => r == f_ty,
+                                        None => java_to_descriptor(&m.ty) == original_desc(f_ty, &mapping, &by_obf),
+                                    } =>
                             {
                                 Some((m, &mm.metadata))
                             }

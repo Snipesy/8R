@@ -5,7 +5,7 @@
 //! The plugin emits exactly these calls in these shapes, so a member playing the role in (almost)
 //! every composable is that member.
 
-use eightr_rules::{Attribute, Source, COMPOSE_RUNTIME_API};
+use eightr_rules::{Attribute, Source, COMPOSE_RUNTIME_API, COMPOSE_SINGLETONS};
 
 use super::{Context, Pass};
 use crate::error::Result;
@@ -49,6 +49,13 @@ impl Pass for ComposeApi {
         }
         for (item, name) in labels {
             cx.labels.record_value(item, Attribute::MemberName, COMPOSE_RUNTIME_API, None, Some(name.to_string()))?;
+        }
+        // ComposableSingletons fields, when the compiler era names them lambda$K.
+        if roles.composer.iter().any(|r| r.name == "shouldExecute") {
+            for (class, index, key) in crate::compose::singletons(&p.model, &c) {
+                let item = ItemId::Field { class: ClassId(class as u32), index: index as u32 };
+                cx.labels.record_value(item, Attribute::MemberName, COMPOSE_SINGLETONS, None, Some(format!("lambda${key}")))?;
+            }
         }
         Ok(())
     }

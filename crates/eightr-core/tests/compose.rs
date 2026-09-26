@@ -76,6 +76,124 @@ fn composer_and_restartable_composables_match_ground_truth() {
         assert_eq!(era.len(), 1, "{name}: D8 skip check {era:?}");
         assert!(named.contains(era[0]), "{name}: {} not found in the R8 build ({named:?})", era[0]);
         assert!(roles.update_changed_flags.is_some(), "{name}: updateChangedFlags not found in the R8 build");
+
+        // ComposableSingletons: the D8 build's lambda$K fields (its lambda class is on the
+        // classpath only, so they're read by name) are all found in the R8 build.
+        let r8_keys: std::collections::BTreeSet<i32> = eightr_core::compose::singletons(&om, &found).iter().map(|x| x.2).collect();
+        let d8_keys: std::collections::BTreeSet<i32> = gm
+            .classes
+            .iter()
+            .flat_map(|c| &c.fields)
+            .filter_map(|f| gm.syms.get(f.name).strip_prefix("lambda$").and_then(|k| k.parse().ok()))
+            .collect();
+        // Recall on the app's fields (precision is graded against the mapping, library fields included).
+        assert!(d8_keys.is_subset(&r8_keys) && !r8_keys.is_empty(), "{name}: R8 singletons {r8_keys:?} vs D8 {d8_keys:?}");
     }
     assert!(compose_fixtures >= 3, "only {compose_fixtures} Compose fixtures");
+}
+
+/// Parameter roles and bindings (crates/eightr-core/src/composables.rs) against the D8 twins'
+/// debug-info parameter names (exact truth: nothing removed or reordered), and the R8 builds
+/// against the D8 twin with the same entry key (counts, bounds, and types at bound positions).
+#[test]
+fn composable_parameter_roles_match_ground_truth() {
+    let mut names: Vec<String> = fs::read_dir(root()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    let (mut d8_changed, mut d8_changed_found, mut d8_defaults, mut d8_defaults_found) = (0, 0, 0, 0);
+    let (mut slot_checked, mut bit_checked, mut r8_checked, mut r8_slot_types, mut r8_bit_types) = (0, 0, 0, 0, 0);
+    for name in names {
+        let (r8, d8) = (root().join(&name).join("r8/classes.dex"), root().join(&name).join("d8/classes.dex"));
+        if !r8.exists() || !d8.exists() {
+            continue;
+        }
+        let (om, gm) = (load(&r8), load(&d8));
+        let Some(gc) = eightr_core::compose::find(&gm) else { continue };
+        let groles = eightr_core::compose::roles(&gm, &gc);
+        let truth = eightr_core::composables::composables(&gm, &gc, &groles);
+        // D8: key → (param types, param names, static).
+        let mut by_key: std::collections::BTreeMap<i32, (Vec<String>, Vec<String>, bool)> = std::collections::BTreeMap::new();
+        for c in &truth {
+            let m = &gm.classes[c.class].methods[c.method];
+            let b = m.code.as_ref().unwrap();
+            let (types, _) = eightr_ir::types::parse_proto(gm.syms.get(m.proto)).unwrap();
+            let mut pn: Vec<String> = (0..types.len()).map(|j| b.parameter_names.get(j).copied().flatten().map_or(String::new(), |n| gm.syms.get(n).to_string())).collect();
+            // kotlinc leaves `$default` unnamed: the unnamed ints after the `$changed` ints.
+            if let Some(last) = pn.iter().rposition(|n| n.starts_with("$changed")) {
+                for j in last + 1..pn.len() {
+                    if pn[j].is_empty() && types[j] == "I" {
+                        pn[j] = "$default".into();
+                    }
+                }
+            }
+            let ctx = format!("{name} D8 {}", c.signature);
+            assert_eq!(c.composer.map(|j| pn[j].as_str()), Some("$composer"), "{ctx}: {pn:?}");
+            for &j in &c.changed {
+                assert!(pn[j].starts_with("$changed"), "{ctx}: $changed claimed for {} ({pn:?})", pn[j]);
+            }
+            for &j in &c.defaults {
+                assert!(pn[j].starts_with("$default"), "{ctx}: $default claimed for {} ({pn:?})", pn[j]);
+            }
+            if !c.restart.is_empty() {
+                d8_changed += pn.iter().filter(|n| n.starts_with("$changed")).count();
+                d8_changed_found += c.changed.len();
+            }
+            d8_defaults += pn.iter().filter(|n| n.starts_with("$default")).count();
+            d8_defaults_found += c.defaults.len();
+            // Real params come before $composer; slot j (the dispatch receiver takes the last).
+            let composer = c.composer.unwrap();
+            let changed_ints: Vec<usize> = (0..pn.len()).filter(|&j| pn[j].starts_with("$changed")).collect();
+            for &(j, q, s) in &c.slots {
+                assert!(j < composer, "{ctx}: slot binding on synthetic param {j}");
+                assert_eq!((s as usize, Some(q)), (j % 10, changed_ints.get(j / 10).copied()), "{ctx}: slot binding of param {j} ({pn:?})");
+                slot_checked += 1;
+            }
+            let receivers = pn.iter().take_while(|n| n.starts_with("$this") || n.starts_with("$context")).count();
+            for &(j, i) in &c.default_bits {
+                assert_eq!(i as usize + receivers, j, "{ctx}: default bit of param {j} ({pn:?})");
+                bit_checked += 1;
+            }
+            let slots = composer as u32 + u32::from(!m.is_static());
+            assert!(c.slots_at_least <= slots, "{ctx}: slot bound {} > {slots}", c.slots_at_least);
+            assert_eq!(c.removed_at_least, 0, "{ctx}: nothing is removed in D8");
+            by_key.insert(c.key, (types.iter().map(|t| t.to_string()).collect(), pn, m.is_static()));
+        }
+
+        let oc = eightr_core::compose::find(&om).unwrap();
+        let oroles = eightr_core::compose::roles(&om, &oc);
+        for c in eightr_core::composables::composables(&om, &oc, &oroles) {
+            let Some((gtypes, pn, gstatic)) = by_key.get(&c.key) else { continue };
+            let ctx = format!("{name} R8 {} (key {})", c.signature, c.key);
+            let m = &om.classes[c.class].methods[c.method];
+            let (types, _) = eightr_ir::types::parse_proto(om.syms.get(m.proto)).unwrap();
+            let count = |p: &str| pn.iter().filter(|n| n.starts_with(p)).count();
+            assert!(c.composer.is_some(), "{ctx}: no $composer");
+            assert!(c.changed.len() <= count("$changed"), "{ctx}: {} $changed, D8 has {}", c.changed.len(), count("$changed"));
+            assert!(c.defaults.len() <= count("$default"), "{ctx}: {} $default, D8 has {}", c.defaults.len(), count("$default"));
+            let gcomposer = pn.iter().position(|n| n == "$composer").unwrap();
+            let slots = gcomposer as u32 + u32::from(!gstatic);
+            assert!(c.slots_at_least <= slots, "{ctx}: slot bound {} > original {slots}", c.slots_at_least);
+            let real = types.len() - 1 - c.changed.len() - c.defaults.len();
+            assert!(c.removed_at_least as usize <= slots as usize - real.min(slots as usize), "{ctx}: removed bound");
+            // A primitive stays the same primitive; a reference stays a reference.
+            let kind = |t: &str| if t.starts_with('L') || t.starts_with('[') { "L".to_string() } else { t.to_string() };
+            if count("$changed") == 1 {
+                for &(j, _, s) in &c.slots {
+                    assert_eq!(kind(types[j]), kind(&gtypes[s as usize]), "{ctx}: slot {s} type");
+                    r8_slot_types += 1;
+                }
+            }
+            let receivers = pn.iter().take_while(|n| n.starts_with("$this") || n.starts_with("$context")).count();
+            for &(j, i) in &c.default_bits {
+                assert_eq!(kind(types[j]), kind(&gtypes[i as usize + receivers]), "{ctx}: default bit {i} type");
+                r8_bit_types += 1;
+            }
+            r8_checked += 1;
+        }
+    }
+    eprintln!(
+        "D8: $changed {d8_changed_found}/{d8_changed}, $default {d8_defaults_found}/{d8_defaults}, slot bindings {slot_checked}, default bindings {bit_checked}; R8: {r8_checked} composables, {r8_slot_types} slot / {r8_bit_types} default types"
+    );
+    assert_eq!(d8_changed_found, d8_changed, "D8 $changed recall");
+    assert!(d8_defaults_found * 10 >= d8_defaults * 8, "D8 $default recall {d8_defaults_found}/{d8_defaults}");
+    assert!(slot_checked >= 20 && bit_checked >= 5 && r8_checked >= 20, "too few checks");
 }

@@ -88,6 +88,35 @@ fn inverse(r: &Renaming, before: &Model) -> Renaming {
     inv
 }
 
+/// Drops parameter names `after` has and `before` lacks (same class, name, proto).
+fn forget_added_param_names(before: &Model, after: &mut Model) {
+    let key = |m: &Model, c: usize, k: usize| {
+        let x = &m.classes[c].methods[k];
+        (m.syms.get(m.classes[c].ty).to_string(), m.syms.get(x.name).to_string(), m.syms.get(x.proto).to_string())
+    };
+    let mut names = std::collections::BTreeMap::new();
+    for c in 0..before.classes.len() {
+        for k in 0..before.classes[c].methods.len() {
+            if let Some(b) = &before.classes[c].methods[k].code {
+                names.insert(key(before, c, k), b.parameter_names.clone());
+            }
+        }
+    }
+    for c in 0..after.classes.len() {
+        for k in 0..after.classes[c].methods.len() {
+            let Some(orig) = names.get(&key(after, c, k)) else { continue };
+            let Some(b) = after.classes[c].methods[k].code.as_mut() else { continue };
+            let n = orig.len();
+            for (j, name) in b.parameter_names.iter_mut().enumerate() {
+                if orig.get(j).copied().flatten().is_none() {
+                    *name = None;
+                }
+            }
+            b.parameter_names.truncate(n);
+        }
+    }
+}
+
 #[test]
 fn renaming_is_a_consistent_bijection() {
     for (name, bytes) in fixtures() {
@@ -97,6 +126,8 @@ fn renaming_is_a_consistent_bijection() {
         // 8R's hint annotations are its own metadata, not part of the program.
         eightr_core::inline_hints::strip(&mut after);
         inverse(&outcome.renaming, &before).apply(&mut after);
+        // So are the Compose synthetic parameter names it adds where the input has none.
+        forget_added_param_names(&before, &mut after);
         let (a, b) = (eightr_ir::print::program(&before), eightr_ir::print::program(&after));
         if a != b {
             let first = a.lines().zip(b.lines()).position(|(x, y)| x != y).unwrap_or(0);

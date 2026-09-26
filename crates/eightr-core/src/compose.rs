@@ -381,3 +381,109 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
     out.dedup();
     Roles { composer: out, update_changed_flags }
 }
+
+/// `ComposableSingletons$FileKt` fields (compose.md `compose/singletons`): static fields a
+/// `<clinit>` sets to `new ComposableLambdaImpl(K, false, block)`, named `lambda$K` by compilers
+/// ≥ 2.1.20. The lambda class is found by behavior: a method taking the composer opens a restart
+/// group keyed by an int field its constructor stores from its first parameter. Returns
+/// (class index, field index, K); a key stored into two fields is dropped.
+pub fn singletons(p: &Model, c: &Composer) -> Vec<(usize, usize, i32)> {
+    let s = &p.syms;
+    let (srg_name, srg_proto) = &c.start_restart_group;
+    // Lambda classes: descriptor → key field name.
+    let mut lambda: BTreeMap<String, String> = BTreeMap::new();
+    for cls in &p.classes {
+        let ty = s.get(cls.ty);
+        for m in &cls.methods {
+            let Some(b) = &m.code else { continue };
+            for (i, x) in b.insns.iter().enumerate() {
+                let Op::Invoke { method, args, .. } = &x.op else { continue };
+                if s.get(method.class) != c.class || s.get(method.name) != srg_name || s.get(method.proto) != srg_proto || args.len() != 2 {
+                    continue;
+                }
+                // The key: the last def of args[1] before the call, straight-line, an own int field.
+                let key_field = b.insns[..i].iter().rev().take_while(|y| !y.op.is_branch()).find_map(|y| match &y.op {
+                    Op::InstanceGet { dst, field, .. } if *dst == args[1] => Some(Some(field)),
+                    op if op.def().is_some_and(|(d, _)| d == args[1]) => Some(None),
+                    _ => None,
+                });
+                if let Some(Some(f)) = key_field {
+                    if s.get(f.class) == ty && s.get(f.ty) == "I" {
+                        lambda.insert(ty.to_string(), s.get(f.name).to_string());
+                    }
+                }
+            }
+        }
+    }
+    // Constructors storing their first (int) parameter into the key field.
+    let mut ctors: BTreeSet<(String, String)> = BTreeSet::new();
+    for cls in &p.classes {
+        let ty = s.get(cls.ty);
+        let Some(key_field) = lambda.get(ty) else { continue };
+        for m in cls.methods.iter().filter(|m| s.get(m.name) == "<init>") {
+            let Some(b) = &m.code else { continue };
+            if !s.get(m.proto).starts_with("(I") {
+                continue;
+            }
+            let first = b.registers - b.ins + 1;
+            // The parameter register is never redefined before the store.
+            let stores = b.insns.iter().take_while(|y| y.op.def().is_none_or(|(d, _)| d != first)).any(|y| {
+                matches!(&y.op, Op::InstancePut { src, field, .. } if *src == first && s.get(field.name) == key_field && s.get(field.class) == ty)
+            });
+            if stores {
+                ctors.insert((ty.to_string(), s.get(m.proto).to_string()));
+            }
+        }
+    }
+    // `<clinit>`: new L; const K; L.<init>(K, ...); sput-object → field.
+    let mut found: BTreeMap<i32, Vec<(usize, usize)>> = BTreeMap::new();
+    for cls in &p.classes {
+        for m in cls.methods.iter().filter(|m| s.get(m.name) == "<clinit>") {
+            let Some(b) = &m.code else { continue };
+            let mut consts: BTreeMap<u16, i32> = BTreeMap::new();
+            let mut made: BTreeMap<u16, i32> = BTreeMap::new();
+            for x in &b.insns {
+                match &x.op {
+                    Op::Invoke { kind: InvokeKind::Direct, method, args } if ctors.contains(&(s.get(method.class).to_string(), s.get(method.proto).to_string())) && s.get(method.name) == "<init>" => {
+                        if let (Some(&obj), Some(k)) = (args.first(), args.get(1).and_then(|r| consts.get(r))) {
+                            made.insert(obj, *k);
+                        }
+                        continue;
+                    }
+                    Op::StaticPut { src, field, .. } => {
+                        if let Some(&k) = made.get(src) {
+                            if let Some(fc) = p.find(s.get(field.class)) {
+                                if let Some(fi) = p.classes[fc].fields.iter().position(|f| f.name == field.name && f.ty == field.ty) {
+                                    found.entry(k).or_default().push((fc, fi));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                if x.op.is_branch() {
+                    consts.clear();
+                    made.clear();
+                }
+                if let Some((d, wide)) = x.op.def() {
+                    consts.remove(&d);
+                    made.remove(&d);
+                    if wide {
+                        consts.remove(&(d + 1));
+                        made.remove(&(d + 1));
+                    }
+                    match &x.op {
+                        Op::Const { dst, value: Const::Narrow(k) } => {
+                            consts.insert(*dst, *k);
+                        }
+                        Op::NewInstance { .. } => {}
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    let mut out: Vec<(usize, usize, i32)> = found.into_iter().filter(|(_, v)| v.len() == 1).map(|(k, v)| (v[0].0, v[0].1, k)).collect();
+    out.sort();
+    out
+}

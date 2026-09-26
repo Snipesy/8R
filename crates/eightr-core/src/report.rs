@@ -27,6 +27,12 @@ pub struct Report {
     /// Every inlining hint, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub inline_hints: Vec<crate::inline_hints::InlineHint>,
+    /// Compose: restartable composables and what their synthetic parameters prove.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compose: Option<crate::composables::ComposeSummary>,
+    /// Every composable's roles and bindings, when `Config::verbose_labels` is set.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub composables: Vec<crate::composables::Composable>,
     /// Every non-identity label, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<LabelEntry>,
