@@ -11,6 +11,7 @@ pub mod passes;
 pub mod pipeline;
 pub mod program;
 pub mod report;
+pub mod rewrites;
 pub mod sources;
 
 pub use error::{Error, Result};

@@ -77,12 +77,13 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     }
     let sources = sources::detect(&dexes, &markers);
     let dex_refs: Vec<&Dex> = dexes.iter().map(|(_, d)| d).collect();
-    let model = eightr_ir::model::Program::load(&dex_refs).map_err(|e| match e {
+    let mut model = eightr_ir::model::Program::load(&dex_refs).map_err(|e| match e {
         eightr_ir::model::LoadError::Dex { input, error } => Error::Dex { input: dexes[input].0.clone(), error },
         eightr_ir::model::LoadError::DuplicateClass { descriptor, inputs } => {
             Error::DuplicateClass { descriptor, inputs: inputs.map(|i| dexes[i].0.clone()) }
         }
     })?;
+    let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
     let mut program = Program { model };
     let name_stats = name_stats(&dexes, &program);
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
@@ -117,7 +118,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     }
     findings.sort();
     findings.dedup();
-    let report = build_report(&program, &labels, summaries, markers, sources, findings, config);
+    let report = build_report(&program, &labels, summaries, markers, sources, findings, rewrites, config);
     Ok(Outcome { program, labels, report, renaming })
 }
 
@@ -191,6 +192,7 @@ fn build_report(
     markers: Vec<Marker>,
     sources: Vec<DetectedSource>,
     findings: Vec<Finding>,
+    rewrites: Vec<crate::rewrites::RewriteRecord>,
     config: &Config,
 ) -> Report {
     use eightr_rules::Class::*;
@@ -207,6 +209,9 @@ fn build_report(
         }
     }
     let mut applications: BTreeMap<&'static str, u64> = BTreeMap::new();
+    for r in &rewrites {
+        *applications.entry(r.rule).or_default() += 1;
+    }
     let mut entries = Vec::new();
     for ((item, attr), label) in labels.iter() {
         for r in &label.rules {
@@ -231,6 +236,7 @@ fn build_report(
         sources,
         findings,
         rules: Report::rule_usage(&applications),
+        rewrites,
         summary,
         labels: entries,
     }

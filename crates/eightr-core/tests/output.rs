@@ -38,7 +38,19 @@ fn load(files: &[Vec<u8>]) -> Model {
 }
 
 fn undo(bytes: &[u8]) -> (eightr_core::Outcome, Output) {
-    let outcome = run(&[DexInput { name: "classes.dex".into(), bytes: bytes.to_vec() }], &Config::default()).unwrap();
+    undo_with(bytes, false)
+}
+
+/// Names-only runs, for invariants that assume the output has the input's class set (the
+/// renaming bijection, override preservation, the mapping file). Structural rewrites are
+/// checked by execution (tests/exec.rs) and by the validity/idempotence/α tests.
+fn undo_names(bytes: &[u8]) -> (eightr_core::Outcome, Output) {
+    undo_with(bytes, true)
+}
+
+fn undo_with(bytes: &[u8], no_rewrites: bool) -> (eightr_core::Outcome, Output) {
+    let outcome =
+        run(&[DexInput { name: "classes.dex".into(), bytes: bytes.to_vec() }], &Config { no_rewrites, ..Default::default() }).unwrap();
     let out = emit(&outcome).unwrap();
     (outcome, out)
 }
@@ -79,7 +91,7 @@ fn inverse(r: &Renaming, before: &Model) -> Renaming {
 #[test]
 fn renaming_is_a_consistent_bijection() {
     for (name, bytes) in fixtures() {
-        let (outcome, out) = undo(&bytes);
+        let (outcome, out) = undo_names(&bytes);
         let before = load(std::slice::from_ref(&bytes));
         let mut after = load(&out_files(&out));
         inverse(&outcome.renaming, &before).apply(&mut after);
@@ -122,7 +134,7 @@ fn overrides(m: &Model) -> BTreeSet<(String, String, String, String)> {
 #[test]
 fn overrides_are_preserved_and_none_created() {
     for (name, bytes) in fixtures() {
-        let (outcome, out) = undo(&bytes);
+        let (outcome, out) = undo_names(&bytes);
         let before = load(std::slice::from_ref(&bytes));
         let after = load(&out_files(&out));
         // Map the "before" override relation through the renaming and compare as sets.
@@ -144,7 +156,7 @@ fn overrides_are_preserved_and_none_created() {
 #[test]
 fn renamed_fields_are_unique_program_wide() {
     for (name, bytes) in fixtures() {
-        let (outcome, _) = undo(&bytes);
+        let (outcome, _) = undo_names(&bytes);
         let mut seen = BTreeSet::new();
         for new in outcome.renaming.fields.values() {
             assert!(seen.insert(new.clone()), "{name}: field name {new} assigned twice");
@@ -155,7 +167,7 @@ fn renamed_fields_are_unique_program_wide() {
 #[test]
 fn mapping_file_describes_the_renaming() {
     for (name, bytes) in fixtures() {
-        let (_, out) = undo(&bytes);
+        let (_, out) = undo_names(&bytes);
         let before = load(std::slice::from_ref(&bytes));
         let after = load(&out_files(&out));
         let m = Mapping::parse(&out.mapping).unwrap_or_else(|e| panic!("{name}: {e}"));
