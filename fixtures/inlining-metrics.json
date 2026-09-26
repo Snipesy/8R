@@ -1,11 +1,11 @@
 {
   "coverage": {
-    "inlined_occurrences": 63057,
+    "inlined_occurrences": 63037,
     "recall": 0.03,
     "touched": 1879
   },
   "discarded-getclass": {
-    "hints": 1536,
+    "hints": 1535,
     "precision": 0.687
   },
   "discarded-getclass@r8-8": {
@@ -15,8 +15,8 @@
     "precision": 0.83
   },
   "discarded-getclass@r8-9": {
-    "base_rate": 0.518,
-    "hints": 1401,
+    "base_rate": 0.517,
+    "hints": 1400,
     "lift": 1.301,
     "precision": 0.673
   },
@@ -58,15 +58,15 @@
     "precision": 0.843
   },
   "idiom:areEqual@r8-9": {
-    "base_rate": 0.518,
+    "base_rate": 0.517,
     "hints": 255,
-    "lift": 1.75,
+    "lift": 1.751,
     "precision": 0.906
   },
   "idiom:collectionSizeOrDefault": {
-    "hints": 15,
+    "hints": 16,
     "occurrences": 18,
-    "precision": 0.4,
+    "precision": 0.375,
     "recall": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-8": {
@@ -76,14 +76,14 @@
     "precision": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-9": {
-    "base_rate": 0.518,
-    "hints": 13,
-    "lift": 0.743,
-    "precision": 0.385
+    "base_rate": 0.517,
+    "hints": 14,
+    "lift": 0.69,
+    "precision": 0.357
   },
   "inlined-instance-call": {
-    "hints": 568,
-    "precision": 0.722
+    "hints": 567,
+    "precision": 0.721
   },
   "inlined-instance-call@r8-8": {
     "base_rate": 0.518,
@@ -92,14 +92,14 @@
     "precision": 0.903
   },
   "inlined-instance-call@r8-9": {
-    "base_rate": 0.518,
-    "hints": 506,
-    "lift": 1.352,
-    "precision": 0.7
+    "base_rate": 0.517,
+    "hints": 505,
+    "lift": 1.351,
+    "precision": 0.699
   },
   "param-null-check": {
-    "hints": 500,
-    "precision": 0.276
+    "hints": 501,
+    "precision": 0.275
   },
   "param-null-check@r8-8": {
     "base_rate": 0.518,
@@ -108,9 +108,9 @@
     "precision": 0.0
   },
   "param-null-check@r8-9": {
-    "base_rate": 0.518,
-    "hints": 499,
+    "base_rate": 0.517,
+    "hints": 500,
     "lift": 0.534,
-    "precision": 0.277
+    "precision": 0.276
   }
 }

@@ -137,8 +137,10 @@ suspend fun flows(repo: Repo): List<String> = coroutineScope {
 fun main() {
     val client = buildClient()
     val repo = Repo(client)
-    val handler = CoroutineExceptionHandler { _, e -> println("handled $e") }
-    val res = runBlocking(handler) { flows(repo) }
+    // Only deterministic results are printed (the channel/merge prefix; timing-dependent flows
+    // like debounce and cross-dispatcher combine still run), so the fixture can be executed.
+    val handler = CoroutineExceptionHandler { _, e -> if (e.message != "boom") println("handled $e") }
+    val res = runBlocking(handler) { flows(repo) }.take(11)
     println(res.joinToString())
     println(collections())
     println(okioStuff())
@@ -146,7 +148,7 @@ fun main() {
     println(req.url.toString() + req.method + repo.formAndMultipart().size)
     if (System.getProperty("net") != null) { println(repo.execute(req)); repo.enqueue(req) }
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    scope.launch(start = CoroutineStart.LAZY) { println(repo.load(1)) }.start()
+    scope.launch(start = CoroutineStart.LAZY) { repo.load(1) }.start()
     scope.cancel()
     println(res.groupBy { it.length }.mapValues { it.value.size }.toSortedMap().entries.joinToString(prefix = "[", postfix = "]"))
     println(listOf(3, 1, 2).sortedDescending().windowed(2).chunked(1).flatten().associateWith { it.sum() })

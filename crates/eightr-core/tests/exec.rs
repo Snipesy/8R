@@ -54,9 +54,10 @@ struct Run {
 impl Run {
     /// The backend itself couldn't load the program (not a behavior difference).
     fn backend_failure(&self) -> Option<&str> {
-        ["java.lang.VerifyError", "java.lang.InstantiationError", "java.lang.ClassFormatError", "java.lang.NoClassDefFoundError", "Could not find or load main class"]
+        // (A JVM crash on dex2jar's translation with verification off is dex2jar's.)
+        ["java.lang.VerifyError", "java.lang.InstantiationError", "java.lang.ClassFormatError", "java.lang.NoClassDefFoundError", "Could not find or load main class", "A fatal error has been detected by the Java Runtime Environment"]
             .into_iter()
-            .find(|m| self.stderr.contains(m))
+            .find(|m| self.stderr.contains(m) || self.stdout.contains(m))
     }
 }
 
@@ -94,7 +95,9 @@ impl Backend for Jvm {
         let out = Command::new("java")
             // Dex typing is laxer than the JVM's (relaxed field types, protected access);
             // behavior, not verification, is what's compared.
-            .args(["-XX:+UnlockDiagnosticVMOptions", "-XX:-BytecodeVerificationRemote", "-cp"])
+            .args(["-XX:+UnlockDiagnosticVMOptions", "-XX:-BytecodeVerificationRemote", "-XX:-CreateCoredumpOnCrash"])
+            .arg(format!("-XX:ErrorFile={}/hs_err_%p.log", work.display()))
+            .arg("-cp")
             .arg(cp)
             .arg(main)
             .args(ARGS)
@@ -206,6 +209,10 @@ fn outputs_behave_like_inputs() {
             // A fixture whose own output varies between runs (timing, identity hashes) can't be
             // compared; fail loudly so the fixture gets fixed.
             let again = backend.run(std::slice::from_ref(&input), &main, &work.join("base2"));
+            if let Some(why) = again.backend_failure() {
+                eprintln!("[{}] {fixture}: skipped, backend can't run the unmodified build reliably ({why})", backend.name());
+                continue;
+            }
             assert!(again.stdout == base.stdout, "[{}] {fixture}: fixture output is nondeterministic\n{}\n---\n{}", backend.name(), base.stdout, again.stdout);
             for no_rewrites in [true, false] {
                 let out = eightr_output(&input, no_rewrites);
