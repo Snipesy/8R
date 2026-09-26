@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::error::{Error, Result};
 
+mod merged;
 mod outlines;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -27,7 +28,7 @@ pub trait Rewrite {
 
 /// All rewrites, in undo order.
 pub fn all() -> Vec<Box<dyn Rewrite>> {
-    let mut v: Vec<Box<dyn Rewrite>> = vec![Box::new(outlines::OutlineInline)];
+    let mut v: Vec<Box<dyn Rewrite>> = vec![Box::new(outlines::OutlineInline), Box::new(merged::SplitMerged)];
     v.sort_by_key(|r| (r.source(), r.name()));
     v
 }

@@ -102,6 +102,7 @@ pub const STRUCTURAL_TIE: &str = "core/structural-tie";
 pub const KEPT_NAME: &str = "r8/kept-name";
 pub const OUTLINE_INLINE: &str = "r8/outline-inline";
 pub const BU_OUTLINE_INLINE: &str = "r8/bu-outline-inline";
+pub const SPLIT_MERGED_CLASS: &str = "r8/split-merged-class";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
@@ -232,6 +233,20 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["r94_outline", "kotlin_serialization", "r94_desugar"],
+    },
+    Rule {
+        id: SPLIT_MERGED_CLASS,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::Body],
+        summary: "Split a class R8's horizontal merger combined (merged siblings, lambda groups) into an abstract base plus one subclass per class id, each overriding the id-dispatching methods with its own arm.",
+        preconditions: &[
+            "A synthetic final byte/short/int instance field written only by the class's constructors, once each, from a constant or a parameter; no constructor delegates to another of the class.",
+            "Every instantiation passes a constant id and pairs one new-instance with one <init>; no program subclass, no const-class, method handle or constant naming the class, no used getClass() on a value typed as it.",
+            "S facts: at least (number of ids) classes were merged, and each override is exactly that id's behavior. The split form (base + subclasses, names) is D.",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["r94_merging", "kotlin_basic", "kotlin_basic_r94", "compose_basic_r94"],
     },
 ];
 
