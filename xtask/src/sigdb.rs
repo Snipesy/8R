@@ -1,7 +1,7 @@
 //! `cargo xtask sigdb`: builds `sigdb/<library>.sigdb` from the libraries in `fixtures/sigdb.conf`
 //! (docs/research/sigdb.md §5): each version run through the pinned R8 alone (its consumer rules and
-//! `-keep public class * { public protected *; }`), fingerprinted by 8R, keyed by the originals
-//! the build's mapping gives.
+//! `-keep public class * { public protected *; }`), normalized by 8R's rewrites, fingerprinted by
+//! 8R, keyed by the originals the build's mapping gives.
 
 use std::collections::BTreeMap;
 
@@ -30,8 +30,11 @@ fn descriptor(dotted: &str) -> String {
 pub struct Names {
     /// Residual class descriptor → original class descriptor.
     classes: BTreeMap<String, String>,
-    /// (residual class, residual name, residual proto) → (original name, original proto).
-    methods: BTreeMap<(String, String, String), (String, String)>,
+    /// (residual class, residual name, residual proto) → (original owner, original name, original proto).
+    methods: BTreeMap<(String, String, String), (String, String, String)>,
+    /// Residual classes and methods R8 synthesized: their names are R8's, not the library's.
+    synthesized_classes: std::collections::BTreeSet<String>,
+    synthesized_methods: std::collections::BTreeSet<(String, String, String)>,
 }
 
 impl Names {
@@ -46,12 +49,14 @@ impl Names {
             }
         };
         let mut methods = BTreeMap::new();
+        let mut synthesized_classes = std::collections::BTreeSet::new();
+        let mut synthesized_methods = std::collections::BTreeSet::new();
         for c in &mapping.classes {
             let rc = descriptor(&c.obfuscated);
+            if c.metadata.iter().any(|x| x.parsed == Metadata::Synthesized) {
+                synthesized_classes.insert(rc.clone());
+            }
             for (m, md) in c.outermost_methods() {
-                if md.iter().any(|x| x.parsed == Metadata::Synthesized) {
-                    continue;
-                }
                 let ps: Vec<String> = m.params.iter().map(|t| descriptor(t)).collect();
                 let original = format!("({}){}", ps.concat(), descriptor(&m.return_type));
                 let residual = md
@@ -61,21 +66,32 @@ impl Names {
                         _ => None,
                     })
                     .unwrap_or_else(|| format!("({}){}", ps.iter().map(|t| residual_type(t)).collect::<String>(), residual_type(&descriptor(&m.return_type))));
-                methods.insert((rc.clone(), m.obfuscated.clone(), residual), (m.original_name.clone(), original));
+                let key = (rc.clone(), m.obfuscated.clone(), residual);
+                if md.iter().any(|x| x.parsed == Metadata::Synthesized) {
+                    synthesized_methods.insert(key);
+                    continue;
+                }
+                // A method R8 moved here (or merged into it) keeps its original owner.
+                let owner = m.original_owner.as_deref().map_or_else(|| descriptor(&c.original), descriptor);
+                methods.insert(key, (owner, m.original_name.clone(), original));
             }
         }
-        Names { classes, methods }
+        Names { classes, methods, synthesized_classes, synthesized_methods }
     }
 
     pub fn class(&self, residual: &str) -> String {
         self.classes.get(residual).cloned().unwrap_or_else(|| residual.to_string())
     }
 
-    /// Original (name, proto) of a residual method; unmapped methods kept their names, and their
-    /// proto maps type by type.
-    pub fn method(&self, class: &str, name: &str, proto: &str) -> (String, String) {
-        if let Some(x) = self.methods.get(&(class.to_string(), name.to_string(), proto.to_string())) {
-            return x.clone();
+    /// The original (owner, name, proto) of a residual method; `None` for R8's own methods and
+    /// classes. Unmapped methods kept their names, and their proto maps type by type.
+    pub fn method(&self, class: &str, name: &str, proto: &str) -> Option<(String, String, String)> {
+        let key = (class.to_string(), name.to_string(), proto.to_string());
+        if self.synthesized_methods.contains(&key) || self.synthesized_classes.contains(class) {
+            return None;
+        }
+        if let Some(x) = self.methods.get(&key) {
+            return Some(x.clone());
         }
         let map = |t: &str| {
             let dims = t.bytes().take_while(|&b| b == b'[').count();
@@ -85,10 +101,9 @@ impl Names {
             Some((ps, r)) => format!("({}){}", ps.iter().map(|t| map(t)).collect::<String>(), map(r)),
             None => proto.to_string(),
         };
-        (name.to_string(), proto)
+        Some((self.class(class), name.to_string(), proto))
     }
 }
-
 
 fn intern_class(db: &mut SigDb, index: &mut BTreeMap<String, u32>, name: String) -> u32 {
     *index.entry(name.clone()).or_insert_with(|| {
@@ -97,69 +112,81 @@ fn intern_class(db: &mut SigDb, index: &mut BTreeMap<String, u32>, name: String)
     })
 }
 
-/// Adds one version's residual program. `universe` holds the original descriptors of every
-/// class of every library in the DB universe: references to them are erased too, as an app
-/// that shrank them would have renamed them.
-pub fn add_version(db: &mut SigDb, version: &str, model: &Model, mapping: &Mapping, universe: &dyn Fn(&str) -> bool) {
+/// Interning of DB keys, carried across the versions of one library.
+struct Keys {
+    classes: BTreeMap<String, u32>,
+    methods: BTreeMap<(u32, String, String), u32>,
+}
+
+impl Keys {
+    fn of(db: &SigDb) -> Keys {
+        Keys {
+            classes: db.classes.iter().enumerate().map(|(i, c)| (c.clone(), i as u32)).collect(),
+            methods: db.methods.iter().enumerate().map(|(i, (c, n, p))| ((*c, n.clone(), p.clone()), i as u32)).collect(),
+        }
+    }
+
+    /// The key of a residual method, `None` for R8's own methods.
+    fn method(&mut self, db: &mut SigDb, names: &Names, rc: &str, rn: &str, rp: &str) -> Option<u32> {
+        let (owner, n, p) = names.method(rc, rn, rp)?;
+        let class = intern_class(db, &mut self.classes, owner);
+        Some(*self.methods.entry((class, n.clone(), p.clone())).or_insert_with(|| {
+            db.methods.push((class, n, p));
+            (db.methods.len() - 1) as u32
+        }))
+    }
+}
+
+/// Adds one version's residual program. The model is normalized by 8R's own rewrites first
+/// (outlines inlined back, merged classes split), as an app's is before matching; classes 8R
+/// created and the bases it split have no single original and get no records. A reference is
+/// stable (keeps its name) only if it names a platform class, the rule the app side uses.
+pub fn add_version(db: &mut SigDb, version: &str, model: &mut Model, mapping: &Mapping) -> Result<(), String> {
     let bit = match db.versions.iter().position(|v| v == version) {
-        Some(i) => 1u32 << i,
+        Some(i) => 1u64 << i,
         None => {
+            if db.versions.len() >= 64 {
+                return Err(format!("{}: more than 64 versions", db.library));
+            }
             db.versions.push(version.to_string());
-            1u32 << (db.versions.len() - 1)
+            1u64 << (db.versions.len() - 1)
         }
     };
     let names = Names::new(mapping);
+    let program: std::collections::BTreeSet<String> = model.classes.iter().map(|c| model.syms.get(c.ty).to_string()).collect();
+    let rewrites = eightr_core::rewrites::run_all(model).map_err(|e| e.to_string())?;
+    let split: std::collections::BTreeSet<String> = rewrites.iter().filter(|r| r.rule == eightr_rules::SPLIT_MERGED_CLASS).map(|r| r.item.clone()).collect();
+    let model = &*model;
     let reflective = reflective_strings(model);
     let s = &model.syms;
-    let stable = |d: &str| model.find(d).is_none() && !universe(d) && !universe(&names.class(d));
-    let mut class_index: BTreeMap<String, u32> = db.classes.iter().enumerate().map(|(i, c)| (c.clone(), i as u32)).collect();
-    let mut method_index: BTreeMap<(u32, String, String), u32> =
-        db.methods.iter().enumerate().map(|(i, (c, n, p))| ((*c, n.clone(), p.clone()), i as u32)).collect();
-    // (method index, class index); interning the method only when it exists.
-    let mut key_of = |db: &mut SigDb, rc: &str, rn: &str, rp: &str| -> (u32, u32) {
-        let class = intern_class(db, &mut class_index, names.class(rc));
-        if rn == "<clinit>" && rp == "()V" && !model.find(rc).is_some_and(|k| model.classes[k].methods.iter().any(|m| s.get(m.name) == "<clinit>")) {
-            return (u32::MAX, class);
-        }
-        let (n, p) = names.method(rc, rn, rp);
-        let m = *method_index.entry((class, n.clone(), p.clone())).or_insert_with(|| {
-            db.methods.push((class, n, p));
-            (db.methods.len() - 1) as u32
-        });
-        (m, class)
-    };
-    let mut records: BTreeMap<Record, u32> = db.records.drain(..).map(|r| (Record { versions: 0, ..r.clone() }, r.versions)).collect();
-    let mut class_records: BTreeMap<ClassRecord, u32> = db.class_records.drain(..).map(|r| (ClassRecord { versions: 0, ..r.clone() }, r.versions)).collect();
+    let stable = |d: &str| eightr_core::sigdb::print::platform_stable(d);
+    let mut keys = Keys::of(db);
+    let mut records: BTreeMap<Record, u64> = db.records.drain(..).map(|r| (Record { versions: 0, ..r.clone() }, r.versions)).collect();
+    let mut class_records: BTreeMap<ClassRecord, u64> = db.class_records.drain(..).map(|r| (ClassRecord { versions: 0, ..r.clone() }, r.versions)).collect();
     for (ci, c) in model.classes.iter().enumerate() {
         let rc = s.get(c.ty);
-        let class = key_of(db, rc, "<clinit>", "()V").1;
+        if !program.contains(rc) || split.contains(rc) || names.synthesized_classes.contains(rc) {
+            continue;
+        }
+        let class = intern_class(db, &mut keys.classes, names.class(rc));
         let cp = class_print(model, ci, &stable);
         *class_records.entry(ClassRecord { class, versions: 0, c2: cp.c2, c3: cp.c3 }).or_default() |= bit;
         for (mi, m) in c.methods.iter().enumerate() {
             let Some(mp) = method_print(model, ci, mi, &stable, &reflective) else { continue };
-            let method = key_of(db, rc, s.get(m.name), s.get(m.proto)).0;
+            let Some(method) = keys.method(db, &names, rc, s.get(m.name), s.get(m.proto)) else { continue };
             let callees = mp
                 .callees
                 .iter()
-                .map(|(tok, (cc, cn, cpr))| (*tok, if model.find(cc).is_some() { key_of(db, cc, cn, cpr).0 } else { u32::MAX }))
+                .map(|(tok, (cc, cn, cpr))| (*tok, if program.contains(cc.as_str()) { keys.method(db, &names, cc, cn, cpr).unwrap_or(u32::MAX) } else { u32::MAX }))
                 .collect();
-            let r = Record {
-                method,
-                versions: 0,
-                informative: mp.informative,
-                all: mp.all,
-                strings: mp.strings,
-                proto: mp.proto,
-                sketch: mp.sketch,
-                callees,
-            };
+            let r = Record { method, versions: 0, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees };
             *records.entry(r).or_default() |= bit;
         }
     }
     db.records = records.into_iter().map(|(r, v)| Record { versions: v, ..r }).collect();
     db.class_records = class_records.into_iter().map(|(r, v)| ClassRecord { versions: v, ..r }).collect();
+    Ok(())
 }
-
 
 /// One `fixtures/sigdb.conf` line: `library version artifact [lib=artifact ...]`.
 struct Entry {
@@ -189,14 +216,6 @@ fn parse_conf(text: &str) -> Result<Vec<Entry>, String> {
     Ok(out)
 }
 
-/// Class descriptors in a jar.
-fn jar_classes(jar: &std::path::Path) -> Result<Vec<String>, String> {
-    Ok(crate::zip_entries(jar)?
-        .into_iter()
-        .filter_map(|e| e.strip_suffix(".class").filter(|c| !c.starts_with("META-INF/") && !c.ends_with("module-info")).map(|c| format!("L{c};")))
-        .collect())
-}
-
 pub fn sigdb(only: &[String]) -> Result<(), String> {
     use std::fs;
     use std::process::Command;
@@ -207,14 +226,6 @@ pub fn sigdb(only: &[String]) -> Result<(), String> {
     let r8_jar = crate::fetch("r8-9.4.24", &tc)?;
     let r8_version = crate::run(Command::new(&tools.java).arg("-cp").arg(&r8_jar).args(["com.android.tools.r8.R8", "--version"]))?;
     let r8_version = r8_version.lines().next().unwrap_or_default().to_string();
-    // The universe: every class of every configured library and dependency.
-    let mut universe = std::collections::BTreeSet::new();
-    let mut artifacts: Vec<&str> = entries.iter().flat_map(|e| std::iter::once(e.artifact.as_str()).chain(e.libs.iter().map(String::as_str))).collect();
-    artifacts.sort();
-    artifacts.dedup();
-    for a in &artifacts {
-        universe.extend(jar_classes(&crate::prepare_lib(a, &tc)?.jar)?);
-    }
     let mut dbs: BTreeMap<String, SigDb> = BTreeMap::new();
     for e in &entries {
         if !only.is_empty() && !only.contains(&e.library) {
@@ -249,10 +260,10 @@ pub fn sigdb(only: &[String]) -> Result<(), String> {
         }
         let parsed: Vec<eightr_dex::Dex> = dexes.iter().map(|b| eightr_dex::Dex::parse(b).map_err(|x| format!("{x:?}"))).collect::<Result<_, _>>()?;
         let refs: Vec<&eightr_dex::Dex> = parsed.iter().collect();
-        let model = Model::load(&refs).map_err(|x| format!("{x:?}"))?;
+        let mut model = Model::load(&refs).map_err(|x| format!("{x:?}"))?;
         let mapping = Mapping::parse_normalized(&fs::read_to_string(work.join("mapping.txt")).map_err(|x| x.to_string())?).map_err(|x| format!("{x:?}"))?;
         let db = dbs.entry(e.library.clone()).or_insert_with(|| SigDb::new(&e.library, &r8_version));
-        add_version(db, &e.version, &model, &mapping, &|d| universe.contains(d));
+        add_version(db, &e.version, &mut model, &mapping)?;
     }
     let out = root.join("sigdb");
     fs::create_dir_all(&out).map_err(|x| x.to_string())?;
@@ -262,4 +273,36 @@ pub fn sigdb(only: &[String]) -> Result<(), String> {
         fs::write(out.join(format!("{name}.sigdb")), bytes).map_err(|x| x.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Residual → original keys: residualsignature, a method R8 moved (keyed by its original
+    /// owner), R8's synthesized methods and classes (no key), and an unmapped kept method.
+    #[test]
+    fn names_key_by_original_owner_and_skip_synthesized() {
+        let text = "\
+com.lib.Foo -> a:
+    com.lib.Bar field -> a
+    1:2:com.lib.Bar make(int):10:11 -> b
+      # {\"id\":\"com.android.tools.r8.residualsignature\",\"signature\":\"(I)Lb;\"}
+    3:4:void com.lib.Moved.helper(java.lang.String):20:21 -> c
+    5:6:void lambda$0():0:0 -> d
+      # {\"id\":\"com.android.tools.r8.synthesized\"}
+com.lib.Bar -> b:
+com.lib.Foo$0 -> c:
+# {\"id\":\"com.android.tools.r8.synthesized\"}
+    1:2:void m():0:0 -> a
+";
+        let mapping = Mapping::parse_normalized(text).unwrap();
+        let n = Names::new(&mapping);
+        assert_eq!(n.method("La;", "b", "(I)Lb;"), Some(("Lcom/lib/Foo;".into(), "make".into(), "(I)Lcom/lib/Bar;".into())));
+        assert_eq!(n.method("La;", "c", "(Ljava/lang/String;)V"), Some(("Lcom/lib/Moved;".into(), "helper".into(), "(Ljava/lang/String;)V".into())));
+        assert_eq!(n.method("La;", "d", "()V"), None);
+        assert_eq!(n.method("Lc;", "a", "()V"), None);
+        // Not in the mapping: kept name, types mapped one by one.
+        assert_eq!(n.method("La;", "toString", "(Lb;)Ljava/lang/String;"), Some(("Lcom/lib/Foo;".into(), "toString".into(), "(Lcom/lib/Bar;)Ljava/lang/String;".into())));
+    }
 }

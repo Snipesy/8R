@@ -60,7 +60,7 @@ fn fingerprints_ignore_program_names() {
     }
     r.apply(&mut b);
     let prints = |m: &Model| {
-        let stable = |d: &str| m.find(d).is_none();
+        let stable = |d: &str| eightr_core::sigdb::print::platform_stable(d);
         let reflective = reflective_strings(m);
         let mut v = Vec::new();
         for ci in 0..m.classes.len() {

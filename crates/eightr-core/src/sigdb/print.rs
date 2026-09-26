@@ -63,6 +63,14 @@ pub struct ClassPrint {
     pub c3: u64,
 }
 
+/// The stable-reference rule both sides use: a reference keeps its name only if it names a
+/// platform (android.jar) class; anything an app or library build may rename, or ship itself, is
+/// erased. (A class defined in neither is erased on both sides alike.)
+pub fn platform_stable(d: &str) -> bool {
+    let base = d.trim_start_matches('[');
+    !base.starts_with('L') || crate::naming::is_platform_class(base)
+}
+
 /// Erases program types in a type descriptor (arrays keep their dimensions).
 pub fn erase_type(t: &str, stable: &dyn Fn(&str) -> bool) -> String {
     let dims = t.bytes().take_while(|&b| b == b'[').count();
@@ -179,7 +187,7 @@ fn tokens(p: &Model, body: &Body, stable: &dyn Fn(&str) -> bool, reflective: &dy
                 };
                 let _: &MemKind = kind;
                 let (c, n, ft) = (s.get(field.class), s.get(field.name), s.get(field.ty));
-                if stable(c) {
+                if stable(c.trim_start_matches('[')) {
                     t.stable_refs += 1;
                     t.refs.push(format!("{dir}:{c}->{n}:{ft}"));
                 } else {
@@ -188,15 +196,17 @@ fn tokens(p: &Model, body: &Body, stable: &dyn Fn(&str) -> bool, reflective: &dy
             }
             Op::Invoke { kind, method, .. } => {
                 let (c, n, pr) = (s.get(method.class), s.get(method.name), s.get(method.proto));
+                // An array receiver (`[LFoo;->clone()`) is as stable as its element type.
+                let c_stable = { let base = c.trim_start_matches('['); !base.starts_with('L') || stable(base) };
                 let k = match kind {
                     InvokeKind::Static => "S",
                     InvokeKind::Direct => "D",
                     InvokeKind::Super => "U",
                     _ => "V",
                 };
-                if stable(c) {
+                if c_stable {
                     t.stable_refs += 1;
-                    t.refs.push(format!("{k}:{c}->{n}{pr}"));
+                    t.refs.push(format!("{k}:{}->{n}{}", erase_type(c, stable), erase_proto(pr, stable)));
                 } else {
                     // Constructors keep their name: R8 can't rename <init>.
                     let name = if n == "<init>" || n == "<clinit>" { n } else { "?" };
