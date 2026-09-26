@@ -543,6 +543,7 @@ dependencies = [
  "eightr-dex",
  "eightr-ir",
  "eightr-mapping",
+ "eightr-rules",
 ]
 
 [[package]]

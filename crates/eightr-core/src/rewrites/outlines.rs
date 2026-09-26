@@ -12,8 +12,9 @@
 //! * bottom-up (throw) outline (R8 ≥ 9): ends in `throw` of a freshly built exception (which
 //!   may be an app class, and may use other outlines to build its message).
 //!
-//! Inlining a static method preserves behavior provided no class initializer would have run
-//! on the call (holder and its superclasses have no `<clinit>`) and everything the body
+//! Inlining a static method preserves behavior provided no class initializer with an effect
+//! would have run on the call (the holder and its superclasses have no `<clinit>`, or only one
+//! filling their own statics with constants) and everything the body
 //! references is accessible from the caller (checked per call site, resolving inherited
 //! members). Outlines that call outlines are inlined callee-first, so every copy is final. A
 //! hand-written helper can look like an outline, so these rules are D: the result is the same
@@ -135,10 +136,14 @@ fn is_outline_holder(p: &Model, ci: usize, subclassed: &std::collections::BTreeS
 /// class's own static fields: running it early, late or not at all is unobservable.
 fn pure_clinit(p: &Model, owner: eightr_ir::sym::Sym, body: &Body) -> bool {
     body.tries.is_empty()
-        && body.insns.iter().all(|x| match &x.op {
+        && body.insns.iter().enumerate().all(|(at, x)| match &x.op {
             Op::Const { .. } | Op::ConstString { .. } | Op::Move { .. } | Op::FillArrayData { .. } | Op::ReturnVoid | Op::Nop => true,
-            // Constant sizes only (a negative size would throw).
-            Op::NewArray { size, .. } => body.insns.iter().any(|y| matches!(y.op, Op::Const { dst, value: eightr_ir::op::Const::Narrow(k) } if dst == *size && k >= 0)),
+            // Constant sizes only (a negative size would throw): the size register's only
+            // definition before the allocation is a non-negative constant.
+            Op::NewArray { size, .. } => {
+                let mut defs = body.insns[..at].iter().filter(|y| y.op.def().is_some_and(|(d, w)| d == *size || (w && d + 1 == *size)));
+                matches!((defs.next().map(|y| &y.op), defs.next()), (Some(Op::Const { value: eightr_ir::op::Const::Narrow(k), .. }), None) if *k >= 0)
+            }
             Op::StaticPut { field, .. } => field.class == owner,
             _ => false,
         })
@@ -680,6 +685,33 @@ mod tests {
         let mut rec = vec![];
         OutlineInline.run(&mut p, &mut rec).unwrap();
         assert!(rec.is_empty(), "{rec:?}");
+    }
+
+    /// A holder whose initializer only fills its own static with a constant array doesn't block
+    /// inlining; one whose array size register is redefined (maybe negative) does.
+    #[test]
+    fn pure_initializer_allows_inlining_only_with_one_constant_size() {
+        for (sizes, inlined) in [(vec![5], true), (vec![5, -1], false)] {
+            let mut p = Model::default();
+            let f = eightr_ir::op::FieldRef { class: p.syms.intern("LH;"), name: p.syms.intern("t"), ty: p.syms.intern("[I") };
+            let ty = p.syms.intern("[I");
+            let mut ops: Vec<Op> = sizes.iter().map(|&k| Op::Const { dst: 0, value: eightr_ir::op::Const::Narrow(k) }).collect();
+            ops.push(Op::NewArray { dst: 1, size: 0, ty });
+            ops.push(Op::StaticPut { kind: eightr_ir::op::MemKind::Object, src: 1, field: f });
+            ops.push(Op::ReturnVoid);
+            let clinit = meth(&mut p, "<clinit>", "()V", access::STATIC | access::CONSTRUCTOR, Some(body(2, 0, ops)));
+            let o = mref(&mut p, "LH;", "o", "(II)I");
+            let ob = outline_body(&mut p);
+            let mo = meth(&mut p, "o", "(II)I", ST, Some(ob));
+            let h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![clinit, mo]);
+            let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(o)));
+            let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(o)));
+            let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2]);
+            p.classes = vec![h, u];
+            let mut rec = vec![];
+            OutlineInline.run(&mut p, &mut rec).unwrap();
+            assert_eq!(!rec.is_empty(), inlined, "sizes {sizes:?}: {rec:?}");
+        }
     }
 
     /// Backport-shaped (pure arithmetic) and too-small bodies aren't classic outlines.

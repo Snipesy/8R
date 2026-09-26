@@ -5,19 +5,19 @@
 //!
 //! Built by `cargo xtask sigdb` (the only place a mapping is read: to key the DB); 8R only reads it.
 //!
-//! File format (`<library>.sigdb`): `8RSIGDB1`, then a raw-deflate stream of little-endian
+//! File format (`<library>.sigdb`): `8RSIGDB2`, then a raw-deflate stream of little-endian
 //! fields (strings as u32 length + UTF-8, lists as u32 count + items).
 
 use std::io::{Read, Write};
 
 use super::print::SKETCH;
 
-const MAGIC: &[u8; 8] = b"8RSIGDB1";
+const MAGIC: &[u8; 8] = b"8RSIGDB2";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SigDb {
     pub library: String,
-    /// Version labels; bit `i` of a `versions` mask is `versions[i]`.
+    /// Version labels (at most 64); bit `i` of a `versions` mask is `versions[i]`.
     pub versions: Vec<String>,
     /// The R8 that built the residual code.
     pub r8: String,
@@ -32,7 +32,7 @@ pub struct SigDb {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Record {
     pub method: u32,
-    pub versions: u32,
+    pub versions: u64,
     pub informative: bool,
     pub all: u64,
     pub strings: u64,
@@ -45,7 +45,7 @@ pub struct Record {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ClassRecord {
     pub class: u32,
-    pub versions: u32,
+    pub versions: u64,
     pub c2: u64,
     pub c3: u64,
 }
@@ -82,7 +82,7 @@ impl SigDb {
         u32_(&mut w, self.records.len() as u32);
         for r in &self.records {
             u32_(&mut w, r.method);
-            u32_(&mut w, r.versions);
+            u64_(&mut w, r.versions);
             w.push(u8::from(r.informative));
             u64_(&mut w, r.all);
             u64_(&mut w, r.strings);
@@ -99,7 +99,7 @@ impl SigDb {
         u32_(&mut w, self.class_records.len() as u32);
         for r in &self.class_records {
             u32_(&mut w, r.class);
-            u32_(&mut w, r.versions);
+            u64_(&mut w, r.versions);
             u64_(&mut w, r.c2);
             u64_(&mut w, r.c3);
         }
@@ -128,7 +128,7 @@ impl SigDb {
         let mut records = Vec::with_capacity(n as usize);
         for _ in 0..n {
             let method = r.u32()?;
-            let versions = r.u32()?;
+            let versions = r.u64()?;
             let informative = r.u8()? != 0;
             let (all, strings, proto) = (r.u64()?, r.u64()?, r.u64()?);
             let mut sketch = [0u32; SKETCH];
@@ -145,7 +145,7 @@ impl SigDb {
         let n = r.u32()?;
         let mut class_records = Vec::with_capacity(n as usize);
         for _ in 0..n {
-            class_records.push(ClassRecord { class: r.u32()?, versions: r.u32()?, c2: r.u64()?, c3: r.u64()? });
+            class_records.push(ClassRecord { class: r.u32()?, versions: r.u64()?, c2: r.u64()?, c3: r.u64()? });
         }
         if r.at != raw.len() {
             return Err("trailing bytes".into());

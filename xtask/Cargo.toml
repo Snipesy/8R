@@ -12,3 +12,4 @@ eightr-core.workspace = true
 eightr-dex.workspace = true
 eightr-ir.workspace = true
 eightr-mapping.workspace = true
+eightr-rules.workspace = true
