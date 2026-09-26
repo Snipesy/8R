@@ -129,11 +129,15 @@ struct Conf {
     keep: Vec<String>,
     libs: Vec<String>,
     plugins: Vec<String>,
+    /// Toolchain artifact for D8/R8 (default: the SDK build-tools d8.jar).
+    r8: Option<String>,
+    /// Take sources from another fixture's directory (for twins built with another R8).
+    sources: Option<String>,
 }
 
 fn parse_conf(path: &Path) -> Result<Conf> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new() };
+    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), r8: None, sources: None };
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let (k, v) = line.split_once('=').ok_or_else(|| format!("bad line in {}: {line}", path.display()))?;
         match k.trim() {
@@ -141,6 +145,8 @@ fn parse_conf(path: &Path) -> Result<Conf> {
             "keep" => conf.keep.push(v.trim().to_string()),
             "lib" => conf.libs.push(v.trim().to_string()),
             "plugin" => conf.plugins.push(v.trim().to_string()),
+            "r8" => conf.r8 = Some(v.trim().to_string()),
+            "sources" => conf.sources = Some(v.trim().to_string()),
             other => return Err(format!("unknown key {other} in {}", path.display())),
         }
     }
@@ -263,7 +269,6 @@ fn fixtures(only: &[String]) -> Result<()> {
     let src_root = root.join("fixtures/src");
     let out_root = root.join("fixtures/out");
     let work_root = root.join("target/xtask-fixtures");
-    let r8_version = run(Command::new(&tools.java).arg("-cp").arg(&tools.r8_jar).args(["com.android.tools.r8.R8", "--version"]))?;
     let javac_version = run(Command::new(&tools.javac).arg("-version"))?;
 
     let mut names: Vec<String> = fs::read_dir(&src_root)
@@ -281,6 +286,10 @@ fn fixtures(only: &[String]) -> Result<()> {
         eprintln!("fixture {name}");
         let src = src_root.join(&name);
         let conf = parse_conf(&src.join("fixture.conf"))?;
+        let src = match &conf.sources {
+            Some(other) => src_root.join(other),
+            None => src,
+        };
         let work = work_root.join(&name);
         let out = out_root.join(&name);
         let _ = fs::remove_dir_all(&work);
@@ -290,6 +299,11 @@ fn fixtures(only: &[String]) -> Result<()> {
         }
 
         let tc = toolchain()?;
+        let r8_jar = match &conf.r8 {
+            Some(a) => fetch(a, &tc)?,
+            None => tools.r8_jar.clone(),
+        };
+        let r8_version = run(Command::new(&tools.java).arg("-cp").arg(&r8_jar).args(["com.android.tools.r8.R8", "--version"]))?;
         let mut libs: Vec<Lib> = conf.libs.iter().map(|l| prepare_lib(l, &tc)).collect::<Result<_>>()?;
         let mut java_sources = Vec::new();
         files_with_ext(&src, "java", &mut java_sources)?;
@@ -337,7 +351,7 @@ fn fixtures(only: &[String]) -> Result<()> {
         let min_api = conf.min_api.to_string();
         // Ground truth: the app's own classes only; libraries are classpath.
         let mut d8 = Command::new(&tools.java);
-        d8.arg("-cp").arg(&tools.r8_jar).args(["com.android.tools.r8.D8", "--debug", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
+        d8.arg("-cp").arg(&r8_jar).args(["com.android.tools.r8.D8", "--debug", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
         for l in &libs {
             d8.arg("--classpath").arg(&l.jar);
         }
@@ -347,7 +361,7 @@ fn fixtures(only: &[String]) -> Result<()> {
         fs::write(&rules, conf.keep.join("\n") + "\n").map_err(|e| e.to_string())?;
         // Release build: libraries are program input, with their consumer rules, as in AGP.
         let mut r8 = Command::new(&tools.java);
-        r8.arg("-cp").arg(&tools.r8_jar).args(["com.android.tools.r8.R8", "--release", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
+        r8.arg("-cp").arg(&r8_jar).args(["com.android.tools.r8.R8", "--release", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
         r8.arg("--pg-conf").arg(&rules);
         for l in &libs {
             for r in &l.rules {

@@ -1,0 +1,1210 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/enums/Color;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/enums/Color;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/enums/Color;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/enums/Color;)
+      name          : 'BLUE'
+      type          : 'Lcom/example/enums/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/enums/Color;)
+      name          : 'GREEN'
+      type          : 'Lcom/example/enums/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/enums/Color;)
+      name          : 'RED'
+      type          : 'Lcom/example/enums/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Color;)
+      name          : '$values'
+      type          : '()[Lcom/example/enums/Color;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 11 16-bit code units
+0007d4:                                        |[0007d4] com.example.enums.Color.$values:()[Lcom/example/enums/Color;
+0007e4: 6200 0300                              |0000: sget-object v0, Lcom/example/enums/Color;.RED:Lcom/example/enums/Color; // field@0003
+0007e8: 6201 0200                              |0002: sget-object v1, Lcom/example/enums/Color;.GREEN:Lcom/example/enums/Color; // field@0002
+0007ec: 6202 0100                              |0004: sget-object v2, Lcom/example/enums/Color;.BLUE:Lcom/example/enums/Color; // field@0001
+0007f0: 2430 1b00 1002                         |0006: filled-new-array {v0, v1, v2}, [Lcom/example/enums/Color; // type@001b
+0007f6: 0c00                                   |0009: move-result-object v0
+0007f8: 1100                                   |000a: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+    #1              : (in Lcom/example/enums/Color;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 37 16-bit code units
+000820:                                        |[000820] com.example.enums.Color.<clinit>:()V
+000830: 2200 0200                              |0000: new-instance v0, Lcom/example/enums/Color; // type@0002
+000834: 1a01 3900                              |0002: const-string v1, "RED" // string@0039
+000838: 1202                                   |0004: const/4 v2, #int 0 // #0
+00083a: 7030 0200 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/enums/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+000840: 6900 0300                              |0008: sput-object v0, Lcom/example/enums/Color;.RED:Lcom/example/enums/Color; // field@0003
+000844: 2200 0200                              |000a: new-instance v0, Lcom/example/enums/Color; // type@0002
+000848: 1a01 1100                              |000c: const-string v1, "GREEN" // string@0011
+00084c: 1212                                   |000e: const/4 v2, #int 1 // #1
+00084e: 7030 0200 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/enums/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+000854: 6900 0200                              |0012: sput-object v0, Lcom/example/enums/Color;.GREEN:Lcom/example/enums/Color; // field@0002
+000858: 2200 0200                              |0014: new-instance v0, Lcom/example/enums/Color; // type@0002
+00085c: 1a01 0c00                              |0016: const-string v1, "BLUE" // string@000c
+000860: 1222                                   |0018: const/4 v2, #int 2 // #2
+000862: 7030 0200 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/enums/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+000868: 6900 0100                              |001c: sput-object v0, Lcom/example/enums/Color;.BLUE:Lcom/example/enums/Color; // field@0001
+00086c: 7100 0000 0000                         |001e: invoke-static {}, Lcom/example/enums/Color;.$values:()[Lcom/example/enums/Color; // method@0000
+000872: 0c00                                   |0021: move-result-object v0
+000874: 6900 0000                              |0022: sput-object v0, Lcom/example/enums/Color;.$VALUES:[Lcom/example/enums/Color; // field@0000
+000878: 0e00                                   |0024: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+    #2              : (in Lcom/example/enums/Color;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+00087c:                                        |[00087c] com.example.enums.Color.<init>:(Ljava/lang/String;I)V
+00088c: 7030 2d00 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@002d
+000892: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/enums/Color;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/enums/Color;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/enums/Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+0007b0:                                        |[0007b0] com.example.enums.Color.valueOf:(Ljava/lang/String;)Lcom/example/enums/Color;
+0007c0: 1c00 0200                              |0000: const-class v0, Lcom/example/enums/Color; // type@0002
+0007c4: 7120 2e00 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@002e
+0007ca: 0c00                                   |0005: move-result-object v0
+0007cc: 1f00 0200                              |0006: check-cast v0, Lcom/example/enums/Color; // type@0002
+0007d0: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/enums/Color;)
+      name          : 'values'
+      type          : '()[Lcom/example/enums/Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+0007fc:                                        |[0007fc] com.example.enums.Color.values:()[Lcom/example/enums/Color;
+00080c: 6200 0000                              |0000: sget-object v0, Lcom/example/enums/Color;.$VALUES:[Lcom/example/enums/Color; // field@0000
+000810: 6e10 3700 0000                         |0002: invoke-virtual {v0}, [Lcom/example/enums/Color;.clone:()Ljava/lang/Object; // method@0037
+000816: 0c00                                   |0005: move-result-object v0
+000818: 1f00 1b00                              |0006: check-cast v0, [Lcom/example/enums/Color; // type@001b
+00081c: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 56 (Main.java)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/enums/Level;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/enums/Level;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/enums/Level;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/enums/Level;)
+      name          : 'CRITICAL'
+      type          : 'Lcom/example/enums/Level;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/enums/Level;)
+      name          : 'HIGH'
+      type          : 'Lcom/example/enums/Level;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/enums/Level;)
+      name          : 'LOW'
+      type          : 'Lcom/example/enums/Level;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #4              : (in Lcom/example/enums/Level;)
+      name          : 'MEDIUM'
+      type          : 'Lcom/example/enums/Level;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Level;)
+      name          : '$values'
+      type          : '()[Lcom/example/enums/Level;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 4
+      ins           : 0
+      outs          : 4
+      insns size    : 13 16-bit code units
+0008b8:                                        |[0008b8] com.example.enums.Level.$values:()[Lcom/example/enums/Level;
+0008c8: 6200 0700                              |0000: sget-object v0, Lcom/example/enums/Level;.LOW:Lcom/example/enums/Level; // field@0007
+0008cc: 6201 0800                              |0002: sget-object v1, Lcom/example/enums/Level;.MEDIUM:Lcom/example/enums/Level; // field@0008
+0008d0: 6202 0600                              |0004: sget-object v2, Lcom/example/enums/Level;.HIGH:Lcom/example/enums/Level; // field@0006
+0008d4: 6203 0500                              |0006: sget-object v3, Lcom/example/enums/Level;.CRITICAL:Lcom/example/enums/Level; // field@0005
+0008d8: 2440 1c00 1032                         |0008: filled-new-array {v0, v1, v2, v3}, [Lcom/example/enums/Level; // type@001c
+0008de: 0c00                                   |000b: move-result-object v0
+0008e0: 1100                                   |000c: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+      locals        :
+
+    #1              : (in Lcom/example/enums/Level;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 47 16-bit code units
+000908:                                        |[000908] com.example.enums.Level.<clinit>:()V
+000918: 2200 0300                              |0000: new-instance v0, Lcom/example/enums/Level; // type@0003
+00091c: 1a01 1b00                              |0002: const-string v1, "LOW" // string@001b
+000920: 1202                                   |0004: const/4 v2, #int 0 // #0
+000922: 7030 0900 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/enums/Level;.<init>:(Ljava/lang/String;I)V // method@0009
+000928: 6900 0700                              |0008: sput-object v0, Lcom/example/enums/Level;.LOW:Lcom/example/enums/Level; // field@0007
+00092c: 2200 0300                              |000a: new-instance v0, Lcom/example/enums/Level; // type@0003
+000930: 1a01 3500                              |000c: const-string v1, "MEDIUM" // string@0035
+000934: 1212                                   |000e: const/4 v2, #int 1 // #1
+000936: 7030 0900 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/enums/Level;.<init>:(Ljava/lang/String;I)V // method@0009
+00093c: 6900 0800                              |0012: sput-object v0, Lcom/example/enums/Level;.MEDIUM:Lcom/example/enums/Level; // field@0008
+000940: 2200 0300                              |0014: new-instance v0, Lcom/example/enums/Level; // type@0003
+000944: 1a01 1200                              |0016: const-string v1, "HIGH" // string@0012
+000948: 1222                                   |0018: const/4 v2, #int 2 // #2
+00094a: 7030 0900 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/enums/Level;.<init>:(Ljava/lang/String;I)V // method@0009
+000950: 6900 0600                              |001c: sput-object v0, Lcom/example/enums/Level;.HIGH:Lcom/example/enums/Level; // field@0006
+000954: 2200 0300                              |001e: new-instance v0, Lcom/example/enums/Level; // type@0003
+000958: 1a01 0d00                              |0020: const-string v1, "CRITICAL" // string@000d
+00095c: 1232                                   |0022: const/4 v2, #int 3 // #3
+00095e: 7030 0900 1002                         |0023: invoke-direct {v0, v1, v2}, Lcom/example/enums/Level;.<init>:(Ljava/lang/String;I)V // method@0009
+000964: 6900 0500                              |0026: sput-object v0, Lcom/example/enums/Level;.CRITICAL:Lcom/example/enums/Level; // field@0005
+000968: 7100 0700 0000                         |0028: invoke-static {}, Lcom/example/enums/Level;.$values:()[Lcom/example/enums/Level; // method@0007
+00096e: 0c00                                   |002b: move-result-object v0
+000970: 6900 0400                              |002c: sput-object v0, Lcom/example/enums/Level;.$VALUES:[Lcom/example/enums/Level; // field@0004
+000974: 0e00                                   |002e: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+      locals        :
+
+    #2              : (in Lcom/example/enums/Level;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+000978:                                        |[000978] com.example.enums.Level.<init>:(Ljava/lang/String;I)V
+000988: 7030 2d00 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@002d
+00098e: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/enums/Level;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/enums/Level;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/enums/Level;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000894:                                        |[000894] com.example.enums.Level.valueOf:(Ljava/lang/String;)Lcom/example/enums/Level;
+0008a4: 1c00 0300                              |0000: const-class v0, Lcom/example/enums/Level; // type@0003
+0008a8: 7120 2e00 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@002e
+0008ae: 0c00                                   |0005: move-result-object v0
+0008b0: 1f00 0300                              |0006: check-cast v0, Lcom/example/enums/Level; // type@0003
+0008b4: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/enums/Level;)
+      name          : 'values'
+      type          : '()[Lcom/example/enums/Level;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+0008e4:                                        |[0008e4] com.example.enums.Level.values:()[Lcom/example/enums/Level;
+0008f4: 6200 0400                              |0000: sget-object v0, Lcom/example/enums/Level;.$VALUES:[Lcom/example/enums/Level; // field@0004
+0008f8: 6e10 3800 0000                         |0002: invoke-virtual {v0}, [Lcom/example/enums/Level;.clone:()Ljava/lang/Object; // method@0038
+0008fe: 0c00                                   |0005: move-result-object v0
+000900: 1f00 1c00                              |0006: check-cast v0, [Lcom/example/enums/Level; // type@001c
+000904: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=29
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 56 (Main.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/enums/Main$1;'
+  Access flags      : 0x1000 (SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/enums/Main$1;)
+      name          : '$SwitchMap$com$example$enums$Color'
+      type          : '[I'
+      access        : 0x1018 (STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/enums/Main$1;)
+      name          : '$SwitchMap$com$example$enums$Level'
+      type          : '[I'
+      access        : 0x1018 (STATIC FINAL SYNTHETIC)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Main$1;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 0
+      outs          : 1
+      insns size    : 82 16-bit code units
+000990:                                        |[000990] com.example.enums.Main$1.<clinit>:()V
+0009a0: 7100 0e00 0000                         |0000: invoke-static {}, Lcom/example/enums/Level;.values:()[Lcom/example/enums/Level; // method@000e
+0009a6: 0c00                                   |0003: move-result-object v0
+0009a8: 2100                                   |0004: array-length v0, v0
+0009aa: 2300 1a00                              |0005: new-array v0, v0, [I // type@001a
+0009ae: 6900 0a00                              |0007: sput-object v0, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Level:[I // field@000a
+0009b2: 1210                                   |0009: const/4 v0, #int 1 // #1
+0009b4: 6201 0a00                              |000a: sget-object v1, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Level:[I // field@000a
+0009b8: 6202 0700                              |000c: sget-object v2, Lcom/example/enums/Level;.LOW:Lcom/example/enums/Level; // field@0007
+0009bc: 6e10 0c00 0200                         |000e: invoke-virtual {v2}, Lcom/example/enums/Level;.ordinal:()I // method@000c
+0009c2: 0a02                                   |0011: move-result v2
+0009c4: 4b00 0102                              |0012: aput v0, v1, v2
+0009c8: 2802                                   |0014: goto 0016 // +0002
+0009ca: 0d01                                   |0015: move-exception v1
+0009cc: 1221                                   |0016: const/4 v1, #int 2 // #2
+0009ce: 6202 0a00                              |0017: sget-object v2, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Level:[I // field@000a
+0009d2: 6203 0800                              |0019: sget-object v3, Lcom/example/enums/Level;.MEDIUM:Lcom/example/enums/Level; // field@0008
+0009d6: 6e10 0c00 0300                         |001b: invoke-virtual {v3}, Lcom/example/enums/Level;.ordinal:()I // method@000c
+0009dc: 0a03                                   |001e: move-result v3
+0009de: 4b01 0203                              |001f: aput v1, v2, v3
+0009e2: 2802                                   |0021: goto 0023 // +0002
+0009e4: 0d02                                   |0022: move-exception v2
+0009e6: 6202 0a00                              |0023: sget-object v2, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Level:[I // field@000a
+0009ea: 6203 0600                              |0025: sget-object v3, Lcom/example/enums/Level;.HIGH:Lcom/example/enums/Level; // field@0006
+0009ee: 6e10 0c00 0300                         |0027: invoke-virtual {v3}, Lcom/example/enums/Level;.ordinal:()I // method@000c
+0009f4: 0a03                                   |002a: move-result v3
+0009f6: 1234                                   |002b: const/4 v4, #int 3 // #3
+0009f8: 4b04 0203                              |002c: aput v4, v2, v3
+0009fc: 2802                                   |002e: goto 0030 // +0002
+0009fe: 0d02                                   |002f: move-exception v2
+000a00: 7100 0600 0000                         |0030: invoke-static {}, Lcom/example/enums/Color;.values:()[Lcom/example/enums/Color; // method@0006
+000a06: 0c02                                   |0033: move-result-object v2
+000a08: 2122                                   |0034: array-length v2, v2
+000a0a: 2322 1a00                              |0035: new-array v2, v2, [I // type@001a
+000a0e: 6902 0900                              |0037: sput-object v2, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Color:[I // field@0009
+000a12: 6202 0900                              |0039: sget-object v2, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Color:[I // field@0009
+000a16: 6203 0300                              |003b: sget-object v3, Lcom/example/enums/Color;.RED:Lcom/example/enums/Color; // field@0003
+000a1a: 6e10 0400 0300                         |003d: invoke-virtual {v3}, Lcom/example/enums/Color;.ordinal:()I // method@0004
+000a20: 0a03                                   |0040: move-result v3
+000a22: 4b00 0203                              |0041: aput v0, v2, v3
+000a26: 2802                                   |0043: goto 0045 // +0002
+000a28: 0d00                                   |0044: move-exception v0
+000a2a: 6200 0900                              |0045: sget-object v0, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Color:[I // field@0009
+000a2e: 6202 0200                              |0047: sget-object v2, Lcom/example/enums/Color;.GREEN:Lcom/example/enums/Color; // field@0002
+000a32: 6e10 0400 0200                         |0049: invoke-virtual {v2}, Lcom/example/enums/Color;.ordinal:()I // method@0004
+000a38: 0a02                                   |004c: move-result v2
+000a3a: 4b01 0002                              |004d: aput v1, v0, v2
+000a3e: 2802                                   |004f: goto 0051 // +0002
+000a40: 0d00                                   |0050: move-exception v0
+000a42: 0e00                                   |0051: return-void
+      catches       : 5
+        0x000a - 0x0014
+          Ljava/lang/NoSuchFieldError; -> 0x0015
+        0x0017 - 0x0021
+          Ljava/lang/NoSuchFieldError; -> 0x0022
+        0x0023 - 0x002e
+          Ljava/lang/NoSuchFieldError; -> 0x002f
+        0x0039 - 0x0043
+          Ljava/lang/NoSuchFieldError; -> 0x0044
+        0x0045 - 0x004f
+          Ljava/lang/NoSuchFieldError; -> 0x0050
+      positions     :
+        0x0000 line=41
+        0x0030 line=33
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 56 (Main.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/enums/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+000b14:                                        |[000b14] com.example.enums.Main.<init>:()V
+000b24: 7010 2f00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@002f
+000b2a: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=31
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/enums/Main;
+
+    #1              : (in Lcom/example/enums/Main;)
+      name          : 'describe'
+      type          : '(Lcom/example/enums/Color;)Ljava/lang/String;'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 3
+      ins           : 1
+      outs          : 1
+      insns size    : 28 16-bit code units
+000acc:                                        |[000acc] com.example.enums.Main.describe:(Lcom/example/enums/Color;)Ljava/lang/String;
+000adc: 6200 0900                              |0000: sget-object v0, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Color:[I // field@0009
+000ae0: 6e10 0400 0200                         |0002: invoke-virtual {v2}, Lcom/example/enums/Color;.ordinal:()I // method@0004
+000ae6: 0a01                                   |0005: move-result v1
+000ae8: 4400 0001                              |0006: aget v0, v0, v1
+000aec: 2b00 0c00 0000                         |0008: packed-switch v0, 00000014 // +0000000c
+000af2: 1a00 5200                              |000b: const-string v0, "cool" // string@0052
+000af6: 1100                                   |000d: return-object v0
+000af8: 1a00 5b00                              |000e: const-string v0, "natural" // string@005b
+000afc: 1100                                   |0010: return-object v0
+000afe: 1a00 6800                              |0011: const-string v0, "warm" // string@0068
+000b02: 1100                                   |0013: return-object v0
+000b04: 0001 0200 0100 0000 0900 0000 0600 ... |0014: packed-switch-data (8 units)
+      catches       : (none)
+      positions     :
+        0x0000 line=33
+        0x000b line=36
+        0x000e line=35
+        0x0011 line=34
+      locals        :
+        0x0000 - 0x001c reg=2 c Lcom/example/enums/Color;
+
+    #2              : (in Lcom/example/enums/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 14
+      ins           : 1
+      outs          : 3
+      insns size    : 277 16-bit code units
+000b2c:                                        |[000b2c] com.example.enums.Main.main:([Ljava/lang/String;)V
+000b3c: 21d0                                   |0000: array-length v0, v13
+000b3e: 7100 0600 0000                         |0001: invoke-static {}, Lcom/example/enums/Color;.values:()[Lcom/example/enums/Color; // method@0006
+000b44: 0c01                                   |0004: move-result-object v1
+000b46: dc02 0003                              |0005: rem-int/lit8 v2, v0, #int 3 // #03
+000b4a: 4601 0102                              |0007: aget-object v1, v1, v2
+000b4e: 6202 1500                              |0009: sget-object v2, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000b52: 6e10 0300 0100                         |000b: invoke-virtual {v1}, Lcom/example/enums/Color;.name:()Ljava/lang/String; // method@0003
+000b58: 0c03                                   |000e: move-result-object v3
+000b5a: 6e10 0400 0100                         |000f: invoke-virtual {v1}, Lcom/example/enums/Color;.ordinal:()I // method@0004
+000b60: 0a04                                   |0012: move-result v4
+000b62: 7110 1100 0100                         |0013: invoke-static {v1}, Lcom/example/enums/Main;.describe:(Lcom/example/enums/Color;)Ljava/lang/String; // method@0011
+000b68: 0c05                                   |0016: move-result-object v5
+000b6a: 2206 1600                              |0017: new-instance v6, Ljava/lang/StringBuilder; // type@0016
+000b6e: 7010 3100 0600                         |0019: invoke-direct {v6}, Ljava/lang/StringBuilder;.<init>:()V // method@0031
+000b74: 6e20 3400 3600                         |001c: invoke-virtual {v6, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000b7a: 0c03                                   |001f: move-result-object v3
+000b7c: 1a06 0000                              |0020: const-string v6, " " // string@0000
+000b80: 6e20 3400 6300                         |0022: invoke-virtual {v3, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000b86: 0c03                                   |0025: move-result-object v3
+000b88: 6e20 3300 4300                         |0026: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0033
+000b8e: 0c03                                   |0029: move-result-object v3
+000b90: 6e20 3400 6300                         |002a: invoke-virtual {v3, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000b96: 0c03                                   |002d: move-result-object v3
+000b98: 6e20 3400 5300                         |002e: invoke-virtual {v3, v5}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000b9e: 0c03                                   |0031: move-result-object v3
+000ba0: 6e10 3600 0300                         |0032: invoke-virtual {v3}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0036
+000ba6: 0c03                                   |0035: move-result-object v3
+000ba8: 6e20 2c00 3200                         |0036: invoke-virtual {v2, v3}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@002c
+000bae: 6202 1500                              |0039: sget-object v2, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000bb2: 1253                                   |003b: const/4 v3, #int 5 // #5
+000bb4: 3730 0500                              |003c: if-le v0, v3, 0041 // +0005
+000bb8: 1a03 0c00                              |003e: const-string v3, "BLUE" // string@000c
+000bbc: 2803                                   |0040: goto 0043 // +0003
+000bbe: 1a03 1100                              |0041: const-string v3, "GREEN" // string@0011
+000bc2: 7110 0500 0300                         |0043: invoke-static {v3}, Lcom/example/enums/Color;.valueOf:(Ljava/lang/String;)Lcom/example/enums/Color; // method@0005
+000bc8: 0c03                                   |0046: move-result-object v3
+000bca: 6e10 0400 0300                         |0047: invoke-virtual {v3}, Lcom/example/enums/Color;.ordinal:()I // method@0004
+000bd0: 0a03                                   |004a: move-result v3
+000bd2: 6e20 2b00 3200                         |004b: invoke-virtual {v2, v3}, Ljava/io/PrintStream;.println:(I)V // method@002b
+000bd8: 7100 2a00 0000                         |004e: invoke-static {}, Lcom/example/enums/Planet;.values:()[Lcom/example/enums/Planet; // method@002a
+000bde: 0c02                                   |0051: move-result-object v2
+000be0: d803 0002                              |0052: add-int/lit8 v3, v0, #int 2 // #02
+000be4: dc03 0304                              |0054: rem-int/lit8 v3, v3, #int 4 // #04
+000be8: 4602 0203                              |0056: aget-object v2, v2, v3
+000bec: 6203 1500                              |0058: sget-object v3, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000bf0: 7110 3000 0200                         |005a: invoke-static {v2}, Ljava/lang/String;.valueOf:(Ljava/lang/Object;)Ljava/lang/String; // method@0030
+000bf6: 0c04                                   |005d: move-result-object v4
+000bf8: 5327 1400                              |005e: iget-wide v7, v2, Lcom/example/enums/Planet;.mass:D // field@0014
+000bfc: 6205 1000                              |0060: sget-object v5, Lcom/example/enums/Planet;.EARTH:Lcom/example/enums/Planet; // field@0010
+000c00: 6e20 2800 5200                         |0062: invoke-virtual {v2, v5}, Lcom/example/enums/Planet;.compareTo:(Ljava/lang/Enum;)I // method@0028
+000c06: 0a05                                   |0065: move-result v5
+000c08: 2209 1600                              |0066: new-instance v9, Ljava/lang/StringBuilder; // type@0016
+000c0c: 7010 3100 0900                         |0068: invoke-direct {v9}, Ljava/lang/StringBuilder;.<init>:()V // method@0031
+000c12: 6e20 3400 4900                         |006b: invoke-virtual {v9, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000c18: 0c04                                   |006e: move-result-object v4
+000c1a: 6e20 3400 6400                         |006f: invoke-virtual {v4, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000c20: 0c04                                   |0072: move-result-object v4
+000c22: 6e30 3200 7408                         |0073: invoke-virtual {v4, v7, v8}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0032
+000c28: 0c04                                   |0076: move-result-object v4
+000c2a: 6e20 3400 6400                         |0077: invoke-virtual {v4, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000c30: 0c04                                   |007a: move-result-object v4
+000c32: 6e20 3300 5400                         |007b: invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0033
+000c38: 0c04                                   |007e: move-result-object v4
+000c3a: 6e10 3600 0400                         |007f: invoke-virtual {v4}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0036
+000c40: 0c04                                   |0082: move-result-object v4
+000c42: 6e20 2c00 4300                         |0083: invoke-virtual {v3, v4}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@002c
+000c48: 7100 2400 0000                         |0086: invoke-static {}, Lcom/example/enums/Op;.values:()[Lcom/example/enums/Op; // method@0024
+000c4e: 0c03                                   |0089: move-result-object v3
+000c50: 2134                                   |008a: array-length v4, v3
+000c52: 1205                                   |008b: const/4 v5, #int 0 // #0
+000c54: 0157                                   |008c: move v7, v5
+000c56: 3547 2e00                              |008d: if-ge v7, v4, 00bb // +002e
+000c5a: 4608 0307                              |008f: aget-object v8, v3, v7
+000c5e: 6209 1500                              |0091: sget-object v9, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000c62: 6e10 2200 0800                         |0093: invoke-virtual {v8}, Lcom/example/enums/Op;.name:()Ljava/lang/String; // method@0022
+000c68: 0c0a                                   |0096: move-result-object v10
+000c6a: d80b 0006                              |0097: add-int/lit8 v11, v0, #int 6 // #06
+000c6e: 123c                                   |0099: const/4 v12, #int 3 // #3
+000c70: 6e30 2100 b80c                         |009a: invoke-virtual {v8, v11, v12}, Lcom/example/enums/Op;.apply:(II)I // method@0021
+000c76: 0a0b                                   |009d: move-result v11
+000c78: 220c 1600                              |009e: new-instance v12, Ljava/lang/StringBuilder; // type@0016
+000c7c: 7010 3100 0c00                         |00a0: invoke-direct {v12}, Ljava/lang/StringBuilder;.<init>:()V // method@0031
+000c82: 6e20 3400 ac00                         |00a3: invoke-virtual {v12, v10}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000c88: 0c0a                                   |00a6: move-result-object v10
+000c8a: 1a0c 0900                              |00a7: const-string v12, "=" // string@0009
+000c8e: 6e20 3400 ca00                         |00a9: invoke-virtual {v10, v12}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000c94: 0c0a                                   |00ac: move-result-object v10
+000c96: 6e20 3300 ba00                         |00ad: invoke-virtual {v10, v11}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0033
+000c9c: 0c0a                                   |00b0: move-result-object v10
+000c9e: 6e10 3600 0a00                         |00b1: invoke-virtual {v10}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0036
+000ca4: 0c0a                                   |00b4: move-result-object v10
+000ca6: 6e20 2c00 a900                         |00b5: invoke-virtual {v9, v10}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@002c
+000cac: d807 0701                              |00b8: add-int/lit8 v7, v7, #int 1 // #01
+000cb0: 28d3                                   |00ba: goto 008d // -002d
+000cb2: 7100 0e00 0000                         |00bb: invoke-static {}, Lcom/example/enums/Level;.values:()[Lcom/example/enums/Level; // method@000e
+000cb8: 0c03                                   |00be: move-result-object v3
+000cba: d804 0003                              |00bf: add-int/lit8 v4, v0, #int 3 // #03
+000cbe: dc04 0404                              |00c1: rem-int/lit8 v4, v4, #int 4 // #04
+000cc2: 4603 0304                              |00c3: aget-object v3, v3, v4
+000cc6: 6204 1500                              |00c5: sget-object v4, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000cca: 7110 1300 0300                         |00c7: invoke-static {v3}, Lcom/example/enums/Main;.severity:(Lcom/example/enums/Level;)I // method@0013
+000cd0: 0a07                                   |00ca: move-result v7
+000cd2: 6208 0500                              |00cb: sget-object v8, Lcom/example/enums/Level;.CRITICAL:Lcom/example/enums/Level; // field@0005
+000cd6: 1219                                   |00cd: const/4 v9, #int 1 // #1
+000cd8: 3383 0400                              |00ce: if-ne v3, v8, 00d2 // +0004
+000cdc: 0198                                   |00d0: move v8, v9
+000cde: 2802                                   |00d1: goto 00d3 // +0002
+000ce0: 0158                                   |00d2: move v8, v5
+000ce2: 6e10 0a00 0300                         |00d3: invoke-virtual {v3}, Lcom/example/enums/Level;.hashCode:()I // method@000a
+000ce8: 0a0a                                   |00d6: move-result v10
+000cea: 6e10 0a00 0300                         |00d7: invoke-virtual {v3}, Lcom/example/enums/Level;.hashCode:()I // method@000a
+000cf0: 0a0b                                   |00da: move-result v11
+000cf2: 33ba 0300                              |00db: if-ne v10, v11, 00de // +0003
+000cf6: 0195                                   |00dd: move v5, v9
+000cf8: 2209 1600                              |00de: new-instance v9, Ljava/lang/StringBuilder; // type@0016
+000cfc: 7010 3100 0900                         |00e0: invoke-direct {v9}, Ljava/lang/StringBuilder;.<init>:()V // method@0031
+000d02: 6e20 3300 7900                         |00e3: invoke-virtual {v9, v7}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0033
+000d08: 0c07                                   |00e6: move-result-object v7
+000d0a: 6e20 3400 6700                         |00e7: invoke-virtual {v7, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000d10: 0c07                                   |00ea: move-result-object v7
+000d12: 6e20 3500 8700                         |00eb: invoke-virtual {v7, v8}, Ljava/lang/StringBuilder;.append:(Z)Ljava/lang/StringBuilder; // method@0035
+000d18: 0c07                                   |00ee: move-result-object v7
+000d1a: 6e20 3400 6700                         |00ef: invoke-virtual {v7, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0034
+000d20: 0c06                                   |00f2: move-result-object v6
+000d22: 6e20 3500 5600                         |00f3: invoke-virtual {v6, v5}, Ljava/lang/StringBuilder;.append:(Z)Ljava/lang/StringBuilder; // method@0035
+000d28: 0c05                                   |00f6: move-result-object v5
+000d2a: 6e10 3600 0500                         |00f7: invoke-virtual {v5}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0036
+000d30: 0c05                                   |00fa: move-result-object v5
+000d32: 6e20 2c00 5400                         |00fb: invoke-virtual {v4, v5}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@002c
+000d38: 1304 6400                              |00fe: const/16 v4, #int 100 // #64
+000d3c: 3740 0500                              |0100: if-le v0, v4, 0105 // +0005
+000d40: 6204 0700                              |0102: sget-object v4, Lcom/example/enums/Level;.LOW:Lcom/example/enums/Level; // field@0007
+000d44: 2802                                   |0104: goto 0106 // +0002
+000d46: 1204                                   |0105: const/4 v4, #int 0 // #0
+000d48: 6205 1500                              |0106: sget-object v5, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0015
+000d4c: 3904 0500                              |0108: if-nez v4, 010d // +0005
+000d50: 1a06 5d00                              |010a: const-string v6, "null level" // string@005d
+000d54: 2805                                   |010c: goto 0111 // +0005
+000d56: 6e10 0b00 0400                         |010d: invoke-virtual {v4}, Lcom/example/enums/Level;.name:()Ljava/lang/String; // method@000b
+000d5c: 0c06                                   |0110: move-result-object v6
+000d5e: 6e20 2c00 6500                         |0111: invoke-virtual {v5, v6}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@002c
+000d64: 0e00                                   |0114: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=50
+        0x0001 line=51
+        0x0009 line=52
+        0x0039 line=53
+        0x004e line=54
+        0x0058 line=55
+        0x0086 line=56
+        0x00bb line=57
+        0x00c5 line=58
+        0x00fe line=59
+        0x0106 line=60
+        0x0114 line=61
+      locals        :
+        0x0091 - 0x00b8 reg=8 op Lcom/example/enums/Op;
+        0x0001 - 0x0115 reg=0 n I
+        0x0009 - 0x0115 reg=1 c Lcom/example/enums/Color;
+        0x0058 - 0x0115 reg=2 p Lcom/example/enums/Planet;
+        0x00c5 - 0x0115 reg=3 l Lcom/example/enums/Level;
+        0x0106 - 0x0115 reg=4 none Lcom/example/enums/Level;
+        0x0000 - 0x0115 reg=13 args [Ljava/lang/String;
+
+    #3              : (in Lcom/example/enums/Main;)
+      name          : 'severity'
+      type          : '(Lcom/example/enums/Level;)I'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 3
+      ins           : 1
+      outs          : 1
+      insns size    : 32 16-bit code units
+000a7c:                                        |[000a7c] com.example.enums.Main.severity:(Lcom/example/enums/Level;)I
+000a8c: 6200 0a00                              |0000: sget-object v0, Lcom/example/enums/Main$1;.$SwitchMap$com$example$enums$Level:[I // field@000a
+000a90: 6e10 0c00 0200                         |0002: invoke-virtual {v2}, Lcom/example/enums/Level;.ordinal:()I // method@000c
+000a96: 0a01                                   |0005: move-result v1
+000a98: 4400 0001                              |0006: aget v0, v0, v1
+000a9c: 2b00 0e00 0000                         |0008: packed-switch v0, 00000016 // +0000000e
+000aa2: 1300 6400                              |000b: const/16 v0, #int 100 // #64
+000aa6: 0f00                                   |000d: return v0
+000aa8: 1300 0a00                              |000e: const/16 v0, #int 10 // #a
+000aac: 0f00                                   |0010: return v0
+000aae: 1250                                   |0011: const/4 v0, #int 5 // #5
+000ab0: 0f00                                   |0012: return v0
+000ab2: 1210                                   |0013: const/4 v0, #int 1 // #1
+000ab4: 0f00                                   |0014: return v0
+000ab6: 0000                                   |0015: nop // spacer
+000ab8: 0001 0300 0100 0000 0b00 0000 0900 ... |0016: packed-switch-data (10 units)
+      catches       : (none)
+      positions     :
+        0x0000 line=41
+        0x000b line=45
+        0x000e line=44
+        0x0011 line=43
+        0x0013 line=42
+      locals        :
+        0x0000 - 0x0020 reg=2 l Lcom/example/enums/Level;
+
+  Virtual methods   -
+  source_file_idx   : 56 (Main.java)
+
+Class #4            -
+  Class descriptor  : 'Lcom/example/enums/Op;'
+  Access flags      : 0x4400 (ABSTRACT ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/enums/Op;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/enums/Op;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/enums/Op;)
+      name          : 'ADD'
+      type          : 'Lcom/example/enums/Op;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/enums/Op;)
+      name          : 'MUL'
+      type          : 'Lcom/example/enums/Op;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/enums/Op;)
+      name          : 'SUB'
+      type          : 'Lcom/example/enums/Op;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Op;)
+      name          : '$values'
+      type          : '()[Lcom/example/enums/Op;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 11 16-bit code units
+000e70:                                        |[000e70] com.example.enums.Op.$values:()[Lcom/example/enums/Op;
+000e80: 6200 0c00                              |0000: sget-object v0, Lcom/example/enums/Op;.ADD:Lcom/example/enums/Op; // field@000c
+000e84: 6201 0d00                              |0002: sget-object v1, Lcom/example/enums/Op;.MUL:Lcom/example/enums/Op; // field@000d
+000e88: 6202 0e00                              |0004: sget-object v2, Lcom/example/enums/Op;.SUB:Lcom/example/enums/Op; // field@000e
+000e8c: 2430 1d00 1002                         |0006: filled-new-array {v0, v1, v2}, [Lcom/example/enums/Op; // type@001d
+000e92: 0c00                                   |0009: move-result-object v0
+000e94: 1100                                   |000a: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=15
+      locals        :
+
+    #1              : (in Lcom/example/enums/Op;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 0
+      outs          : 4
+      insns size    : 38 16-bit code units
+000ebc:                                        |[000ebc] com.example.enums.Op.<clinit>:()V
+000ecc: 2200 0600                              |0000: new-instance v0, Lcom/example/enums/Op$1; // type@0006
+000ed0: 1a01 0b00                              |0002: const-string v1, "ADD" // string@000b
+000ed4: 1202                                   |0004: const/4 v2, #int 0 // #0
+000ed6: 1203                                   |0005: const/4 v3, #int 0 // #0
+000ed8: 7040 1500 1032                         |0006: invoke-direct {v0, v1, v2, v3}, Lcom/example/enums/Op$1;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@0015
+000ede: 6900 0c00                              |0009: sput-object v0, Lcom/example/enums/Op;.ADD:Lcom/example/enums/Op; // field@000c
+000ee2: 2200 0700                              |000b: new-instance v0, Lcom/example/enums/Op$2; // type@0007
+000ee6: 1a01 3700                              |000d: const-string v1, "MUL" // string@0037
+000eea: 1212                                   |000f: const/4 v2, #int 1 // #1
+000eec: 7040 1800 1032                         |0010: invoke-direct {v0, v1, v2, v3}, Lcom/example/enums/Op$2;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@0018
+000ef2: 6900 0d00                              |0013: sput-object v0, Lcom/example/enums/Op;.MUL:Lcom/example/enums/Op; // field@000d
+000ef6: 2200 0800                              |0015: new-instance v0, Lcom/example/enums/Op$3; // type@0008
+000efa: 1a01 3a00                              |0017: const-string v1, "SUB" // string@003a
+000efe: 1222                                   |0019: const/4 v2, #int 2 // #2
+000f00: 7040 1b00 1032                         |001a: invoke-direct {v0, v1, v2, v3}, Lcom/example/enums/Op$3;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@001b
+000f06: 6900 0e00                              |001d: sput-object v0, Lcom/example/enums/Op;.SUB:Lcom/example/enums/Op; // field@000e
+000f0a: 7100 1d00 0000                         |001f: invoke-static {}, Lcom/example/enums/Op;.$values:()[Lcom/example/enums/Op; // method@001d
+000f10: 0c00                                   |0022: move-result-object v0
+000f12: 6900 0b00                              |0023: sput-object v0, Lcom/example/enums/Op;.$VALUES:[Lcom/example/enums/Op; // field@000b
+000f16: 0e00                                   |0025: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=16
+        0x000b line=19
+        0x0015 line=22
+        0x001f line=15
+      locals        :
+
+    #2              : (in Lcom/example/enums/Op;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+000f18:                                        |[000f18] com.example.enums.Op.<init>:(Ljava/lang/String;I)V
+000f28: 7030 2d00 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@002d
+000f2e: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=15
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/enums/Op;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/enums/Op;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;ILcom/example/enums/Op-IA;)V'
+      access        : 0x11000 (SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 3
+      insns size    : 4 16-bit code units
+000f30:                                        |[000f30] com.example.enums.Op.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V
+000f40: 7030 1f00 1002                         |0000: invoke-direct {v0, v1, v2}, Lcom/example/enums/Op;.<init>:(Ljava/lang/String;I)V // method@001f
+000f46: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+    #4              : (in Lcom/example/enums/Op;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/enums/Op;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000e4c:                                        |[000e4c] com.example.enums.Op.valueOf:(Ljava/lang/String;)Lcom/example/enums/Op;
+000e5c: 1c00 0a00                              |0000: const-class v0, Lcom/example/enums/Op; // type@000a
+000e60: 7120 2e00 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@002e
+000e66: 0c00                                   |0005: move-result-object v0
+000e68: 1f00 0a00                              |0006: check-cast v0, Lcom/example/enums/Op; // type@000a
+000e6c: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=15
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #5              : (in Lcom/example/enums/Op;)
+      name          : 'values'
+      type          : '()[Lcom/example/enums/Op;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+000e98:                                        |[000e98] com.example.enums.Op.values:()[Lcom/example/enums/Op;
+000ea8: 6200 0b00                              |0000: sget-object v0, Lcom/example/enums/Op;.$VALUES:[Lcom/example/enums/Op; // field@000b
+000eac: 6e10 3900 0000                         |0002: invoke-virtual {v0}, [Lcom/example/enums/Op;.clone:()Ljava/lang/Object; // method@0039
+000eb2: 0c00                                   |0005: move-result-object v0
+000eb4: 1f00 1d00                              |0006: check-cast v0, [Lcom/example/enums/Op; // type@001d
+000eb8: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=15
+      locals        :
+
+  Virtual methods   -
+    #0              : (in Lcom/example/enums/Op;)
+      name          : 'apply'
+      type          : '(II)I'
+      access        : 0x0400 (ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 56 (Main.java)
+
+Class #5            -
+  Class descriptor  : 'Lcom/example/enums/Op$1;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Lcom/example/enums/Op;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Op$1;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 4
+      insns size    : 5 16-bit code units
+000d80:                                        |[000d80] com.example.enums.Op$1.<init>:(Ljava/lang/String;I)V
+000d90: 1200                                   |0000: const/4 v0, #int 0 // #0
+000d92: 7040 2000 2103                         |0001: invoke-direct {v1, v2, v3, v0}, Lcom/example/enums/Op;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@0020
+000d98: 0e00                                   |0004: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=16
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/enums/Op$1;
+        0x0000 - 0x0005 reg=2 (null) Ljava/lang/String;
+        0x0000 - 0x0005 reg=3 (null) I
+
+    #1              : (in Lcom/example/enums/Op$1;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;ILcom/example/enums/Op-IA;)V'
+      access        : 0x11000 (SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 3
+      insns size    : 4 16-bit code units
+000d9c:                                        |[000d9c] com.example.enums.Op$1.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V
+000dac: 7030 1400 1002                         |0000: invoke-direct {v0, v1, v2}, Lcom/example/enums/Op$1;.<init>:(Ljava/lang/String;I)V // method@0014
+000db2: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+  Virtual methods   -
+    #0              : (in Lcom/example/enums/Op$1;)
+      name          : 'apply'
+      type          : '(II)I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 0
+      insns size    : 3 16-bit code units
+000d68:                                        |[000d68] com.example.enums.Op$1.apply:(II)I
+000d78: 9000 0203                              |0000: add-int v0, v2, v3
+000d7c: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=17
+      locals        :
+        0x0000 - 0x0003 reg=1 this Lcom/example/enums/Op$1;
+        0x0000 - 0x0003 reg=2 a I
+        0x0000 - 0x0003 reg=3 b I
+
+  source_file_idx   : 56 (Main.java)
+
+Class #6            -
+  Class descriptor  : 'Lcom/example/enums/Op$2;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Lcom/example/enums/Op;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Op$2;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 4
+      insns size    : 5 16-bit code units
+000dcc:                                        |[000dcc] com.example.enums.Op$2.<init>:(Ljava/lang/String;I)V
+000ddc: 1200                                   |0000: const/4 v0, #int 0 // #0
+000dde: 7040 2000 2103                         |0001: invoke-direct {v1, v2, v3, v0}, Lcom/example/enums/Op;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@0020
+000de4: 0e00                                   |0004: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=19
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/enums/Op$2;
+        0x0000 - 0x0005 reg=2 (null) Ljava/lang/String;
+        0x0000 - 0x0005 reg=3 (null) I
+
+    #1              : (in Lcom/example/enums/Op$2;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;ILcom/example/enums/Op-IA;)V'
+      access        : 0x11000 (SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 3
+      insns size    : 4 16-bit code units
+000de8:                                        |[000de8] com.example.enums.Op$2.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V
+000df8: 7030 1700 1002                         |0000: invoke-direct {v0, v1, v2}, Lcom/example/enums/Op$2;.<init>:(Ljava/lang/String;I)V // method@0017
+000dfe: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+  Virtual methods   -
+    #0              : (in Lcom/example/enums/Op$2;)
+      name          : 'apply'
+      type          : '(II)I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 0
+      insns size    : 3 16-bit code units
+000db4:                                        |[000db4] com.example.enums.Op$2.apply:(II)I
+000dc4: 9200 0203                              |0000: mul-int v0, v2, v3
+000dc8: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=20
+      locals        :
+        0x0000 - 0x0003 reg=1 this Lcom/example/enums/Op$2;
+        0x0000 - 0x0003 reg=2 a I
+        0x0000 - 0x0003 reg=3 b I
+
+  source_file_idx   : 56 (Main.java)
+
+Class #7            -
+  Class descriptor  : 'Lcom/example/enums/Op$3;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Lcom/example/enums/Op;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Op$3;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 4
+      insns size    : 5 16-bit code units
+000e18:                                        |[000e18] com.example.enums.Op$3.<init>:(Ljava/lang/String;I)V
+000e28: 1200                                   |0000: const/4 v0, #int 0 // #0
+000e2a: 7040 2000 2103                         |0001: invoke-direct {v1, v2, v3, v0}, Lcom/example/enums/Op;.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V // method@0020
+000e30: 0e00                                   |0004: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=22
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/enums/Op$3;
+        0x0000 - 0x0005 reg=2 (null) Ljava/lang/String;
+        0x0000 - 0x0005 reg=3 (null) I
+
+    #1              : (in Lcom/example/enums/Op$3;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;ILcom/example/enums/Op-IA;)V'
+      access        : 0x11000 (SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 3
+      insns size    : 4 16-bit code units
+000e34:                                        |[000e34] com.example.enums.Op$3.<init>:(Ljava/lang/String;ILcom/example/enums/Op-IA;)V
+000e44: 7030 1a00 1002                         |0000: invoke-direct {v0, v1, v2}, Lcom/example/enums/Op$3;.<init>:(Ljava/lang/String;I)V // method@001a
+000e4a: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+      locals        :
+
+  Virtual methods   -
+    #0              : (in Lcom/example/enums/Op$3;)
+      name          : 'apply'
+      type          : '(II)I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 4
+      ins           : 3
+      outs          : 0
+      insns size    : 3 16-bit code units
+000e00:                                        |[000e00] com.example.enums.Op$3.apply:(II)I
+000e10: 9100 0203                              |0000: sub-int v0, v2, v3
+000e14: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=23
+      locals        :
+        0x0000 - 0x0003 reg=1 this Lcom/example/enums/Op$3;
+        0x0000 - 0x0003 reg=2 a I
+        0x0000 - 0x0003 reg=3 b I
+
+  source_file_idx   : 56 (Main.java)
+
+Class #8            -
+  Class descriptor  : 'Lcom/example/enums/Op-IA;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+  source_file_idx   : 15 (D8$$SyntheticClass)
+
+Class #9            -
+  Class descriptor  : 'Lcom/example/enums/Planet;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/enums/Planet;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/enums/Planet;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/enums/Planet;)
+      name          : 'EARTH'
+      type          : 'Lcom/example/enums/Planet;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/enums/Planet;)
+      name          : 'MARS'
+      type          : 'Lcom/example/enums/Planet;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/enums/Planet;)
+      name          : 'MERCURY'
+      type          : 'Lcom/example/enums/Planet;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #4              : (in Lcom/example/enums/Planet;)
+      name          : 'VENUS'
+      type          : 'Lcom/example/enums/Planet;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+    #0              : (in Lcom/example/enums/Planet;)
+      name          : 'mass'
+      type          : 'D'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/enums/Planet;)
+      name          : '$values'
+      type          : '()[Lcom/example/enums/Planet;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 4
+      ins           : 0
+      outs          : 4
+      insns size    : 13 16-bit code units
+000f6c:                                        |[000f6c] com.example.enums.Planet.$values:()[Lcom/example/enums/Planet;
+000f7c: 6200 1200                              |0000: sget-object v0, Lcom/example/enums/Planet;.MERCURY:Lcom/example/enums/Planet; // field@0012
+000f80: 6201 1300                              |0002: sget-object v1, Lcom/example/enums/Planet;.VENUS:Lcom/example/enums/Planet; // field@0013
+000f84: 6202 1000                              |0004: sget-object v2, Lcom/example/enums/Planet;.EARTH:Lcom/example/enums/Planet; // field@0010
+000f88: 6203 1100                              |0006: sget-object v3, Lcom/example/enums/Planet;.MARS:Lcom/example/enums/Planet; // field@0011
+000f8c: 2440 1e00 1032                         |0008: filled-new-array {v0, v1, v2, v3}, [Lcom/example/enums/Planet; // type@001e
+000f92: 0c00                                   |000b: move-result-object v0
+000f94: 1100                                   |000c: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=7
+      locals        :
+
+    #1              : (in Lcom/example/enums/Planet;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 0
+      outs          : 5
+      insns size    : 67 16-bit code units
+000fbc:                                        |[000fbc] com.example.enums.Planet.<clinit>:()V
+000fcc: 2200 0b00                              |0000: new-instance v0, Lcom/example/enums/Planet; // type@000b
+000fd0: 1201                                   |0002: const/4 v1, #int 0 // #0
+000fd2: 1802 6666 6666 6666 0a40               |0003: const-wide v2, #double 3.3 // #400a666666666666
+000fdc: 1a04 3600                              |0008: const-string v4, "MERCURY" // string@0036
+000fe0: 7053 2700 4021                         |000a: invoke-direct {v0, v4, v1, v2, v3}, Lcom/example/enums/Planet;.<init>:(Ljava/lang/String;ID)V // method@0027
+000fe6: 6900 1200                              |000d: sput-object v0, Lcom/example/enums/Planet;.MERCURY:Lcom/example/enums/Planet; // field@0012
+000fea: 2200 0b00                              |000f: new-instance v0, Lcom/example/enums/Planet; // type@000b
+000fee: 1211                                   |0011: const/4 v1, #int 1 // #1
+000ff0: 1802 3333 3333 3333 1340               |0012: const-wide v2, #double 4.8 // #4013333333333333
+000ffa: 1a04 3c00                              |0017: const-string v4, "VENUS" // string@003c
+000ffe: 7053 2700 4021                         |0019: invoke-direct {v0, v4, v1, v2, v3}, Lcom/example/enums/Planet;.<init>:(Ljava/lang/String;ID)V // method@0027
+001004: 6900 1300                              |001c: sput-object v0, Lcom/example/enums/Planet;.VENUS:Lcom/example/enums/Planet; // field@0013
+001008: 2200 0b00                              |001e: new-instance v0, Lcom/example/enums/Planet; // type@000b
+00100c: 1221                                   |0020: const/4 v1, #int 2 // #2
+00100e: 1802 9a99 9999 9999 1740               |0021: const-wide v2, #double 5.9 // #401799999999999a
+001018: 1a04 1000                              |0026: const-string v4, "EARTH" // string@0010
+00101c: 7053 2700 4021                         |0028: invoke-direct {v0, v4, v1, v2, v3}, Lcom/example/enums/Planet;.<init>:(Ljava/lang/String;ID)V // method@0027
+001022: 6900 1000                              |002b: sput-object v0, Lcom/example/enums/Planet;.EARTH:Lcom/example/enums/Planet; // field@0010
+001026: 2200 0b00                              |002d: new-instance v0, Lcom/example/enums/Planet; // type@000b
+00102a: 1231                                   |002f: const/4 v1, #int 3 // #3
+00102c: 1802 9a99 9999 9999 1940               |0030: const-wide v2, #double 6.4 // #401999999999999a
+001036: 1a04 3400                              |0035: const-string v4, "MARS" // string@0034
+00103a: 7053 2700 4021                         |0037: invoke-direct {v0, v4, v1, v2, v3}, Lcom/example/enums/Planet;.<init>:(Ljava/lang/String;ID)V // method@0027
+001040: 6900 1100                              |003a: sput-object v0, Lcom/example/enums/Planet;.MARS:Lcom/example/enums/Planet; // field@0011
+001044: 7100 2500 0000                         |003c: invoke-static {}, Lcom/example/enums/Planet;.$values:()[Lcom/example/enums/Planet; // method@0025
+00104a: 0c00                                   |003f: move-result-object v0
+00104c: 6900 0f00                              |0040: sput-object v0, Lcom/example/enums/Planet;.$VALUES:[Lcom/example/enums/Planet; // field@000f
+001050: 0e00                                   |0042: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=8
+        0x003c line=7
+      locals        :
+
+    #2              : (in Lcom/example/enums/Planet;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;ID)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 5
+      outs          : 3
+      insns size    : 6 16-bit code units
+001054:                                        |[001054] com.example.enums.Planet.<init>:(Ljava/lang/String;ID)V
+001064: 7030 2d00 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@002d
+00106a: 5a03 1400                              |0003: iput-wide v3, v0, Lcom/example/enums/Planet;.mass:D // field@0014
+00106e: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=12
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/enums/Planet;
+        0x0000 - 0x0006 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0006 reg=2 (null) I
+        0x0000 - 0x0006 reg=3 mass D
+
+    #3              : (in Lcom/example/enums/Planet;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/enums/Planet;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000f48:                                        |[000f48] com.example.enums.Planet.valueOf:(Ljava/lang/String;)Lcom/example/enums/Planet;
+000f58: 1c00 0b00                              |0000: const-class v0, Lcom/example/enums/Planet; // type@000b
+000f5c: 7120 2e00 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@002e
+000f62: 0c00                                   |0005: move-result-object v0
+000f64: 1f00 0b00                              |0006: check-cast v0, Lcom/example/enums/Planet; // type@000b
+000f68: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=7
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/enums/Planet;)
+      name          : 'values'
+      type          : '()[Lcom/example/enums/Planet;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+000f98:                                        |[000f98] com.example.enums.Planet.values:()[Lcom/example/enums/Planet;
+000fa8: 6200 0f00                              |0000: sget-object v0, Lcom/example/enums/Planet;.$VALUES:[Lcom/example/enums/Planet; // field@000f
+000fac: 6e10 3a00 0000                         |0002: invoke-virtual {v0}, [Lcom/example/enums/Planet;.clone:()Ljava/lang/Object; // method@003a
+000fb2: 0c00                                   |0005: move-result-object v0
+000fb4: 1f00 1e00                              |0006: check-cast v0, [Lcom/example/enums/Planet; // type@001e
+000fb8: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=7
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 56 (Main.java)
+

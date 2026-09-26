@@ -1,0 +1,1738 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/android/tools/r8/annotations/LambdaMethod;'
+  Access flags      : 0x3601 (PUBLIC INTERFACE ABSTRACT SYNTHETIC ANNOTATION)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/lang/annotation/Annotation;'
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/android/tools/r8/annotations/LambdaMethod;)
+      name          : 'holder'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lcom/android/tools/r8/annotations/LambdaMethod;)
+      name          : 'method'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #2              : (in Lcom/android/tools/r8/annotations/LambdaMethod;)
+      name          : 'proto'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/merge/Base;'
+  Access flags      : 0x0400 (ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Base;)
+      name          : 'v'
+      type          : 'I'
+      access        : 0x0000 ()
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Base;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000ae8:                                        |[000ae8] com.example.merge.Base.<init>:(I)V
+000af8: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000afe: 5901 0000                              |0003: iput v1, v0, Lcom/example/merge/Base;.v:I // field@0000
+000b02: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=50
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Base;
+        0x0000 - 0x0006 reg=1 v I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Base;)
+      name          : 'f'
+      type          : '()I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 5 16-bit code units
+000acc:                                        |[000acc] com.example.merge.Base.f:()I
+000adc: 5210 0000                              |0000: iget v0, v1, Lcom/example/merge/Base;.v:I // field@0000
+000ae0: d800 0064                              |0002: add-int/lit8 v0, v0, #int 100 // #64
+000ae4: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=52
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/merge/Base;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/merge/Shape;'
+  Access flags      : 0x0600 (INTERFACE ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Shape;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lcom/example/merge/Shape;)
+      name          : 'label'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 66 (Main.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/merge/Circle;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/merge/Shape;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Circle;)
+      name          : 'r'
+      type          : 'D'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Circle;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 6 16-bit code units
+000b68:                                        |[000b68] com.example.merge.Circle.<init>:(D)V
+000b78: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000b7e: 5a01 0100                              |0003: iput-wide v1, v0, Lcom/example/merge/Circle;.r:D // field@0001
+000b82: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=20
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Circle;
+        0x0000 - 0x0006 reg=1 r D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Circle;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 0
+      insns size    : 12 16-bit code units
+000b04:                                        |[000b04] com.example.merge.Circle.area:()D
+000b14: 1800 182d 4454 fb21 0940               |0000: const-wide v0, #double 3.14159 // #400921fb54442d18
+000b1e: 5342 0100                              |0005: iget-wide v2, v4, Lcom/example/merge/Circle;.r:D // field@0001
+000b22: cd02                                   |0007: mul-double/2addr v2, v0
+000b24: 5340 0100                              |0008: iget-wide v0, v4, Lcom/example/merge/Circle;.r:D // field@0001
+000b28: cd02                                   |000a: mul-double/2addr v2, v0
+000b2a: 1002                                   |000b: return-wide v2
+      catches       : (none)
+      positions     :
+        0x0000 line=22
+      locals        :
+        0x0000 - 0x000c reg=4 this Lcom/example/merge/Circle;
+
+    #1              : (in Lcom/example/merge/Circle;)
+      name          : 'label'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 22 16-bit code units
+000b2c:                                        |[000b2c] com.example.merge.Circle.label:()Ljava/lang/String;
+000b3c: 5340 0100                              |0000: iget-wide v0, v4, Lcom/example/merge/Circle;.r:D // field@0001
+000b40: 2202 2000                              |0002: new-instance v2, Ljava/lang/StringBuilder; // type@0020
+000b44: 7010 4900 0200                         |0004: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+000b4a: 1a03 5800                              |0007: const-string v3, "circle:" // string@0058
+000b4e: 6e20 4c00 3200                         |0009: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+000b54: 0c02                                   |000c: move-result-object v2
+000b56: 6e30 4a00 0201                         |000d: invoke-virtual {v2, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@004a
+000b5c: 0c00                                   |0010: move-result-object v0
+000b5e: 6e10 4d00 0000                         |0011: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+000b64: 0c00                                   |0014: move-result-object v0
+000b66: 1100                                   |0015: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=24
+      locals        :
+        0x0000 - 0x0016 reg=4 this Lcom/example/merge/Circle;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #4            -
+  Class descriptor  : 'Lcom/example/merge/Doubler;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Lcom/example/merge/Base;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Doubler;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 2
+      insns size    : 4 16-bit code units
+000ba0:                                        |[000ba0] com.example.merge.Doubler.<init>:(I)V
+000bb0: 7020 0300 1000                         |0000: invoke-direct {v0, v1}, Lcom/example/merge/Base;.<init>:(I)V // method@0003
+000bb6: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=56
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/merge/Doubler;
+        0x0000 - 0x0004 reg=1 v I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Doubler;)
+      name          : 'f'
+      type          : '()I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 5 16-bit code units
+000b84:                                        |[000b84] com.example.merge.Doubler.f:()I
+000b94: 5210 0200                              |0000: iget v0, v1, Lcom/example/merge/Doubler;.v:I // field@0002
+000b98: da00 0002                              |0002: mul-int/lit8 v0, v0, #int 2 // #02
+000b9c: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=58
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/merge/Doubler;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #5            -
+  Class descriptor  : 'Lcom/example/merge/One;'
+  Access flags      : 0x0600 (INTERFACE ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/One;)
+      name          : 'one'
+      type          : '()I'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 66 (Main.java)
+
+Class #6            -
+  Class descriptor  : 'Lcom/example/merge/HasOne;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/merge/One;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/HasOne;)
+      name          : 'a'
+      type          : 'I'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/HasOne;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000bd4:                                        |[000bd4] com.example.merge.HasOne.<init>:(I)V
+000be4: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000bea: 5901 0300                              |0003: iput v1, v0, Lcom/example/merge/HasOne;.a:I // field@0003
+000bee: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=74
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/HasOne;
+        0x0000 - 0x0006 reg=1 a I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/HasOne;)
+      name          : 'one'
+      type          : '()I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 5 16-bit code units
+000bb8:                                        |[000bb8] com.example.merge.HasOne.one:()I
+000bc8: 5210 0300                              |0000: iget v0, v1, Lcom/example/merge/HasOne;.a:I // field@0003
+000bcc: d800 0001                              |0002: add-int/lit8 v0, v0, #int 1 // #01
+000bd0: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=76
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/merge/HasOne;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #7            -
+  Class descriptor  : 'Lcom/example/merge/Two;'
+  Access flags      : 0x0600 (INTERFACE ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Two;)
+      name          : 'two'
+      type          : '()I'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 66 (Main.java)
+
+Class #8            -
+  Class descriptor  : 'Lcom/example/merge/HasTwo;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/merge/Two;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/HasTwo;)
+      name          : 'a'
+      type          : 'I'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/HasTwo;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000c0c:                                        |[000c0c] com.example.merge.HasTwo.<init>:(I)V
+000c1c: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000c22: 5901 0400                              |0003: iput v1, v0, Lcom/example/merge/HasTwo;.a:I // field@0004
+000c26: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=82
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/HasTwo;
+        0x0000 - 0x0006 reg=1 a I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/HasTwo;)
+      name          : 'two'
+      type          : '()I'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 5 16-bit code units
+000bf0:                                        |[000bf0] com.example.merge.HasTwo.two:()I
+000c00: 5210 0400                              |0000: iget v0, v1, Lcom/example/merge/HasTwo;.a:I // field@0004
+000c04: da00 0003                              |0002: mul-int/lit8 v0, v0, #int 3 // #03
+000c08: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=84
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/example/merge/HasTwo;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #9            -
+  Class descriptor  : 'Lcom/example/merge/Incrementer;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Lcom/example/merge/Base;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Incrementer;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 2
+      insns size    : 4 16-bit code units
+000c48:                                        |[000c48] com.example.merge.Incrementer.<init>:(I)V
+000c58: 7020 0300 1000                         |0000: invoke-direct {v0, v1}, Lcom/example/merge/Base;.<init>:(I)V // method@0003
+000c5e: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=62
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/merge/Incrementer;
+        0x0000 - 0x0004 reg=1 v I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Incrementer;)
+      name          : 'f'
+      type          : '()I'
+      access        : 0x0000 ()
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 7 16-bit code units
+000c28:                                        |[000c28] com.example.merge.Incrementer.f:()I
+000c38: 6f10 0400 0100                         |0000: invoke-super {v1}, Lcom/example/merge/Base;.f:()I // method@0004
+000c3e: 0a00                                   |0003: move-result v0
+000c40: d800 0001                              |0004: add-int/lit8 v0, v0, #int 1 // #01
+000c44: 0f00                                   |0006: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=64
+      locals        :
+        0x0000 - 0x0007 reg=1 this Lcom/example/merge/Incrementer;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #10            -
+  Class descriptor  : 'Lcom/example/merge/Main$0;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/IntSupplier;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$0;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$0;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000c80:                                        |[000c80] com.example.merge.Main$0.<init>:(I)V
+000c90: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000c96: 5901 0500                              |0003: iput v1, v0, Lcom/example/merge/Main$0;.f$0:I // field@0005
+000c9a: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$0;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$0;)
+      name          : 'getAsInt'
+      type          : '()I'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 7 16-bit code units
+000c60:                                        |[000c60] com.example.merge.Main$0.getAsInt:()I
+000c70: 5210 0500                              |0000: iget v0, v1, Lcom/example/merge/Main$0;.f$0:I // field@0005
+000c74: 7110 2f00 0000                         |0002: invoke-static {v0}, Lcom/example/merge/Main;.lambda$suppliers$0:(I)I // method@002f
+000c7a: 0a00                                   |0005: move-result v0
+000c7c: 0f00                                   |0006: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0007 reg=1 this Lcom/example/merge/Main$0;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #11            -
+  Class descriptor  : 'Lcom/example/merge/Main$10;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/lang/Runnable;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$10;)
+      name          : 'f$0'
+      type          : '[Ljava/lang/String;'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$10;)
+      name          : '<init>'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000c9c:                                        |[000c9c] com.example.merge.Main$10.<init>:([Ljava/lang/String;)V
+000cac: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000cb2: 5b01 0600                              |0003: iput-object v1, v0, Lcom/example/merge/Main$10;.f$0:[Ljava/lang/String; // field@0006
+000cb6: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$10;
+        0x0000 - 0x0006 reg=1 (null) [Ljava/lang/String;
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$10;)
+      name          : 'run'
+      type          : '()V'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 6 16-bit code units
+000cb8:                                        |[000cb8] com.example.merge.Main$10.run:()V
+000cc8: 5410 0600                              |0000: iget-object v0, v1, Lcom/example/merge/Main$10;.f$0:[Ljava/lang/String; // field@0006
+000ccc: 7110 2e00 0000                         |0002: invoke-static {v0}, Lcom/example/merge/Main;.lambda$main$0:([Ljava/lang/String;)V // method@002e
+000cd2: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=1 this Lcom/example/merge/Main$10;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #12            -
+  Class descriptor  : 'Lcom/example/merge/Main$1;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/IntSupplier;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$1;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$1;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000cf4:                                        |[000cf4] com.example.merge.Main$1.<init>:(I)V
+000d04: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000d0a: 5901 0700                              |0003: iput v1, v0, Lcom/example/merge/Main$1;.f$0:I // field@0007
+000d0e: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$1;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$1;)
+      name          : 'getAsInt'
+      type          : '()I'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 7 16-bit code units
+000cd4:                                        |[000cd4] com.example.merge.Main$1.getAsInt:()I
+000ce4: 5210 0700                              |0000: iget v0, v1, Lcom/example/merge/Main$1;.f$0:I // field@0007
+000ce8: 7110 3000 0000                         |0002: invoke-static {v0}, Lcom/example/merge/Main;.lambda$suppliers$1:(I)I // method@0030
+000cee: 0a00                                   |0005: move-result v0
+000cf0: 0f00                                   |0006: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0007 reg=1 this Lcom/example/merge/Main$1;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #13            -
+  Class descriptor  : 'Lcom/example/merge/Main$2;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/IntSupplier;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$2;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$2;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000d30:                                        |[000d30] com.example.merge.Main$2.<init>:(I)V
+000d40: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000d46: 5901 0800                              |0003: iput v1, v0, Lcom/example/merge/Main$2;.f$0:I // field@0008
+000d4a: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$2;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$2;)
+      name          : 'getAsInt'
+      type          : '()I'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 7 16-bit code units
+000d10:                                        |[000d10] com.example.merge.Main$2.getAsInt:()I
+000d20: 5210 0800                              |0000: iget v0, v1, Lcom/example/merge/Main$2;.f$0:I // field@0008
+000d24: 7110 3100 0000                         |0002: invoke-static {v0}, Lcom/example/merge/Main;.lambda$suppliers$2:(I)I // method@0031
+000d2a: 0a00                                   |0005: move-result v0
+000d2c: 0f00                                   |0006: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0007 reg=1 this Lcom/example/merge/Main$2;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #14            -
+  Class descriptor  : 'Lcom/example/merge/Main$3;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/IntSupplier;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$3;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$3;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000d6c:                                        |[000d6c] com.example.merge.Main$3.<init>:(I)V
+000d7c: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000d82: 5901 0900                              |0003: iput v1, v0, Lcom/example/merge/Main$3;.f$0:I // field@0009
+000d86: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$3;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$3;)
+      name          : 'getAsInt'
+      type          : '()I'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 7 16-bit code units
+000d4c:                                        |[000d4c] com.example.merge.Main$3.getAsInt:()I
+000d5c: 5210 0900                              |0000: iget v0, v1, Lcom/example/merge/Main$3;.f$0:I // field@0009
+000d60: 7110 3200 0000                         |0002: invoke-static {v0}, Lcom/example/merge/Main;.lambda$suppliers$3:(I)I // method@0032
+000d66: 0a00                                   |0005: move-result v0
+000d68: 0f00                                   |0006: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0007 reg=1 this Lcom/example/merge/Main$3;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #15            -
+  Class descriptor  : 'Lcom/example/merge/Main$4;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$4;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$4;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000dac:                                        |[000dac] com.example.merge.Main$4.<init>:(I)V
+000dbc: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000dc2: 5901 0a00                              |0003: iput v1, v0, Lcom/example/merge/Main$4;.f$0:I // field@000a
+000dc6: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$4;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$4;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000d88:                                        |[000d88] com.example.merge.Main$4.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000d98: 5210 0a00                              |0000: iget v0, v1, Lcom/example/merge/Main$4;.f$0:I // field@000a
+000d9c: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000da0: 7120 2800 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$0:(ILjava/lang/Integer;)Ljava/lang/Integer; // method@0028
+000da6: 0c02                                   |0007: move-result-object v2
+000da8: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$4;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #16            -
+  Class descriptor  : 'Lcom/example/merge/Main$5;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$5;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$5;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000dec:                                        |[000dec] com.example.merge.Main$5.<init>:(I)V
+000dfc: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000e02: 5901 0b00                              |0003: iput v1, v0, Lcom/example/merge/Main$5;.f$0:I // field@000b
+000e06: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$5;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$5;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000dc8:                                        |[000dc8] com.example.merge.Main$5.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000dd8: 5210 0b00                              |0000: iget v0, v1, Lcom/example/merge/Main$5;.f$0:I // field@000b
+000ddc: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000de0: 7120 2900 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$1:(ILjava/lang/Integer;)Ljava/lang/Integer; // method@0029
+000de6: 0c02                                   |0007: move-result-object v2
+000de8: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$5;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #17            -
+  Class descriptor  : 'Lcom/example/merge/Main$6;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$6;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$6;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000e2c:                                        |[000e2c] com.example.merge.Main$6.<init>:(I)V
+000e3c: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000e42: 5901 0c00                              |0003: iput v1, v0, Lcom/example/merge/Main$6;.f$0:I // field@000c
+000e46: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$6;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$6;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000e08:                                        |[000e08] com.example.merge.Main$6.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000e18: 5210 0c00                              |0000: iget v0, v1, Lcom/example/merge/Main$6;.f$0:I // field@000c
+000e1c: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000e20: 7120 2a00 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$2:(ILjava/lang/Integer;)Ljava/lang/Integer; // method@002a
+000e26: 0c02                                   |0007: move-result-object v2
+000e28: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$6;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #18            -
+  Class descriptor  : 'Lcom/example/merge/Main$7;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$7;)
+      name          : 'f$0'
+      type          : 'Ljava/lang/String;'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$7;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000e6c:                                        |[000e6c] com.example.merge.Main$7.<init>:(Ljava/lang/String;)V
+000e7c: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000e82: 5b01 0d00                              |0003: iput-object v1, v0, Lcom/example/merge/Main$7;.f$0:Ljava/lang/String; // field@000d
+000e86: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$7;
+        0x0000 - 0x0006 reg=1 (null) Ljava/lang/String;
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$7;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000e48:                                        |[000e48] com.example.merge.Main$7.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000e58: 5410 0d00                              |0000: iget-object v0, v1, Lcom/example/merge/Main$7;.f$0:Ljava/lang/String; // field@000d
+000e5c: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000e60: 7120 2b00 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$3:(Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/Integer; // method@002b
+000e66: 0c02                                   |0007: move-result-object v2
+000e68: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$7;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #19            -
+  Class descriptor  : 'Lcom/example/merge/Main$8;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$8;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$8;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000eac:                                        |[000eac] com.example.merge.Main$8.<init>:(I)V
+000ebc: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000ec2: 5901 0e00                              |0003: iput v1, v0, Lcom/example/merge/Main$8;.f$0:I // field@000e
+000ec6: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$8;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$8;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000e88:                                        |[000e88] com.example.merge.Main$8.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000e98: 5210 0e00                              |0000: iget v0, v1, Lcom/example/merge/Main$8;.f$0:I // field@000e
+000e9c: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000ea0: 7120 2c00 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$4:(ILjava/lang/Integer;)Ljava/lang/Integer; // method@002c
+000ea6: 0c02                                   |0007: move-result-object v2
+000ea8: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$8;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #20            -
+  Class descriptor  : 'Lcom/example/merge/Main$9;'
+  Access flags      : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Ljava/util/function/Function;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Main$9;)
+      name          : 'f$0'
+      type          : 'I'
+      access        : 0x1011 (PUBLIC FINAL SYNTHETIC)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main$9;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x11001 (PUBLIC SYNTHETIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+000eec:                                        |[000eec] com.example.merge.Main$9.<init>:(I)V
+000efc: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+000f02: 5901 0f00                              |0003: iput v1, v0, Lcom/example/merge/Main$9;.f$0:I // field@000f
+000f06: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Main$9;
+        0x0000 - 0x0006 reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Main$9;)
+      name          : 'apply'
+      type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 9 16-bit code units
+000ec8:                                        |[000ec8] com.example.merge.Main$9.apply:(Ljava/lang/Object;)Ljava/lang/Object;
+000ed8: 5210 0f00                              |0000: iget v0, v1, Lcom/example/merge/Main$9;.f$0:I // field@000f
+000edc: 1f02 1c00                              |0002: check-cast v2, Ljava/lang/Integer; // type@001c
+000ee0: 7120 2d00 2000                         |0004: invoke-static {v0, v2}, Lcom/example/merge/Main;.lambda$functions$5:(ILjava/lang/Integer;)Ljava/lang/Integer; // method@002d
+000ee6: 0c02                                   |0007: move-result-object v2
+000ee8: 1102                                   |0008: return-object v2
+      catches       : (none)
+      positions     :
+        0x0000 line=0
+      locals        :
+        0x0000 - 0x0009 reg=1 this Lcom/example/merge/Main$9;
+        0x0000 - 0x0009 reg=2 (null) Ljava/lang/Object;
+
+  source_file_idx   : 10 (D8$$SyntheticClass)
+
+Class #21            -
+  Class descriptor  : 'Lcom/example/merge/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+001128:                                        |[001128] com.example.merge.Main.<init>:()V
+001138: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+00113e: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=87
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/merge/Main;
+
+    #1              : (in Lcom/example/merge/Main;)
+      name          : 'functions'
+      type          : '(ILjava/lang/String;)Ljava/util/List;'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 4
+      ins           : 2
+      outs          : 2
+      insns size    : 54 16-bit code units
+001054:                                        |[001054] com.example.merge.Main.functions:(ILjava/lang/String;)Ljava/util/List;
+001064: 2200 2700                              |0000: new-instance v0, Ljava/util/ArrayList; // type@0027
+001068: 7010 4e00 0000                         |0002: invoke-direct {v0}, Ljava/util/ArrayList;.<init>:()V // method@004e
+00106e: 2201 0e00                              |0005: new-instance v1, Lcom/example/merge/Main$4; // type@000e
+001072: 7020 1a00 2100                         |0007: invoke-direct {v1, v2}, Lcom/example/merge/Main$4;.<init>:(I)V // method@001a
+001078: 7220 5100 1000                         |000a: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+00107e: 2201 0f00                              |000d: new-instance v1, Lcom/example/merge/Main$5; // type@000f
+001082: 7020 1c00 2100                         |000f: invoke-direct {v1, v2}, Lcom/example/merge/Main$5;.<init>:(I)V // method@001c
+001088: 7220 5100 1000                         |0012: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+00108e: 2201 1000                              |0015: new-instance v1, Lcom/example/merge/Main$6; // type@0010
+001092: 7020 1e00 2100                         |0017: invoke-direct {v1, v2}, Lcom/example/merge/Main$6;.<init>:(I)V // method@001e
+001098: 7220 5100 1000                         |001a: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+00109e: 2201 1100                              |001d: new-instance v1, Lcom/example/merge/Main$7; // type@0011
+0010a2: 7020 2000 3100                         |001f: invoke-direct {v1, v3}, Lcom/example/merge/Main$7;.<init>:(Ljava/lang/String;)V // method@0020
+0010a8: 7220 5100 1000                         |0022: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+0010ae: 2201 1200                              |0025: new-instance v1, Lcom/example/merge/Main$8; // type@0012
+0010b2: 7020 2200 2100                         |0027: invoke-direct {v1, v2}, Lcom/example/merge/Main$8;.<init>:(I)V // method@0022
+0010b8: 7220 5100 1000                         |002a: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+0010be: 2201 1300                              |002d: new-instance v1, Lcom/example/merge/Main$9; // type@0013
+0010c2: 7020 2400 2100                         |002f: invoke-direct {v1, v2}, Lcom/example/merge/Main$9;.<init>:(I)V // method@0024
+0010c8: 7220 5100 1000                         |0032: invoke-interface {v0, v1}, Ljava/util/List;.add:(Ljava/lang/Object;)Z // method@0051
+0010ce: 1100                                   |0035: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=89
+        0x0005 line=90
+        0x000d line=91
+        0x0015 line=92
+        0x001d line=93
+        0x0025 line=94
+        0x002d line=95
+        0x0035 line=96
+      locals        :
+        0x0005 - 0x0036 reg=0 fs Ljava/util/List; Ljava/util/List<Ljava/util/function/Function<Ljava/lang/Integer;Ljava/lang/Integer;>;>;
+        0x0000 - 0x0036 reg=2 k I
+        0x0000 - 0x0036 reg=3 tag Ljava/lang/String;
+
+    #2              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$0'
+      type          : '(ILjava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 10 16-bit code units
+000f6c:                                        |[000f6c] com.example.merge.Main.lambda$functions$0:(ILjava/lang/Integer;)Ljava/lang/Integer;
+000f7c: 6e10 4300 0200                         |0000: invoke-virtual {v2}, Ljava/lang/Integer;.intValue:()I // method@0043
+000f82: 0a00                                   |0003: move-result v0
+000f84: b010                                   |0004: add-int/2addr v0, v1
+000f86: 7110 4500 0000                         |0005: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+000f8c: 0c00                                   |0008: move-result-object v0
+000f8e: 1100                                   |0009: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=90
+      locals        :
+        0x0000 - 0x000a reg=1 k I
+        0x0000 - 0x000a reg=2 x Ljava/lang/Integer;
+
+    #3              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$1'
+      type          : '(ILjava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 10 16-bit code units
+000f90:                                        |[000f90] com.example.merge.Main.lambda$functions$1:(ILjava/lang/Integer;)Ljava/lang/Integer;
+000fa0: 6e10 4300 0200                         |0000: invoke-virtual {v2}, Ljava/lang/Integer;.intValue:()I // method@0043
+000fa6: 0a00                                   |0003: move-result v0
+000fa8: b210                                   |0004: mul-int/2addr v0, v1
+000faa: 7110 4500 0000                         |0005: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+000fb0: 0c00                                   |0008: move-result-object v0
+000fb2: 1100                                   |0009: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=91
+      locals        :
+        0x0000 - 0x000a reg=1 k I
+        0x0000 - 0x000a reg=2 x Ljava/lang/Integer;
+
+    #4              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$2'
+      type          : '(ILjava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 10 16-bit code units
+000fb4:                                        |[000fb4] com.example.merge.Main.lambda$functions$2:(ILjava/lang/Integer;)Ljava/lang/Integer;
+000fc4: 6e10 4300 0200                         |0000: invoke-virtual {v2}, Ljava/lang/Integer;.intValue:()I // method@0043
+000fca: 0a00                                   |0003: move-result v0
+000fcc: b110                                   |0004: sub-int/2addr v0, v1
+000fce: 7110 4500 0000                         |0005: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+000fd4: 0c00                                   |0008: move-result-object v0
+000fd6: 1100                                   |0009: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=92
+      locals        :
+        0x0000 - 0x000a reg=1 k I
+        0x0000 - 0x000a reg=2 x Ljava/lang/Integer;
+
+    #5              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$3'
+      type          : '(Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 4
+      ins           : 2
+      outs          : 1
+      insns size    : 14 16-bit code units
+000fd8:                                        |[000fd8] com.example.merge.Main.lambda$functions$3:(Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/Integer;
+000fe8: 6e10 4800 0200                         |0000: invoke-virtual {v2}, Ljava/lang/String;.length:()I // method@0048
+000fee: 0a00                                   |0003: move-result v0
+000ff0: 6e10 4300 0300                         |0004: invoke-virtual {v3}, Ljava/lang/Integer;.intValue:()I // method@0043
+000ff6: 0a01                                   |0007: move-result v1
+000ff8: b010                                   |0008: add-int/2addr v0, v1
+000ffa: 7110 4500 0000                         |0009: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+001000: 0c00                                   |000c: move-result-object v0
+001002: 1100                                   |000d: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=93
+      locals        :
+        0x0000 - 0x000e reg=2 tag Ljava/lang/String;
+        0x0000 - 0x000e reg=3 x Ljava/lang/Integer;
+
+    #6              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$4'
+      type          : '(ILjava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 10 16-bit code units
+001004:                                        |[001004] com.example.merge.Main.lambda$functions$4:(ILjava/lang/Integer;)Ljava/lang/Integer;
+001014: 6e10 4300 0200                         |0000: invoke-virtual {v2}, Ljava/lang/Integer;.intValue:()I // method@0043
+00101a: 0a00                                   |0003: move-result v0
+00101c: b710                                   |0004: xor-int/2addr v0, v1
+00101e: 7110 4500 0000                         |0005: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+001024: 0c00                                   |0008: move-result-object v0
+001026: 1100                                   |0009: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=94
+      locals        :
+        0x0000 - 0x000a reg=1 k I
+        0x0000 - 0x000a reg=2 x Ljava/lang/Integer;
+
+    #7              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$functions$5'
+      type          : '(ILjava/lang/Integer;)Ljava/lang/Integer;'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 2
+      insns size    : 13 16-bit code units
+001028:                                        |[001028] com.example.merge.Main.lambda$functions$5:(ILjava/lang/Integer;)Ljava/lang/Integer;
+001038: 6e10 4300 0200                         |0000: invoke-virtual {v2}, Ljava/lang/Integer;.intValue:()I // method@0043
+00103e: 0a00                                   |0003: move-result v0
+001040: 7120 4400 1000                         |0004: invoke-static {v0, v1}, Ljava/lang/Integer;.rotateLeft:(II)I // method@0044
+001046: 0a00                                   |0007: move-result v0
+001048: 7110 4500 0000                         |0008: invoke-static {v0}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+00104e: 0c00                                   |000b: move-result-object v0
+001050: 1100                                   |000c: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=95
+      locals        :
+        0x0000 - 0x000d reg=1 k I
+        0x0000 - 0x000d reg=2 x Ljava/lang/Integer;
+
+    #8              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$main$0'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 26 16-bit code units
+001140:                                        |[001140] com.example.merge.Main.lambda$main$0:([Ljava/lang/String;)V
+001150: 6200 1200                              |0000: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+001154: 2141                                   |0002: array-length v1, v4
+001156: 2202 2000                              |0003: new-instance v2, Ljava/lang/StringBuilder; // type@0020
+00115a: 7010 4900 0200                         |0005: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+001160: 1a03 7900                              |0008: const-string v3, "ran " // string@0079
+001164: 6e20 4c00 3200                         |000a: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+00116a: 0c02                                   |000d: move-result-object v2
+00116c: 6e20 4b00 1200                         |000e: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@004b
+001172: 0c01                                   |0011: move-result-object v1
+001174: 6e10 4d00 0100                         |0012: invoke-virtual {v1}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+00117a: 0c01                                   |0015: move-result-object v1
+00117c: 6e20 4100 1000                         |0016: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0041
+001182: 0e00                                   |0019: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=114
+      locals        :
+        0x0000 - 0x001a reg=4 args [Ljava/lang/String;
+
+    #9              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$suppliers$0'
+      type          : '(I)I'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 3 16-bit code units
+000f08:                                        |[000f08] com.example.merge.Main.lambda$suppliers$0:(I)I
+000f18: d800 0101                              |0000: add-int/lit8 v0, v1, #int 1 // #01
+000f1c: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=100
+      locals        :
+        0x0000 - 0x0003 reg=1 n I
+
+    #10              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$suppliers$1'
+      type          : '(I)I'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 3 16-bit code units
+000f20:                                        |[000f20] com.example.merge.Main.lambda$suppliers$1:(I)I
+000f30: 9200 0101                              |0000: mul-int v0, v1, v1
+000f34: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=100
+      locals        :
+        0x0000 - 0x0003 reg=1 n I
+
+    #11              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$suppliers$2'
+      type          : '(I)I'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 0
+      insns size    : 3 16-bit code units
+000f38:                                        |[000f38] com.example.merge.Main.lambda$suppliers$2:(I)I
+000f48: d800 01f9                              |0000: add-int/lit8 v0, v1, #int -7 // #f9
+000f4c: 0f00                                   |0002: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=100
+      locals        :
+        0x0000 - 0x0003 reg=1 n I
+
+    #12              : (in Lcom/example/merge/Main;)
+      name          : 'lambda$suppliers$3'
+      type          : '(I)I'
+      access        : 0x1008 (STATIC SYNTHETIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 5 16-bit code units
+000f50:                                        |[000f50] com.example.merge.Main.lambda$suppliers$3:(I)I
+000f60: 7110 4200 0100                         |0000: invoke-static {v1}, Ljava/lang/Integer;.bitCount:(I)I // method@0042
+000f66: 0a00                                   |0003: move-result v0
+000f68: 0f00                                   |0004: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=100
+      locals        :
+        0x0000 - 0x0005 reg=1 n I
+
+    #13              : (in Lcom/example/merge/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 14
+      ins           : 1
+      outs          : 3
+      insns size    : 226 16-bit code units
+001184:                                        |[001184] com.example.merge.Main.main:([Ljava/lang/String;)V
+001194: 21d0                                   |0000: array-length v0, v13
+001196: 1231                                   |0001: const/4 v1, #int 3 // #3
+001198: b010                                   |0002: add-int/2addr v0, v1
+00119a: 2311 2f00                              |0003: new-array v1, v1, [Lcom/example/merge/Shape; // type@002f
+00119e: 2202 0400                              |0005: new-instance v2, Lcom/example/merge/Circle; // type@0004
+0011a2: 8303                                   |0007: int-to-double v3, v0
+0011a4: 7030 0500 3204                         |0008: invoke-direct {v2, v3, v4}, Lcom/example/merge/Circle;.<init>:(D)V // method@0005
+0011aa: 1203                                   |000b: const/4 v3, #int 0 // #0
+0011ac: 4d02 0103                              |000c: aput-object v2, v1, v3
+0011b0: 2202 1700                              |000e: new-instance v2, Lcom/example/merge/Square; // type@0017
+0011b4: d804 0001                              |0010: add-int/lit8 v4, v0, #int 1 // #01
+0011b8: 8344                                   |0012: int-to-double v4, v4
+0011ba: 7030 3800 4205                         |0013: invoke-direct {v2, v4, v5}, Lcom/example/merge/Square;.<init>:(D)V // method@0038
+0011c0: 1214                                   |0016: const/4 v4, #int 1 // #1
+0011c2: 4d02 0104                              |0017: aput-object v2, v1, v4
+0011c6: 2202 1800                              |0019: new-instance v2, Lcom/example/merge/Triangle; // type@0018
+0011ca: d805 0002                              |001b: add-int/lit8 v5, v0, #int 2 // #02
+0011ce: 8355                                   |001d: int-to-double v5, v5
+0011d0: 7030 3b00 5206                         |001e: invoke-direct {v2, v5, v6}, Lcom/example/merge/Triangle;.<init>:(D)V // method@003b
+0011d6: 1225                                   |0021: const/4 v5, #int 2 // #2
+0011d8: 4d02 0105                              |0022: aput-object v2, v1, v5
+0011dc: 2112                                   |0024: array-length v2, v1
+0011de: 0136                                   |0025: move v6, v3
+0011e0: 3526 2b00                              |0026: if-ge v6, v2, 0051 // +002b
+0011e4: 4607 0106                              |0028: aget-object v7, v1, v6
+0011e8: 6208 1200                              |002a: sget-object v8, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+0011ec: 7210 3700 0700                         |002c: invoke-interface {v7}, Lcom/example/merge/Shape;.label:()Ljava/lang/String; // method@0037
+0011f2: 0c09                                   |002f: move-result-object v9
+0011f4: 7210 3600 0700                         |0030: invoke-interface {v7}, Lcom/example/merge/Shape;.area:()D // method@0036
+0011fa: 0b0a                                   |0033: move-result-wide v10
+0011fc: 220c 2000                              |0034: new-instance v12, Ljava/lang/StringBuilder; // type@0020
+001200: 7010 4900 0c00                         |0036: invoke-direct {v12}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+001206: 6e20 4c00 9c00                         |0039: invoke-virtual {v12, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+00120c: 0c09                                   |003c: move-result-object v9
+00120e: 1a0c 0000                              |003d: const-string v12, " " // string@0000
+001212: 6e20 4c00 c900                         |003f: invoke-virtual {v9, v12}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+001218: 0c09                                   |0042: move-result-object v9
+00121a: 6e30 4a00 a90b                         |0043: invoke-virtual {v9, v10, v11}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@004a
+001220: 0c09                                   |0046: move-result-object v9
+001222: 6e10 4d00 0900                         |0047: invoke-virtual {v9}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+001228: 0c09                                   |004a: move-result-object v9
+00122a: 6e20 4100 9800                         |004b: invoke-virtual {v8, v9}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0041
+001230: d806 0601                              |004e: add-int/lit8 v6, v6, #int 1 // #01
+001234: 28d6                                   |0050: goto 0026 // -002a
+001236: 2352 2e00                              |0051: new-array v2, v5, [Lcom/example/merge/Base; // type@002e
+00123a: 2205 0500                              |0053: new-instance v5, Lcom/example/merge/Doubler; // type@0005
+00123e: 7020 0800 0500                         |0055: invoke-direct {v5, v0}, Lcom/example/merge/Doubler;.<init>:(I)V // method@0008
+001244: 4d05 0203                              |0058: aput-object v5, v2, v3
+001248: 2205 0800                              |005a: new-instance v5, Lcom/example/merge/Incrementer; // type@0008
+00124c: da06 0002                              |005c: mul-int/lit8 v6, v0, #int 2 // #02
+001250: 7020 0e00 6500                         |005e: invoke-direct {v5, v6}, Lcom/example/merge/Incrementer;.<init>:(I)V // method@000e
+001256: 4d05 0204                              |0061: aput-object v5, v2, v4
+00125a: 2124                                   |0063: array-length v4, v2
+00125c: 0135                                   |0064: move v5, v3
+00125e: 3545 1000                              |0065: if-ge v5, v4, 0075 // +0010
+001262: 4606 0205                              |0067: aget-object v6, v2, v5
+001266: 6207 1200                              |0069: sget-object v7, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+00126a: 6e10 0400 0600                         |006b: invoke-virtual {v6}, Lcom/example/merge/Base;.f:()I // method@0004
+001270: 0a08                                   |006e: move-result v8
+001272: 6e20 3f00 8700                         |006f: invoke-virtual {v7, v8}, Ljava/io/PrintStream;.println:(I)V // method@003f
+001278: d805 0501                              |0072: add-int/lit8 v5, v5, #int 1 // #01
+00127c: 28f1                                   |0074: goto 0065 // -000f
+00127e: 2204 0600                              |0075: new-instance v4, Lcom/example/merge/HasOne; // type@0006
+001282: 7020 0a00 0400                         |0077: invoke-direct {v4, v0}, Lcom/example/merge/HasOne;.<init>:(I)V // method@000a
+001288: 2205 0700                              |007a: new-instance v5, Lcom/example/merge/HasTwo; // type@0007
+00128c: 7020 0c00 0500                         |007c: invoke-direct {v5, v0}, Lcom/example/merge/HasTwo;.<init>:(I)V // method@000c
+001292: 6206 1200                              |007f: sget-object v6, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+001296: 7210 3500 0400                         |0081: invoke-interface {v4}, Lcom/example/merge/One;.one:()I // method@0035
+00129c: 0a07                                   |0084: move-result v7
+00129e: 7210 3e00 0500                         |0085: invoke-interface {v5}, Lcom/example/merge/Two;.two:()I // method@003e
+0012a4: 0a08                                   |0088: move-result v8
+0012a6: b087                                   |0089: add-int/2addr v7, v8
+0012a8: 6e20 3f00 7600                         |008a: invoke-virtual {v6, v7}, Ljava/io/PrintStream;.println:(I)V // method@003f
+0012ae: 2206 2000                              |008d: new-instance v6, Ljava/lang/StringBuilder; // type@0020
+0012b2: 7010 4900 0600                         |008f: invoke-direct {v6}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+0012b8: 1a07 8000                              |0092: const-string v7, "tag" // string@0080
+0012bc: 6e20 4c00 7600                         |0094: invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+0012c2: 0c06                                   |0097: move-result-object v6
+0012c4: 6e20 4b00 0600                         |0098: invoke-virtual {v6, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@004b
+0012ca: 0c06                                   |009b: move-result-object v6
+0012cc: 6e10 4d00 0600                         |009c: invoke-virtual {v6}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+0012d2: 0c06                                   |009f: move-result-object v6
+0012d4: 7120 2700 6000                         |00a0: invoke-static {v0, v6}, Lcom/example/merge/Main;.functions:(ILjava/lang/String;)Ljava/util/List; // method@0027
+0012da: 0c06                                   |00a3: move-result-object v6
+0012dc: 7210 5200 0600                         |00a4: invoke-interface {v6}, Ljava/util/List;.iterator:()Ljava/util/Iterator; // method@0052
+0012e2: 0c06                                   |00a7: move-result-object v6
+0012e4: 7210 4f00 0600                         |00a8: invoke-interface {v6}, Ljava/util/Iterator;.hasNext:()Z // method@004f
+0012ea: 0a07                                   |00ab: move-result v7
+0012ec: 3807 1800                              |00ac: if-eqz v7, 00c4 // +0018
+0012f0: 7210 5000 0600                         |00ae: invoke-interface {v6}, Ljava/util/Iterator;.next:()Ljava/lang/Object; // method@0050
+0012f6: 0c07                                   |00b1: move-result-object v7
+0012f8: 1f07 2a00                              |00b2: check-cast v7, Ljava/util/function/Function; // type@002a
+0012fc: 6208 1200                              |00b4: sget-object v8, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+001300: da09 0005                              |00b6: mul-int/lit8 v9, v0, #int 5 // #05
+001304: 7110 4500 0900                         |00b8: invoke-static {v9}, Ljava/lang/Integer;.valueOf:(I)Ljava/lang/Integer; // method@0045
+00130a: 0c09                                   |00bb: move-result-object v9
+00130c: 7220 5300 9700                         |00bc: invoke-interface {v7, v9}, Ljava/util/function/Function;.apply:(Ljava/lang/Object;)Ljava/lang/Object; // method@0053
+001312: 0c09                                   |00bf: move-result-object v9
+001314: 6e20 4000 9800                         |00c0: invoke-virtual {v8, v9}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@0040
+00131a: 28e5                                   |00c3: goto 00a8 // -001b
+00131c: 7110 3400 0000                         |00c4: invoke-static {v0}, Lcom/example/merge/Main;.suppliers:(I)[Ljava/util/function/IntSupplier; // method@0034
+001322: 0c06                                   |00c7: move-result-object v6
+001324: 2167                                   |00c8: array-length v7, v6
+001326: 3573 1000                              |00c9: if-ge v3, v7, 00d9 // +0010
+00132a: 4608 0603                              |00cb: aget-object v8, v6, v3
+00132e: 6209 1200                              |00cd: sget-object v9, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0012
+001332: 7210 5400 0800                         |00cf: invoke-interface {v8}, Ljava/util/function/IntSupplier;.getAsInt:()I // method@0054
+001338: 0a0a                                   |00d2: move-result v10
+00133a: 6e20 3f00 a900                         |00d3: invoke-virtual {v9, v10}, Ljava/io/PrintStream;.println:(I)V // method@003f
+001340: d803 0301                              |00d6: add-int/lit8 v3, v3, #int 1 // #01
+001344: 28f1                                   |00d8: goto 00c9 // -000f
+001346: 2203 0a00                              |00d9: new-instance v3, Lcom/example/merge/Main$10; // type@000a
+00134a: 7020 1200 d300                         |00db: invoke-direct {v3, v13}, Lcom/example/merge/Main$10;.<init>:([Ljava/lang/String;)V // method@0012
+001350: 7210 4700 0300                         |00de: invoke-interface {v3}, Ljava/lang/Runnable;.run:()V // method@0047
+001356: 0e00                                   |00e1: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=104
+        0x0003 line=105
+        0x0024 line=106
+        0x0051 line=107
+        0x0063 line=108
+        0x0075 line=109
+        0x007a line=110
+        0x007f line=111
+        0x008d line=112
+        0x00c4 line=113
+        0x00d9 line=114
+        0x00de line=115
+        0x00e1 line=116
+      locals        :
+        0x002a - 0x004e reg=7 s Lcom/example/merge/Shape;
+        0x0069 - 0x0072 reg=6 b Lcom/example/merge/Base;
+        0x00b4 - 0x00c3 reg=7 f Ljava/util/function/Function; Ljava/util/function/Function<Ljava/lang/Integer;Ljava/lang/Integer;>;
+        0x00cd - 0x00d6 reg=8 s Ljava/util/function/IntSupplier;
+        0x0003 - 0x00e2 reg=0 n I
+        0x0024 - 0x00e2 reg=1 shapes [Lcom/example/merge/Shape;
+        0x0063 - 0x00e2 reg=2 bases [Lcom/example/merge/Base;
+        0x00de - 0x00e2 reg=3 r Ljava/lang/Runnable;
+        0x007a - 0x00e2 reg=4 one Lcom/example/merge/One;
+        0x007f - 0x00e2 reg=5 two Lcom/example/merge/Two;
+        0x0000 - 0x00e2 reg=13 args [Ljava/lang/String;
+
+    #14              : (in Lcom/example/merge/Main;)
+      name          : 'suppliers'
+      type          : '(I)[Ljava/util/function/IntSupplier;'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 4
+      ins           : 1
+      outs          : 2
+      insns size    : 36 16-bit code units
+0010d0:                                        |[0010d0] com.example.merge.Main.suppliers:(I)[Ljava/util/function/IntSupplier;
+0010e0: 1240                                   |0000: const/4 v0, #int 4 // #4
+0010e2: 2300 3100                              |0001: new-array v0, v0, [Ljava/util/function/IntSupplier; // type@0031
+0010e6: 2201 0900                              |0003: new-instance v1, Lcom/example/merge/Main$0; // type@0009
+0010ea: 7020 1000 3100                         |0005: invoke-direct {v1, v3}, Lcom/example/merge/Main$0;.<init>:(I)V // method@0010
+0010f0: 1202                                   |0008: const/4 v2, #int 0 // #0
+0010f2: 4d01 0002                              |0009: aput-object v1, v0, v2
+0010f6: 2201 0b00                              |000b: new-instance v1, Lcom/example/merge/Main$1; // type@000b
+0010fa: 7020 1400 3100                         |000d: invoke-direct {v1, v3}, Lcom/example/merge/Main$1;.<init>:(I)V // method@0014
+001100: 1212                                   |0010: const/4 v2, #int 1 // #1
+001102: 4d01 0002                              |0011: aput-object v1, v0, v2
+001106: 2201 0c00                              |0013: new-instance v1, Lcom/example/merge/Main$2; // type@000c
+00110a: 7020 1600 3100                         |0015: invoke-direct {v1, v3}, Lcom/example/merge/Main$2;.<init>:(I)V // method@0016
+001110: 1222                                   |0018: const/4 v2, #int 2 // #2
+001112: 4d01 0002                              |0019: aput-object v1, v0, v2
+001116: 2201 0d00                              |001b: new-instance v1, Lcom/example/merge/Main$3; // type@000d
+00111a: 7020 1800 3100                         |001d: invoke-direct {v1, v3}, Lcom/example/merge/Main$3;.<init>:(I)V // method@0018
+001120: 1232                                   |0020: const/4 v2, #int 3 // #3
+001122: 4d01 0002                              |0021: aput-object v1, v0, v2
+001126: 1100                                   |0023: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=100
+      locals        :
+        0x0000 - 0x0024 reg=3 n I
+
+  Virtual methods   -
+  source_file_idx   : 66 (Main.java)
+
+Class #22            -
+  Class descriptor  : 'Lcom/example/merge/Square;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/merge/Shape;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Square;)
+      name          : 's'
+      type          : 'D'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Square;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 6 16-bit code units
+0013b0:                                        |[0013b0] com.example.merge.Square.<init>:(D)V
+0013c0: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+0013c6: 5a01 1000                              |0003: iput-wide v1, v0, Lcom/example/merge/Square;.s:D // field@0010
+0013ca: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=30
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Square;
+        0x0000 - 0x0006 reg=1 s D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Square;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 0
+      insns size    : 6 16-bit code units
+001358:                                        |[001358] com.example.merge.Square.area:()D
+001368: 5340 1000                              |0000: iget-wide v0, v4, Lcom/example/merge/Square;.s:D // field@0010
+00136c: 5342 1000                              |0002: iget-wide v2, v4, Lcom/example/merge/Square;.s:D // field@0010
+001370: cd20                                   |0004: mul-double/2addr v0, v2
+001372: 1000                                   |0005: return-wide v0
+      catches       : (none)
+      positions     :
+        0x0000 line=32
+      locals        :
+        0x0000 - 0x0006 reg=4 this Lcom/example/merge/Square;
+
+    #1              : (in Lcom/example/merge/Square;)
+      name          : 'label'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 22 16-bit code units
+001374:                                        |[001374] com.example.merge.Square.label:()Ljava/lang/String;
+001384: 5340 1000                              |0000: iget-wide v0, v4, Lcom/example/merge/Square;.s:D // field@0010
+001388: 2202 2000                              |0002: new-instance v2, Ljava/lang/StringBuilder; // type@0020
+00138c: 7010 4900 0200                         |0004: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+001392: 1a03 7e00                              |0007: const-string v3, "square:" // string@007e
+001396: 6e20 4c00 3200                         |0009: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+00139c: 0c02                                   |000c: move-result-object v2
+00139e: 6e30 4a00 0201                         |000d: invoke-virtual {v2, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@004a
+0013a4: 0c00                                   |0010: move-result-object v0
+0013a6: 6e10 4d00 0000                         |0011: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+0013ac: 0c00                                   |0014: move-result-object v0
+0013ae: 1100                                   |0015: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=34
+      locals        :
+        0x0000 - 0x0016 reg=4 this Lcom/example/merge/Square;
+
+  source_file_idx   : 66 (Main.java)
+
+Class #23            -
+  Class descriptor  : 'Lcom/example/merge/Triangle;'
+  Access flags      : 0x0010 (FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lcom/example/merge/Shape;'
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lcom/example/merge/Triangle;)
+      name          : 'b'
+      type          : 'D'
+      access        : 0x0010 (FINAL)
+  Direct methods    -
+    #0              : (in Lcom/example/merge/Triangle;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10000 (CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 6 16-bit code units
+00142c:                                        |[00142c] com.example.merge.Triangle.<init>:(D)V
+00143c: 7010 4600 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0046
+001442: 5a01 1100                              |0003: iput-wide v1, v0, Lcom/example/merge/Triangle;.b:D // field@0011
+001446: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=40
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lcom/example/merge/Triangle;
+        0x0000 - 0x0006 reg=1 b D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/merge/Triangle;)
+      name          : 'area'
+      type          : '()D'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 0
+      insns size    : 9 16-bit code units
+0013cc:                                        |[0013cc] com.example.merge.Triangle.area:()D
+0013dc: 5340 1100                              |0000: iget-wide v0, v4, Lcom/example/merge/Triangle;.b:D // field@0011
+0013e0: 5342 1100                              |0002: iget-wide v2, v4, Lcom/example/merge/Triangle;.b:D // field@0011
+0013e4: cd20                                   |0004: mul-double/2addr v0, v2
+0013e6: 1902 0040                              |0005: const-wide/high16 v2, #long 4611686018427387904 // #4000
+0013ea: ce20                                   |0007: div-double/2addr v0, v2
+0013ec: 1000                                   |0008: return-wide v0
+      catches       : (none)
+      positions     :
+        0x0000 line=42
+      locals        :
+        0x0000 - 0x0009 reg=4 this Lcom/example/merge/Triangle;
+
+    #1              : (in Lcom/example/merge/Triangle;)
+      name          : 'label'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 22 16-bit code units
+0013f0:                                        |[0013f0] com.example.merge.Triangle.label:()Ljava/lang/String;
+001400: 5340 1100                              |0000: iget-wide v0, v4, Lcom/example/merge/Triangle;.b:D // field@0011
+001404: 2202 2000                              |0002: new-instance v2, Ljava/lang/StringBuilder; // type@0020
+001408: 7010 4900 0200                         |0004: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0049
+00140e: 1a03 8200                              |0007: const-string v3, "triangle:" // string@0082
+001412: 6e20 4c00 3200                         |0009: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@004c
+001418: 0c02                                   |000c: move-result-object v2
+00141a: 6e30 4a00 0201                         |000d: invoke-virtual {v2, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@004a
+001420: 0c00                                   |0010: move-result-object v0
+001422: 6e10 4d00 0000                         |0011: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@004d
+001428: 0c00                                   |0014: move-result-object v0
+00142a: 1100                                   |0015: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=44
+      locals        :
+        0x0000 - 0x0016 reg=4 this Lcom/example/merge/Triangle;
+
+  source_file_idx   : 66 (Main.java)
+
