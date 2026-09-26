@@ -2,6 +2,7 @@
 
 mod annotation_member;
 mod compose_api;
+mod data_class;
 mod sigdb;
 pub mod compose_libkey;
 pub mod compose_params;
@@ -42,6 +43,7 @@ pub fn all() -> Vec<Box<dyn Pass>> {
         Box::new(compose_api::ComposeApi),
         Box::new(compose_params::ComposeParams),
         Box::new(compose_libkey::ComposeLibKey),
+        Box::new(data_class::DataClass),
         Box::new(sigdb::Sigdb),
         Box::new(enum_unboxing::EnumUnboxing),
         Box::new(library_override::LibraryOverride),

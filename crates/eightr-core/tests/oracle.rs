@@ -156,7 +156,14 @@ fn solved_names_match_held_back_mapping() {
             match (attr, member) {
                 (Attribute::ClassName, None) => {
                     let simple = |d: &str| d.rsplit('.').next().unwrap_or(d).to_string();
-                    assert_eq!(simple(&cm.original), simple(&obf), "{ctx}: R8 renamed {} -> {}", cm.original, obf);
+                    match &label.value {
+                        // A recovered simple name (without the outer class chain).
+                        Some(v) => {
+                            let orig = simple(&cm.original);
+                            assert_eq!(orig.rsplit('$').next().unwrap_or(&orig), v, "{ctx}: recovered {v} for {}", cm.original);
+                        }
+                        None => assert_eq!(simple(&cm.original), simple(&obf), "{ctx}: R8 renamed {} -> {}", cm.original, obf),
+                    }
                 }
                 (Attribute::Package, None) => {
                     let pkg = |d: &str| d.rsplit_once('.').map(|(p, _)| p.to_string()).unwrap_or_default();

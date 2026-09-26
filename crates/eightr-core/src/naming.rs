@@ -412,9 +412,18 @@ fn is_virtual(m: &eightr_ir::model::Method) -> bool {
 }
 
 pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Result<Naming> {
+    // S classes whose name stays (kept): stable in hashing. S classes with a recovered simple name
+    // (applied by the pipeline) are hashed like the rest: their input names are R8's choice.
     let s_classes: BTreeSet<ClassId> = p
         .class_ids()
-        .filter(|&id| labels.get(ItemId::Class { class: id }, Attribute::ClassName).is_some_and(|l| l.class == Class::Solved))
+        .filter(|&id| labels.get(ItemId::Class { class: id }, Attribute::ClassName).is_some_and(|l| l.class == Class::Solved && l.value.is_none()))
+        .collect();
+    let recovered_classes: BTreeMap<ClassId, String> = p
+        .class_ids()
+        .filter_map(|id| {
+            let l = labels.get(ItemId::Class { class: id }, Attribute::ClassName)?;
+            (l.class == Class::Solved).then(|| l.value.clone()).flatten().map(|v| (id, v))
+        })
         .collect();
     let cx = Ctx { p, labels, s_classes };
     // Members and classes looked up reflectively by a name string that can't be rewritten
@@ -575,8 +584,12 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
             taken.entry(package_of(d).to_string()).or_default().insert(simple_name_of(d).to_string());
         }
     }
+    // Recovered simple names are reserved in their package (the pipeline applies them).
+    for (&id, v) in &recovered_classes {
+        taken.entry(package_of(p.descriptor(id)).to_string()).or_default().insert(v.clone());
+    }
     let mut class_cands: Vec<(String, String, ClassId)> = Vec::new(); // (label, hint, id)
-    for id in p.class_ids().filter(|id| !cx.s_class(*id)) {
+    for id in p.class_ids().filter(|id| !cx.s_class(*id) && !recovered_classes.contains_key(id)) {
         let d = p.descriptor(id);
         // A platform class's name on a program class: a stub R8 synthesized for APIs newer than
         // min-api. On devices that have the API the platform's class is loaded instead, so every
