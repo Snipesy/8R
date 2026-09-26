@@ -11,7 +11,7 @@ use eightr_dex::code::CodeItem;
 use eightr_dex::insn::Decoded;
 use eightr_dex::Dex;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 struct DClass {
     descriptor: String,
     access: u32,
@@ -24,14 +24,14 @@ struct DClass {
     virtual_methods: Vec<DMethod>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 struct DField {
     name: String,
     ty: String,
     access: u32,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 struct DMethod {
     name: String,
     ty: String,
@@ -42,7 +42,7 @@ struct DMethod {
 /// (start, end, [(type or "<any>", addr)])
 type TryBlock = (u32, u32, Vec<(String, u32)>);
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 struct DCode {
     registers: u32,
     ins: u32,
@@ -196,6 +196,15 @@ fn payload_name(d: &Decoded) -> &'static str {
     }
 }
 
+/// End of real instructions: the first payload's pc, or the code length.
+fn instruction_end(code: &CodeItem) -> u32 {
+    code.decode()
+        .unwrap()
+        .iter()
+        .find_map(|d| matches!(d, Decoded::Payload { .. }).then(|| d.pc()))
+        .unwrap_or(code.insns.len() as u32)
+}
+
 fn our_code(dex: &Dex, code: &CodeItem) -> DCode {
     let insns = code.decode().unwrap().iter().map(|d| (d.pc(), payload_name(d).to_string())).collect();
     let catches = code
@@ -215,8 +224,8 @@ fn our_code(dex: &Dex, code: &CodeItem) -> DCode {
         .debug_info(code.debug_info_off)
         .unwrap()
         // R8 shares one debug_info_item (a pc→line table) across methods; entries past this
-        // method's code are irrelevant to it, and dexdump omits them.
-        .map(|d| d.positions.iter().filter(|p| (p.addr as usize) < code.insns.len()).map(|p| (p.addr, p.line)).collect())
+        // method's instructions (into payload data or beyond) are meaningless for it.
+        .map(|d| d.positions.iter().filter(|p| p.addr < instruction_end(code)).map(|p| (p.addr, p.line)).collect())
         .unwrap_or_default();
     DCode {
         registers: code.registers_size.into(),
@@ -292,11 +301,22 @@ fn matches_dexdump() {
     for path in fixture_dexes() {
         let bytes = fs::read(&path).unwrap();
         let dex = Dex::parse(&bytes).unwrap();
-        let expected = parse_dexdump(&fs::read_to_string(path.with_file_name("dexdump.txt")).unwrap());
+        // Large fixtures don't carry a dump (see xtask); they're still validated elsewhere.
+        let Ok(dump) = fs::read_to_string(path.with_file_name("dexdump.txt")) else { continue };
+        let expected = parse_dexdump(&dump);
         let actual = our_classes(&dex);
         assert_eq!(actual.len(), expected.len(), "{}: class count", path.display());
         for (a, e) in actual.iter().zip(&expected) {
-            assert_eq!(a, e, "{}: class {}", path.display(), e.descriptor);
+            // Apply the same meaningful-position cutoff to dexdump's side (it keeps an entry
+            // at the first payload's pc).
+            let mut e = e.clone();
+            for (am, em) in a.direct_methods.iter().chain(&a.virtual_methods).zip(e.direct_methods.iter_mut().chain(e.virtual_methods.iter_mut())) {
+                if let (Some(ac), Some(ec)) = (&am.code, &mut em.code) {
+                    let end = ac.insns.iter().find(|(_, n)| matches!(n.as_str(), "packed-switch-data" | "sparse-switch-data" | "array-data")).map(|(pc, _)| *pc).unwrap_or(ac.insns_size);
+                    ec.positions.retain(|(addr, _)| *addr < end);
+                }
+            }
+            assert_eq!(a, &e, "{}: class {}", path.display(), e.descriptor);
         }
         // Guard against the dexdump parser silently parsing nothing.
         let insn_count: usize = expected

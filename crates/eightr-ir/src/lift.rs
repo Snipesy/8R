@@ -104,16 +104,50 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
     let base = code.off as usize + 16;
     let mut lx = Lifter { r: Resolver { dex, syms }, base };
 
+    // Every pc something can transfer control to.
+    let mut targets = std::collections::BTreeSet::new();
+    for d in &decoded {
+        if let Decoded::Insn(i) = d {
+            if let Some(off) = i.offset {
+                let t = i64::from(i.pc) + i64::from(off);
+                targets.insert(t);
+                // Switch cases are relative to the switch instruction.
+                if let Some(Decoded::Payload { payload, .. }) = decoded.iter().find(|x| i64::from(x.pc()) == t) {
+                    match payload {
+                        Payload::PackedSwitch { targets: ts, .. } | Payload::SparseSwitch { targets: ts, .. } => {
+                            targets.extend(ts.iter().map(|&o| i64::from(i.pc) + i64::from(o)));
+                        }
+                        Payload::FillArrayData { .. } => {}
+                    }
+                }
+            }
+        }
+    }
+    for t in &code.tries {
+        targets.insert(i64::from(t.start_addr));
+    }
+    for (_, h) in &code.handlers {
+        targets.extend(h.catches.iter().map(|&(_, a)| i64::from(a)));
+        targets.extend(h.catch_all.map(i64::from));
+    }
+    // A `nop` directly before a payload is alignment padding, not code (unless something
+    // branches to it). Different writers pad differently, so padding is dropped.
+    let padding = |k: usize| -> bool {
+        matches!(&decoded[k], Decoded::Insn(i) if i.opcode == 0 && !targets.contains(&i64::from(i.pc)))
+            && matches!(decoded.get(k + 1), Some(Decoded::Payload { .. }))
+    };
+
     // pc → instruction index (payloads are not instructions).
     let mut pc_map = vec![u32::MAX; code.insns.len() + 1];
     let mut payloads: BTreeMap<u32, &Payload> = BTreeMap::new();
     let mut count = 0u32;
-    for d in &decoded {
+    for (k, d) in decoded.iter().enumerate() {
         match d {
-            Decoded::Insn(i) => {
+            Decoded::Insn(i) if !padding(k) => {
                 pc_map[i.pc as usize] = count;
                 count += 1;
             }
+            Decoded::Insn(_) => {}
             Decoded::Payload { pc, payload, .. } => {
                 payloads.insert(*pc, payload);
             }
@@ -122,8 +156,11 @@ pub fn lift(dex: &Dex, code: &CodeItem, syms: &mut Interner) -> Result<Body> {
     let pcs = PcMap(pc_map);
 
     let mut insns = Vec::with_capacity(count as usize);
-    for d in &decoded {
+    for (k, d) in decoded.iter().enumerate() {
         let Decoded::Insn(i) = d else { continue };
+        if padding(k) {
+            continue;
+        }
         let op = lift_insn(&mut lx, i, &pcs, &payloads)?;
         insns.push(Insn { pc: i.pc, op });
     }
