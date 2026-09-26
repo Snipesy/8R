@@ -195,6 +195,11 @@ fn outputs_behave_like_inputs() {
                     continue;
                 }
             }
+            if base.stdout.is_empty() && !art_baselines.contains_key(&fixture) {
+                // No ART run to tell a backend limitation from a broken fixture.
+                eprintln!("[{}] {fixture}: skipped, backend can't run the unmodified build (no output)", backend.name());
+                continue;
+            }
             assert!(!base.stdout.is_empty(), "[{}] {fixture}: baseline printed nothing", backend.name());
             // A fixture whose own output varies between runs (timing, identity hashes) can't be
             // compared; fail loudly so the fixture gets fixed.

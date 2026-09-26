@@ -190,8 +190,12 @@ impl Pass for KeptName {
             let simple = simple_name_of(desc);
             let t = tail(simple);
             let in_target = targets.contains(package_of(desc));
+            // R8 ≥ 9 names its synthetics `Outer$N` (no marker) and flags them ACC_SYNTHETIC;
+            // javac's anonymous `Outer$1` isn't flagged.
+            let r8_numbered = class.access & eightr_dex::class::access::SYNTHETIC != 0 && !t.is_empty() && t.bytes().all(|c| c.is_ascii_digit());
             let class_kept = !may_be_minified(t, bounds.class)
                 && !is_synthetic(simple)
+                && !r8_numbered
                 && !desc.starts_with("Lj$/")
                 // A kept name moved into a repackaging target gets a numeric suffix on
                 // collision (`Rep` → `Rep1`), so a trailing digit there isn't proof.
@@ -203,7 +207,7 @@ impl Pass for KeptName {
                 }
             }
             // Members of a compiler-synthesized class never existed in the source.
-            let class_synthetic = is_synthetic(simple);
+            let class_synthetic = is_synthetic(simple) || r8_numbered;
             let member_kept = |name: &str| {
                 !class_synthetic
                     && (name == "<init>"
