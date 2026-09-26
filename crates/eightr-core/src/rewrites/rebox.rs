@@ -501,7 +501,11 @@ impl Rewrite for Rebox {
                     let Some(&e) = by_names.get(&names) else { continue };
                     let n = names.len() as i32;
                     let seeds: Vec<usize> = if chain.from_value_of {
-                        chain.compares.iter().filter_map(|&(i, r)| def_index(&rd, i, r)).collect()
+                        // The success branch defines the result, or (a jump) it already holds it.
+                        chain.compares.iter().flat_map(|&(i, r)| match def_index(&rd, i, r) {
+                            Some(d) => vec![d],
+                            None => reaching(&rd, i, r).to_vec(),
+                        }).collect()
                     } else {
                         chain.compares.iter().flat_map(|&(i, r)| reaching(&rd, i, r).iter().copied()).collect()
                     };

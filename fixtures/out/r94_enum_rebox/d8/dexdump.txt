@@ -1,0 +1,570 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/rebox/Dir;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/rebox/Dir;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/rebox/Dir;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/rebox/Dir;)
+      name          : 'EAST'
+      type          : 'Lcom/example/rebox/Dir;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/rebox/Dir;)
+      name          : 'NORTH'
+      type          : 'Lcom/example/rebox/Dir;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/rebox/Dir;)
+      name          : 'SOUTH'
+      type          : 'Lcom/example/rebox/Dir;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #4              : (in Lcom/example/rebox/Dir;)
+      name          : 'WEST'
+      type          : 'Lcom/example/rebox/Dir;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/rebox/Dir;)
+      name          : '$values'
+      type          : '()[Lcom/example/rebox/Dir;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 4
+      ins           : 0
+      outs          : 4
+      insns size    : 13 16-bit code units
+0004bc:                                        |[0004bc] com.example.rebox.Dir.$values:()[Lcom/example/rebox/Dir;
+0004cc: 6200 0200                              |0000: sget-object v0, Lcom/example/rebox/Dir;.NORTH:Lcom/example/rebox/Dir; // field@0002
+0004d0: 6201 0100                              |0002: sget-object v1, Lcom/example/rebox/Dir;.EAST:Lcom/example/rebox/Dir; // field@0001
+0004d4: 6202 0300                              |0004: sget-object v2, Lcom/example/rebox/Dir;.SOUTH:Lcom/example/rebox/Dir; // field@0003
+0004d8: 6203 0400                              |0006: sget-object v3, Lcom/example/rebox/Dir;.WEST:Lcom/example/rebox/Dir; // field@0004
+0004dc: 2440 1400 1032                         |0008: filled-new-array {v0, v1, v2, v3}, [Lcom/example/rebox/Dir; // type@0014
+0004e2: 0c00                                   |000b: move-result-object v0
+0004e4: 1100                                   |000c: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+    #1              : (in Lcom/example/rebox/Dir;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 47 16-bit code units
+00050c:                                        |[00050c] com.example.rebox.Dir.<clinit>:()V
+00051c: 2200 0200                              |0000: new-instance v0, Lcom/example/rebox/Dir; // type@0002
+000520: 1a01 2e00                              |0002: const-string v1, "NORTH" // string@002e
+000524: 1202                                   |0004: const/4 v2, #int 0 // #0
+000526: 7030 0200 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Dir;.<init>:(Ljava/lang/String;I)V // method@0002
+00052c: 6900 0200                              |0008: sput-object v0, Lcom/example/rebox/Dir;.NORTH:Lcom/example/rebox/Dir; // field@0002
+000530: 2200 0200                              |000a: new-instance v0, Lcom/example/rebox/Dir; // type@0002
+000534: 1a01 1200                              |000c: const-string v1, "EAST" // string@0012
+000538: 1212                                   |000e: const/4 v2, #int 1 // #1
+00053a: 7030 0200 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Dir;.<init>:(Ljava/lang/String;I)V // method@0002
+000540: 6900 0100                              |0012: sput-object v0, Lcom/example/rebox/Dir;.EAST:Lcom/example/rebox/Dir; // field@0001
+000544: 2200 0200                              |0014: new-instance v0, Lcom/example/rebox/Dir; // type@0002
+000548: 1a01 3000                              |0016: const-string v1, "SOUTH" // string@0030
+00054c: 1222                                   |0018: const/4 v2, #int 2 // #2
+00054e: 7030 0200 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Dir;.<init>:(Ljava/lang/String;I)V // method@0002
+000554: 6900 0300                              |001c: sput-object v0, Lcom/example/rebox/Dir;.SOUTH:Lcom/example/rebox/Dir; // field@0003
+000558: 2200 0200                              |001e: new-instance v0, Lcom/example/rebox/Dir; // type@0002
+00055c: 1a01 3500                              |0020: const-string v1, "WEST" // string@0035
+000560: 1232                                   |0022: const/4 v2, #int 3 // #3
+000562: 7030 0200 1002                         |0023: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Dir;.<init>:(Ljava/lang/String;I)V // method@0002
+000568: 6900 0400                              |0026: sput-object v0, Lcom/example/rebox/Dir;.WEST:Lcom/example/rebox/Dir; // field@0004
+00056c: 7100 0000 0000                         |0028: invoke-static {}, Lcom/example/rebox/Dir;.$values:()[Lcom/example/rebox/Dir; // method@0000
+000572: 0c00                                   |002b: move-result-object v0
+000574: 6900 0000                              |002c: sput-object v0, Lcom/example/rebox/Dir;.$VALUES:[Lcom/example/rebox/Dir; // field@0000
+000578: 0e00                                   |002e: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+    #2              : (in Lcom/example/rebox/Dir;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+00057c:                                        |[00057c] com.example.rebox.Dir.<init>:(Ljava/lang/String;I)V
+00058c: 7030 1300 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@0013
+000592: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/rebox/Dir;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/rebox/Dir;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/rebox/Dir;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000498:                                        |[000498] com.example.rebox.Dir.valueOf:(Ljava/lang/String;)Lcom/example/rebox/Dir;
+0004a8: 1c00 0200                              |0000: const-class v0, Lcom/example/rebox/Dir; // type@0002
+0004ac: 7120 1400 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@0014
+0004b2: 0c00                                   |0005: move-result-object v0
+0004b4: 1f00 0200                              |0006: check-cast v0, Lcom/example/rebox/Dir; // type@0002
+0004b8: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/rebox/Dir;)
+      name          : 'values'
+      type          : '()[Lcom/example/rebox/Dir;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+0004e8:                                        |[0004e8] com.example.rebox.Dir.values:()[Lcom/example/rebox/Dir;
+0004f8: 6200 0000                              |0000: sget-object v0, Lcom/example/rebox/Dir;.$VALUES:[Lcom/example/rebox/Dir; // field@0000
+0004fc: 6e10 1b00 0000                         |0002: invoke-virtual {v0}, [Lcom/example/rebox/Dir;.clone:()Ljava/lang/Object; // method@001b
+000502: 0c00                                   |0005: move-result-object v0
+000504: 1f00 1400                              |0006: check-cast v0, [Lcom/example/rebox/Dir; // type@0014
+000508: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 45 (Main.java)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/rebox/Main$1;'
+  Access flags      : 0x1000 (SYNTHETIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/rebox/Main$1;)
+      name          : '$SwitchMap$com$example$rebox$Mode'
+      type          : '[I'
+      access        : 0x1018 (STATIC FINAL SYNTHETIC)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/rebox/Main$1;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 1
+      insns size    : 36 16-bit code units
+000594:                                        |[000594] com.example.rebox.Main$1.<clinit>:()V
+0005a4: 7100 1100 0000                         |0000: invoke-static {}, Lcom/example/rebox/Mode;.values:()[Lcom/example/rebox/Mode; // method@0011
+0005aa: 0c00                                   |0003: move-result-object v0
+0005ac: 2100                                   |0004: array-length v0, v0
+0005ae: 2300 1300                              |0005: new-array v0, v0, [I // type@0013
+0005b2: 6900 0500                              |0007: sput-object v0, Lcom/example/rebox/Main$1;.$SwitchMap$com$example$rebox$Mode:[I // field@0005
+0005b6: 6200 0500                              |0009: sget-object v0, Lcom/example/rebox/Main$1;.$SwitchMap$com$example$rebox$Mode:[I // field@0005
+0005ba: 6201 0900                              |000b: sget-object v1, Lcom/example/rebox/Mode;.OFF:Lcom/example/rebox/Mode; // field@0009
+0005be: 6e10 0f00 0100                         |000d: invoke-virtual {v1}, Lcom/example/rebox/Mode;.ordinal:()I // method@000f
+0005c4: 0a01                                   |0010: move-result v1
+0005c6: 1212                                   |0011: const/4 v2, #int 1 // #1
+0005c8: 4b02 0001                              |0012: aput v2, v0, v1
+0005cc: 2802                                   |0014: goto 0016 // +0002
+0005ce: 0d00                                   |0015: move-exception v0
+0005d0: 6200 0500                              |0016: sget-object v0, Lcom/example/rebox/Main$1;.$SwitchMap$com$example$rebox$Mode:[I // field@0005
+0005d4: 6201 0800                              |0018: sget-object v1, Lcom/example/rebox/Mode;.LOW:Lcom/example/rebox/Mode; // field@0008
+0005d8: 6e10 0f00 0100                         |001a: invoke-virtual {v1}, Lcom/example/rebox/Mode;.ordinal:()I // method@000f
+0005de: 0a01                                   |001d: move-result v1
+0005e0: 1222                                   |001e: const/4 v2, #int 2 // #2
+0005e2: 4b02 0001                              |001f: aput v2, v0, v1
+0005e6: 2802                                   |0021: goto 0023 // +0002
+0005e8: 0d00                                   |0022: move-exception v0
+0005ea: 0e00                                   |0023: return-void
+      catches       : 2
+        0x0009 - 0x0014
+          Ljava/lang/NoSuchFieldError; -> 0x0015
+        0x0016 - 0x0021
+          Ljava/lang/NoSuchFieldError; -> 0x0022
+      positions     :
+        0x0000 line=16
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 45 (Main.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/rebox/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/rebox/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+000604:                                        |[000604] com.example.rebox.Main.<init>:()V
+000614: 7010 1500 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0015
+00061a: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=7
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/rebox/Main;
+
+    #1              : (in Lcom/example/rebox/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 13
+      ins           : 1
+      outs          : 4
+      insns size    : 258 16-bit code units
+00061c:                                        |[00061c] com.example.rebox.Main.main:([Ljava/lang/String;)V
+00062c: 21c0                                   |0000: array-length v0, v12
+00062e: 1271                                   |0001: const/4 v1, #int 7 // #7
+000630: 3710 0500                              |0002: if-le v0, v1, 0007 // +0005
+000634: 1a01 1000                              |0004: const-string v1, "BOGUS" // string@0010
+000638: 2803                                   |0006: goto 0009 // +0003
+00063a: 1a01 1300                              |0007: const-string v1, "HIGH" // string@0013
+00063e: 1a02 1b00                              |0009: const-string v2, "LOW" // string@001b
+000642: 1a03 3100                              |000b: const-string v3, "TURBO" // string@0031
+000646: 1a04 2f00                              |000d: const-string v4, "OFF" // string@002f
+00064a: 2440 1600 3214                         |000f: filled-new-array {v2, v3, v4, v1}, [Ljava/lang/String; // type@0016
+000650: 0c01                                   |0012: move-result-object v1
+000652: 2202 1000                              |0013: new-instance v2, Ljava/lang/StringBuilder; // type@0010
+000656: 7010 1600 0200                         |0015: invoke-direct {v2}, Ljava/lang/StringBuilder;.<init>:()V // method@0016
+00065c: 2113                                   |0018: array-length v3, v1
+00065e: 1204                                   |0019: const/4 v4, #int 0 // #0
+000660: 1305 0a00                              |001a: const/16 v5, #int 10 // #a
+000664: 3534 8600                              |001c: if-ge v4, v3, 00a2 // +0086
+000668: 4606 0104                              |001e: aget-object v6, v1, v4
+00066c: 7110 1000 0600                         |0020: invoke-static {v6}, Lcom/example/rebox/Mode;.valueOf:(Ljava/lang/String;)Lcom/example/rebox/Mode; // method@0010
+000672: 0c07                                   |0023: move-result-object v7
+000674: 6e10 0f00 0700                         |0024: invoke-virtual {v7}, Lcom/example/rebox/Mode;.ordinal:()I // method@000f
+00067a: 0a08                                   |0027: move-result v8
+00067c: b008                                   |0028: add-int/2addr v8, v0
+00067e: dc08 0803                              |0029: rem-int/lit8 v8, v8, #int 3 // #03
+000682: 3908 0400                              |002b: if-nez v8, 002f // +0004
+000686: 1208                                   |002d: const/4 v8, #int 0 // #0
+000688: 2802                                   |002e: goto 0030 // +0002
+00068a: 0778                                   |002f: move-object v8, v7
+00068c: 6e10 0e00 0700                         |0030: invoke-virtual {v7}, Lcom/example/rebox/Mode;.name:()Ljava/lang/String; // method@000e
+000692: 0c09                                   |0033: move-result-object v9
+000694: 6e20 1900 9200                         |0034: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+00069a: 0c09                                   |0037: move-result-object v9
+00069c: 130a 3a00                              |0038: const/16 v10, #int 58 // #3a
+0006a0: 6e20 1700 a900                         |003a: invoke-virtual {v9, v10}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@0017
+0006a6: 0c09                                   |003d: move-result-object v9
+0006a8: 6e10 0f00 0700                         |003e: invoke-virtual {v7}, Lcom/example/rebox/Mode;.ordinal:()I // method@000f
+0006ae: 0a0a                                   |0041: move-result v10
+0006b0: 6e20 1800 a900                         |0042: invoke-virtual {v9, v10}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0018
+0006b6: 6209 0500                              |0045: sget-object v9, Lcom/example/rebox/Main$1;.$SwitchMap$com$example$rebox$Mode:[I // field@0005
+0006ba: 6e10 0f00 0700                         |0047: invoke-virtual {v7}, Lcom/example/rebox/Mode;.ordinal:()I // method@000f
+0006c0: 0a0a                                   |004a: move-result v10
+0006c2: 4409 090a                              |004b: aget v9, v9, v10
+0006c6: 2b09 ad00 0000                         |004d: packed-switch v9, 000000fa // +000000ad
+0006cc: 1a09 0300                              |0050: const-string v9, " fast" // string@0003
+0006d0: 6e20 1900 9200                         |0052: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+0006d6: 280c                                   |0055: goto 0061 // +000c
+0006d8: 1a09 0400                              |0056: const-string v9, " low" // string@0004
+0006dc: 6e20 1900 9200                         |0058: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+0006e2: 2806                                   |005b: goto 0061 // +0006
+0006e4: 1a09 0600                              |005c: const-string v9, " off" // string@0006
+0006e8: 6e20 1900 9200                         |005e: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+0006ee: 6209 0a00                              |0061: sget-object v9, Lcom/example/rebox/Mode;.TURBO:Lcom/example/rebox/Mode; // field@000a
+0006f2: 3397 0500                              |0063: if-ne v7, v9, 0068 // +0005
+0006f6: 1a09 0200                              |0065: const-string v9, " T" // string@0002
+0006fa: 2803                                   |0067: goto 006a // +0003
+0006fc: 1a09 0100                              |0068: const-string v9, " -" // string@0001
+000700: 6e20 1900 9200                         |006a: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+000706: 3908 0500                              |006d: if-nez v8, 0072 // +0005
+00070a: 1a09 0500                              |006f: const-string v9, " null" // string@0005
+00070e: 2818                                   |0071: goto 0089 // +0018
+000710: 6e10 0e00 0800                         |0072: invoke-virtual {v8}, Lcom/example/rebox/Mode;.name:()Ljava/lang/String; // method@000e
+000716: 0c09                                   |0075: move-result-object v9
+000718: 220a 1000                              |0076: new-instance v10, Ljava/lang/StringBuilder; // type@0010
+00071c: 7010 1600 0a00                         |0078: invoke-direct {v10}, Ljava/lang/StringBuilder;.<init>:()V // method@0016
+000722: 1a0b 0000                              |007b: const-string v11, " " // string@0000
+000726: 6e20 1900 ba00                         |007d: invoke-virtual {v10, v11}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+00072c: 0c0a                                   |0080: move-result-object v10
+00072e: 6e20 1900 9a00                         |0081: invoke-virtual {v10, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+000734: 0c09                                   |0084: move-result-object v9
+000736: 6e10 1a00 0900                         |0085: invoke-virtual {v9}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@001a
+00073c: 0c09                                   |0088: move-result-object v9
+00073e: 6e20 1900 9200                         |0089: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+000744: 1309 2000                              |008c: const/16 v9, #int 32 // #20
+000748: 6e20 1700 9200                         |008e: invoke-virtual {v2, v9}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@0017
+00074e: 0c09                                   |0091: move-result-object v9
+000750: 620a 0700                              |0092: sget-object v10, Lcom/example/rebox/Mode;.HIGH:Lcom/example/rebox/Mode; // field@0007
+000754: 6e20 0d00 a700                         |0094: invoke-virtual {v7, v10}, Lcom/example/rebox/Mode;.compareTo:(Ljava/lang/Enum;)I // method@000d
+00075a: 0a0a                                   |0097: move-result v10
+00075c: 6e20 1800 a900                         |0098: invoke-virtual {v9, v10}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0018
+000762: 6e20 1700 5200                         |009b: invoke-virtual {v2, v5}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@0017
+000768: d804 0401                              |009e: add-int/lit8 v4, v4, #int 1 // #01
+00076c: 2900 7aff                              |00a0: goto/16 001a // -0086
+000770: 7100 0600 0000                         |00a2: invoke-static {}, Lcom/example/rebox/Dir;.values:()[Lcom/example/rebox/Dir; // method@0006
+000776: 0c03                                   |00a5: move-result-object v3
+000778: d804 0001                              |00a6: add-int/lit8 v4, v0, #int 1 // #01
+00077c: dc04 0404                              |00a8: rem-int/lit8 v4, v4, #int 4 // #04
+000780: 4603 0304                              |00aa: aget-object v3, v3, v4
+000784: 1204                                   |00ac: const/4 v4, #int 0 // #0
+000786: 1256                                   |00ad: const/4 v6, #int 5 // #5
+000788: 3564 2b00                              |00ae: if-ge v4, v6, 00d9 // +002b
+00078c: 6e10 0300 0300                         |00b0: invoke-virtual {v3}, Lcom/example/rebox/Dir;.name:()Ljava/lang/String; // method@0003
+000792: 0c06                                   |00b3: move-result-object v6
+000794: 6e20 1900 6200                         |00b4: invoke-virtual {v2, v6}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+00079a: 0c06                                   |00b7: move-result-object v6
+00079c: 6207 0400                              |00b8: sget-object v7, Lcom/example/rebox/Dir;.WEST:Lcom/example/rebox/Dir; // field@0004
+0007a0: 3373 0500                              |00ba: if-ne v3, v7, 00bf // +0005
+0007a4: 1a07 0700                              |00bc: const-string v7, "!" // string@0007
+0007a8: 2803                                   |00be: goto 00c1 // +0003
+0007aa: 1a07 0c00                              |00bf: const-string v7, "." // string@000c
+0007ae: 6e20 1900 7600                         |00c1: invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0019
+0007b4: 7100 0600 0000                         |00c4: invoke-static {}, Lcom/example/rebox/Dir;.values:()[Lcom/example/rebox/Dir; // method@0006
+0007ba: 0c06                                   |00c7: move-result-object v6
+0007bc: 6e10 0400 0300                         |00c8: invoke-virtual {v3}, Lcom/example/rebox/Dir;.ordinal:()I // method@0004
+0007c2: 0a07                                   |00cb: move-result v7
+0007c4: d807 0701                              |00cc: add-int/lit8 v7, v7, #int 1 // #01
+0007c8: 7100 0600 0000                         |00ce: invoke-static {}, Lcom/example/rebox/Dir;.values:()[Lcom/example/rebox/Dir; // method@0006
+0007ce: 0c08                                   |00d1: move-result-object v8
+0007d0: 2188                                   |00d2: array-length v8, v8
+0007d2: b487                                   |00d3: rem-int/2addr v7, v8
+0007d4: 4603 0607                              |00d4: aget-object v3, v6, v7
+0007d8: d804 0401                              |00d6: add-int/lit8 v4, v4, #int 1 // #01
+0007dc: 28d5                                   |00d8: goto 00ad // -002b
+0007de: 6e20 1700 5200                         |00d9: invoke-virtual {v2, v5}, Ljava/lang/StringBuilder;.append:(C)Ljava/lang/StringBuilder; // method@0017
+0007e4: 0c04                                   |00dc: move-result-object v4
+0007e6: 1a05 3000                              |00dd: const-string v5, "SOUTH" // string@0030
+0007ea: 7110 0500 0500                         |00df: invoke-static {v5}, Lcom/example/rebox/Dir;.valueOf:(Ljava/lang/String;)Lcom/example/rebox/Dir; // method@0005
+0007f0: 0c05                                   |00e2: move-result-object v5
+0007f2: 6e10 0400 0500                         |00e3: invoke-virtual {v5}, Lcom/example/rebox/Dir;.ordinal:()I // method@0004
+0007f8: 0a05                                   |00e6: move-result v5
+0007fa: 6e20 1800 5400                         |00e7: invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0018
+000800: 0c04                                   |00ea: move-result-object v4
+000802: 7100 1100 0000                         |00eb: invoke-static {}, Lcom/example/rebox/Mode;.values:()[Lcom/example/rebox/Mode; // method@0011
+000808: 0c05                                   |00ee: move-result-object v5
+00080a: 2155                                   |00ef: array-length v5, v5
+00080c: 6e20 1800 5400                         |00f0: invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0018
+000812: 6204 0b00                              |00f3: sget-object v4, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@000b
+000816: 6e20 1200 2400                         |00f5: invoke-virtual {v4, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@0012
+00081c: 0e00                                   |00f8: return-void
+00081e: 0000                                   |00f9: nop // spacer
+000820: 0001 0200 0100 0000 0f00 0000 0900 ... |00fa: packed-switch-data (8 units)
+      catches       : (none)
+      positions     :
+        0x0000 line=9
+        0x0001 line=10
+        0x0013 line=11
+        0x0018 line=12
+        0x0020 line=13
+        0x0024 line=14
+        0x0030 line=15
+        0x0045 line=16
+        0x0050 line=19
+        0x0056 line=18
+        0x005c line=17
+        0x0061 line=21
+        0x006d line=22
+        0x008c line=23
+        0x009b line=24
+        0x009e line=12
+        0x00a2 line=26
+        0x00ac line=27
+        0x00b0 line=28
+        0x00c4 line=29
+        0x00d6 line=27
+        0x00d9 line=31
+        0x00f3 line=32
+        0x00f8 line=33
+      locals        :
+        0x0020 - 0x009e reg=6 s Ljava/lang/String;
+        0x0024 - 0x009e reg=7 m Lcom/example/rebox/Mode;
+        0x0030 - 0x009e reg=8 maybe Lcom/example/rebox/Mode;
+        0x00ad - 0x00d9 reg=4 i I
+        0x0001 - 0x0102 reg=0 n I
+        0x0013 - 0x0102 reg=1 inputs [Ljava/lang/String;
+        0x0018 - 0x0102 reg=2 out Ljava/lang/StringBuilder;
+        0x00ac - 0x0102 reg=3 d Lcom/example/rebox/Dir;
+        0x0000 - 0x0102 reg=12 args [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 45 (Main.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/rebox/Mode;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/rebox/Mode;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/rebox/Mode;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/rebox/Mode;)
+      name          : 'HIGH'
+      type          : 'Lcom/example/rebox/Mode;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/rebox/Mode;)
+      name          : 'LOW'
+      type          : 'Lcom/example/rebox/Mode;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/rebox/Mode;)
+      name          : 'OFF'
+      type          : 'Lcom/example/rebox/Mode;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #4              : (in Lcom/example/rebox/Mode;)
+      name          : 'TURBO'
+      type          : 'Lcom/example/rebox/Mode;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/rebox/Mode;)
+      name          : '$values'
+      type          : '()[Lcom/example/rebox/Mode;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 4
+      ins           : 0
+      outs          : 4
+      insns size    : 13 16-bit code units
+000854:                                        |[000854] com.example.rebox.Mode.$values:()[Lcom/example/rebox/Mode;
+000864: 6200 0900                              |0000: sget-object v0, Lcom/example/rebox/Mode;.OFF:Lcom/example/rebox/Mode; // field@0009
+000868: 6201 0800                              |0002: sget-object v1, Lcom/example/rebox/Mode;.LOW:Lcom/example/rebox/Mode; // field@0008
+00086c: 6202 0700                              |0004: sget-object v2, Lcom/example/rebox/Mode;.HIGH:Lcom/example/rebox/Mode; // field@0007
+000870: 6203 0a00                              |0006: sget-object v3, Lcom/example/rebox/Mode;.TURBO:Lcom/example/rebox/Mode; // field@000a
+000874: 2440 1500 1032                         |0008: filled-new-array {v0, v1, v2, v3}, [Lcom/example/rebox/Mode; // type@0015
+00087a: 0c00                                   |000b: move-result-object v0
+00087c: 1100                                   |000c: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+    #1              : (in Lcom/example/rebox/Mode;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 47 16-bit code units
+0008a4:                                        |[0008a4] com.example.rebox.Mode.<clinit>:()V
+0008b4: 2200 0500                              |0000: new-instance v0, Lcom/example/rebox/Mode; // type@0005
+0008b8: 1a01 2f00                              |0002: const-string v1, "OFF" // string@002f
+0008bc: 1202                                   |0004: const/4 v2, #int 0 // #0
+0008be: 7030 0c00 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Mode;.<init>:(Ljava/lang/String;I)V // method@000c
+0008c4: 6900 0900                              |0008: sput-object v0, Lcom/example/rebox/Mode;.OFF:Lcom/example/rebox/Mode; // field@0009
+0008c8: 2200 0500                              |000a: new-instance v0, Lcom/example/rebox/Mode; // type@0005
+0008cc: 1a01 1b00                              |000c: const-string v1, "LOW" // string@001b
+0008d0: 1212                                   |000e: const/4 v2, #int 1 // #1
+0008d2: 7030 0c00 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Mode;.<init>:(Ljava/lang/String;I)V // method@000c
+0008d8: 6900 0800                              |0012: sput-object v0, Lcom/example/rebox/Mode;.LOW:Lcom/example/rebox/Mode; // field@0008
+0008dc: 2200 0500                              |0014: new-instance v0, Lcom/example/rebox/Mode; // type@0005
+0008e0: 1a01 1300                              |0016: const-string v1, "HIGH" // string@0013
+0008e4: 1222                                   |0018: const/4 v2, #int 2 // #2
+0008e6: 7030 0c00 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Mode;.<init>:(Ljava/lang/String;I)V // method@000c
+0008ec: 6900 0700                              |001c: sput-object v0, Lcom/example/rebox/Mode;.HIGH:Lcom/example/rebox/Mode; // field@0007
+0008f0: 2200 0500                              |001e: new-instance v0, Lcom/example/rebox/Mode; // type@0005
+0008f4: 1a01 3100                              |0020: const-string v1, "TURBO" // string@0031
+0008f8: 1232                                   |0022: const/4 v2, #int 3 // #3
+0008fa: 7030 0c00 1002                         |0023: invoke-direct {v0, v1, v2}, Lcom/example/rebox/Mode;.<init>:(Ljava/lang/String;I)V // method@000c
+000900: 6900 0a00                              |0026: sput-object v0, Lcom/example/rebox/Mode;.TURBO:Lcom/example/rebox/Mode; // field@000a
+000904: 7100 0a00 0000                         |0028: invoke-static {}, Lcom/example/rebox/Mode;.$values:()[Lcom/example/rebox/Mode; // method@000a
+00090a: 0c00                                   |002b: move-result-object v0
+00090c: 6900 0600                              |002c: sput-object v0, Lcom/example/rebox/Mode;.$VALUES:[Lcom/example/rebox/Mode; // field@0006
+000910: 0e00                                   |002e: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+    #2              : (in Lcom/example/rebox/Mode;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+000914:                                        |[000914] com.example.rebox.Mode.<init>:(Ljava/lang/String;I)V
+000924: 7030 1300 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@0013
+00092a: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/rebox/Mode;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/rebox/Mode;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/rebox/Mode;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+000830:                                        |[000830] com.example.rebox.Mode.valueOf:(Ljava/lang/String;)Lcom/example/rebox/Mode;
+000840: 1c00 0500                              |0000: const-class v0, Lcom/example/rebox/Mode; // type@0005
+000844: 7120 1400 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@0014
+00084a: 0c00                                   |0005: move-result-object v0
+00084c: 1f00 0500                              |0006: check-cast v0, Lcom/example/rebox/Mode; // type@0005
+000850: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/rebox/Mode;)
+      name          : 'values'
+      type          : '()[Lcom/example/rebox/Mode;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+000880:                                        |[000880] com.example.rebox.Mode.values:()[Lcom/example/rebox/Mode;
+000890: 6200 0600                              |0000: sget-object v0, Lcom/example/rebox/Mode;.$VALUES:[Lcom/example/rebox/Mode; // field@0006
+000894: 6e10 1c00 0000                         |0002: invoke-virtual {v0}, [Lcom/example/rebox/Mode;.clone:()Ljava/lang/Object; // method@001c
+00089a: 0c00                                   |0005: move-result-object v0
+00089c: 1f00 1500                              |0006: check-cast v0, [Lcom/example/rebox/Mode; // type@0015
+0008a0: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 45 (Main.java)
+
