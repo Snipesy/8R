@@ -1,11 +1,17 @@
 //! Developer tasks. `cargo xtask fixtures` regenerates `fixtures/out/` from `fixtures/src/`.
 //!
-//! Each fixture directory holds Java sources plus a `fixture.conf`:
+//! Each fixture directory holds Java *or* Kotlin sources plus a `fixture.conf`:
 //!
 //! ```text
 //! min_api = 21
 //! keep = -keep class com.example.Main { *; }     # one ProGuard rule per `keep` line
+//! lib = kxs-core                                 # library from fixtures/toolchain.conf
+//! plugin = kotlinx-serialization                 # kotlinc plugin (kotlinx-serialization, compose)
 //! ```
+//!
+//! Libraries are program input to R8 (shrunk into the app, as in a real build) together with
+//! their consumer keep rules, and classpath-only for the D8 ground truth. Kotlin fixtures
+//! always get the kotlinc distribution's stdlib.
 //!
 //! For each fixture this produces:
 //!   d8/classes.dex    D8 --debug build: ground truth ("G" in DESIGN.md §6.1)
@@ -16,6 +22,7 @@
 //!
 //! Outputs are checked in so the normal test suite needs no JDK or Android SDK.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -118,20 +125,134 @@ fn files_with_ext(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) -> Result<()> {
 struct Conf {
     min_api: u32,
     keep: Vec<String>,
+    libs: Vec<String>,
+    plugins: Vec<String>,
 }
 
 fn parse_conf(path: &Path) -> Result<Conf> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut conf = Conf { min_api: 21, keep: Vec::new() };
+    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new() };
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let (k, v) = line.split_once('=').ok_or_else(|| format!("bad line in {}: {line}", path.display()))?;
         match k.trim() {
             "min_api" => conf.min_api = v.trim().parse().map_err(|_| format!("bad min_api: {v}"))?,
             "keep" => conf.keep.push(v.trim().to_string()),
+            "lib" => conf.libs.push(v.trim().to_string()),
+            "plugin" => conf.plugins.push(v.trim().to_string()),
             other => return Err(format!("unknown key {other} in {}", path.display())),
         }
     }
     Ok(conf)
+}
+
+// ---- pinned artifacts ----
+
+struct Artifact {
+    sha256: String,
+    url: String,
+}
+
+fn toolchain() -> Result<BTreeMap<String, Artifact>> {
+    let path = root().join("fixtures/toolchain.conf");
+    let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut out = BTreeMap::new();
+    for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        let [name, sha256, url] = parts[..] else { return Err(format!("bad toolchain line: {line}")) };
+        out.insert(name.to_string(), Artifact { sha256: sha256.to_string(), url: url.to_string() });
+    }
+    Ok(out)
+}
+
+fn sha256_of(path: &Path) -> Result<String> {
+    let out = Command::new("sha256sum")
+        .arg(path)
+        .output()
+        .or_else(|_| Command::new("shasum").args(["-a", "256"]).arg(path).output())
+        .map_err(|e| format!("sha256: {e}"))?;
+    Ok(String::from_utf8_lossy(&out.stdout).split_whitespace().next().unwrap_or("").to_string())
+}
+
+fn cache_dir() -> PathBuf {
+    root().join("target/xtask-cache")
+}
+
+/// Downloads (if needed) and verifies an artifact; returns its local path.
+fn fetch(name: &str, tc: &BTreeMap<String, Artifact>) -> Result<PathBuf> {
+    let a = tc.get(name).ok_or_else(|| format!("unknown artifact {name} (see fixtures/toolchain.conf)"))?;
+    let file = cache_dir().join(a.url.rsplit('/').next().unwrap());
+    fs::create_dir_all(cache_dir()).map_err(|e| e.to_string())?;
+    if !file.exists() || sha256_of(&file)? != a.sha256 {
+        eprintln!("  fetching {}", a.url);
+        run(Command::new("curl").args(["-sSLf", "-o"]).arg(&file).arg(&a.url))?;
+    }
+    let got = sha256_of(&file)?;
+    if got != a.sha256 {
+        let _ = fs::remove_file(&file);
+        return Err(format!("{name}: sha256 mismatch (expected {}, got {got})", a.sha256));
+    }
+    Ok(file)
+}
+
+/// A prepared library: its class jar and the consumer rules R8 should see (as AGP passes them).
+struct Lib {
+    jar: PathBuf,
+    rules: Vec<PathBuf>,
+}
+
+fn zip_entries(zip: &Path) -> Result<Vec<String>> {
+    Ok(run(Command::new("unzip").arg("-Z1").arg(zip))?.lines().map(str::to_string).collect())
+}
+
+fn extract(zip: &Path, entry: &str, to: &Path) -> Result<()> {
+    let out = Command::new("unzip").arg("-p").arg(zip).arg(entry).output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!("unzip {entry} from {}", zip.display()));
+    }
+    fs::write(to, out.stdout).map_err(|e| e.to_string())
+}
+
+fn prepare_lib(name: &str, tc: &BTreeMap<String, Artifact>) -> Result<Lib> {
+    let file = fetch(name, tc)?;
+    let dir = cache_dir().join(format!("lib-{name}"));
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let entries = zip_entries(&file)?;
+    let (jar, rule_entries): (PathBuf, Vec<String>) = if file.extension().is_some_and(|e| e == "aar") {
+        let jar = dir.join("classes.jar");
+        extract(&file, "classes.jar", &jar)?;
+        (jar, entries.into_iter().filter(|e| e == "proguard.txt").collect())
+    } else {
+        // AGP prefers R8-specific rules when a jar ships them.
+        let r8: Vec<String> = entries.iter().filter(|e| e.starts_with("META-INF/com.android.tools/r8") && e.ends_with(".pro")).cloned().collect();
+        let rules = if r8.is_empty() {
+            entries.into_iter().filter(|e| e.starts_with("META-INF/proguard/") && e.ends_with(".pro")).collect()
+        } else {
+            r8
+        };
+        (file.clone(), rules)
+    };
+    let mut rules = Vec::new();
+    for (i, e) in rule_entries.iter().enumerate() {
+        let to = dir.join(format!("rules-{i}.pro"));
+        extract(&file, e, &to)?;
+        rules.push(to);
+    }
+    Ok(Lib { jar, rules })
+}
+
+/// Unpacks the pinned kotlinc distribution; returns its root (containing bin/ and lib/).
+fn kotlinc_home(tc: &BTreeMap<String, Artifact>) -> Result<PathBuf> {
+    let zip = fetch("kotlinc", tc)?;
+    let dir = cache_dir().join(format!("kotlinc-{}", &tc["kotlinc"].sha256[..12]));
+    if !dir.join("kotlinc/bin/kotlinc").exists() {
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        run(Command::new("unzip").args(["-q", "-o"]).arg(&zip).arg("-d").arg(&dir))?;
+    }
+    Ok(dir.join("kotlinc"))
+}
+
+fn classpath(paths: &[PathBuf]) -> std::ffi::OsString {
+    std::env::join_paths(paths).expect("valid paths")
 }
 
 fn fixtures(only: &[String]) -> Result<()> {
@@ -166,48 +287,91 @@ fn fixtures(only: &[String]) -> Result<()> {
             fs::create_dir_all(&d).map_err(|e| e.to_string())?;
         }
 
-        let mut sources = Vec::new();
-        files_with_ext(&src, "java", &mut sources)?;
-        run(Command::new(&tools.javac)
-            .args(["--release", "11", "-g", "-encoding", "UTF-8", "-d"])
-            .arg(work.join("classes"))
-            .args(&sources))?;
+        let tc = toolchain()?;
+        let mut libs: Vec<Lib> = conf.libs.iter().map(|l| prepare_lib(l, &tc)).collect::<Result<_>>()?;
+        let mut java_sources = Vec::new();
+        files_with_ext(&src, "java", &mut java_sources)?;
+        let mut kt_sources = Vec::new();
+        files_with_ext(&src, "kt", &mut kt_sources)?;
+        let mut tool_versions = String::new();
+        if !kt_sources.is_empty() {
+            let home = kotlinc_home(&tc)?;
+            libs.insert(0, Lib { jar: home.join("lib/kotlin-stdlib.jar"), rules: Vec::new() });
+            let lib_jars: Vec<PathBuf> = libs.iter().map(|l| l.jar.clone()).collect();
+            let mut cmd = Command::new(home.join("bin/kotlinc"));
+            cmd.args(["-jvm-target", "11", "-no-reflect", "-module-name", &name, "-d"]).arg(work.join("classes"));
+            cmd.arg("-cp").arg(classpath(&lib_jars));
+            for p in &conf.plugins {
+                let jar = match p.as_str() {
+                    "kotlinx-serialization" => "kotlinx-serialization-compiler-plugin.jar",
+                    "compose" => "compose-compiler-plugin.jar",
+                    other => return Err(format!("unknown plugin {other}")),
+                };
+                let mut arg = std::ffi::OsString::from("-Xplugin=");
+                arg.push(home.join("lib").join(jar));
+                cmd.arg(arg);
+            }
+            cmd.args(&kt_sources);
+            run(&mut cmd)?;
+            tool_versions.push_str(&format!("kotlinc: {}\n", fs::read_to_string(home.join("build.txt")).unwrap_or_default().trim()));
+        }
+        if !java_sources.is_empty() {
+            let mut cmd = Command::new(&tools.javac);
+            cmd.args(["--release", "11", "-g", "-encoding", "UTF-8", "-d"]).arg(work.join("classes"));
+            if !kt_sources.is_empty() || !libs.is_empty() {
+                let mut cp: Vec<PathBuf> = vec![work.join("classes")];
+                cp.extend(libs.iter().map(|l| l.jar.clone()));
+                cmd.arg("-cp").arg(classpath(&cp));
+            }
+            run(cmd.args(&java_sources))?;
+        }
+        for l in &conf.libs {
+            tool_versions.push_str(&format!("lib: {l} {}\n", tc[l].url));
+        }
         let mut classes = Vec::new();
         files_with_ext(&work.join("classes"), "class", &mut classes)?;
+        classes.retain(|c| !c.ends_with("module-info.class"));
 
         let min_api = conf.min_api.to_string();
-        run(Command::new(&tools.java)
-            .arg("-cp")
-            .arg(&tools.r8_jar)
-            .args(["com.android.tools.r8.D8", "--debug", "--min-api", &min_api, "--lib"])
-            .arg(&tools.android_jar)
-            .arg("--output")
-            .arg(out.join("d8"))
-            .args(&classes))?;
+        // Ground truth: the app's own classes only; libraries are classpath.
+        let mut d8 = Command::new(&tools.java);
+        d8.arg("-cp").arg(&tools.r8_jar).args(["com.android.tools.r8.D8", "--debug", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
+        for l in &libs {
+            d8.arg("--classpath").arg(&l.jar);
+        }
+        run(d8.arg("--output").arg(out.join("d8")).args(&classes))?;
 
         let rules = work.join("rules.pro");
         fs::write(&rules, conf.keep.join("\n") + "\n").map_err(|e| e.to_string())?;
-        run(Command::new(&tools.java)
-            .arg("-cp")
-            .arg(&tools.r8_jar)
-            .args(["com.android.tools.r8.R8", "--release", "--min-api", &min_api, "--lib"])
-            .arg(&tools.android_jar)
-            .arg("--pg-conf")
-            .arg(&rules)
-            .arg("--pg-map-output")
-            .arg(out.join("r8/mapping.txt"))
-            .arg("--output")
-            .arg(out.join("r8"))
-            .args(&classes))?;
+        // Release build: libraries are program input, with their consumer rules, as in AGP.
+        let mut r8 = Command::new(&tools.java);
+        r8.arg("-cp").arg(&tools.r8_jar).args(["com.android.tools.r8.R8", "--release", "--min-api", &min_api, "--lib"]).arg(&tools.android_jar);
+        r8.arg("--pg-conf").arg(&rules);
+        for l in &libs {
+            for r in &l.rules {
+                r8.arg("--pg-conf").arg(r);
+            }
+        }
+        r8.arg("--pg-map-output").arg(out.join("r8/mapping.txt")).arg("--output").arg(out.join("r8")).args(&classes);
+        for l in &libs {
+            r8.arg(&l.jar);
+        }
+        run(&mut r8)?;
 
         for variant in ["d8", "r8"] {
+            // Large outputs (libraries shrunk in) would make huge dumps; the differential test
+            // covers the small ones, and skips fixtures without a dump.
+            let dex = out.join(variant).join("classes.dex");
+            if fs::metadata(&dex).map(|m| m.len()).unwrap_or(0) > 100 * 1024 {
+                continue;
+            }
             // Run from the variant dir with a relative path so the output has no absolute paths.
             let dump = run(Command::new(&tools.dexdump).current_dir(out.join(variant)).args(["-d", "classes.dex"]))?;
             fs::write(out.join(variant).join("dexdump.txt"), dump).map_err(|e| e.to_string())?;
         }
 
         let build = format!(
-            "# Generated by `cargo xtask fixtures`. Do not edit.\nr8: {}\njavac: {}\nmin_api: {}\n",
+            "# Generated by `cargo xtask fixtures`. Do not edit.\nr8: {}\njavac: {}\n{tool_versions}min_api: {}\n",
             r8_version.trim(),
             javac_version.trim(),
             conf.min_api

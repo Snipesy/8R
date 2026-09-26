@@ -1,4 +1,13 @@
 {
+  "compose_basic": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 541,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "dontobfuscate": {
     "Body": 0,
     "ClassName": 3,
@@ -13,6 +22,24 @@
     "ClassName": 1,
     "Lines": 0,
     "MemberName": 1,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "kotlin_basic": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 81,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "kotlin_serialization": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 514,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0

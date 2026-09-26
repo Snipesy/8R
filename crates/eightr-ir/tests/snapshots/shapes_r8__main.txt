@@ -89,5 +89,3 @@ B18  preds [B7]  succs []
   @67  0084: move-result-object v12
   @68  0085: invoke-virtual {v0, v12}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
   @69  0088: return-void
-B19 unreachable  preds []  succs []
-  @70  0089: nop
