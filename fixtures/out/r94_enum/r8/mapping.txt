@@ -1,0 +1,60 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 26
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 84eb1ac86867956c1af5d931a295b290ab1ae0540021c15665e45af21b3c61d2
+# pg_map_hash: SHA-256 84eb1ac86867956c1af5d931a295b290ab1ae0540021c15665e45af21b3c61d2
+com.example.enums.Color -> R8$$REMOVED$$CLASS$$0:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.enums.Color$EnumUnboxingSharedUtility -> a:
+# {"id":"sourceFile","fileName":"R8$$SyntheticClass"}
+# {"id":"com.android.tools.r8.synthesized"}
+    int[] $VALUES -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:void Color$EnumUnboxingSharedUtility.<clinit>():0:0 -> <clinit>
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:7:int Color$EnumUnboxingSharedUtility.ordinal(int):0:0 -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:9:int[] Color$EnumUnboxingSharedUtility.values(int):0:0 -> b
+      # {"id":"com.android.tools.r8.synthesized"}
+com.example.enums.Level -> R8$$REMOVED$$CLASS$$1:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.enums.Main -> com.example.enums.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:void main(java.lang.String[]):50:50 -> main
+    2:2:com.example.enums.Color[] com.example.enums.Color.values():5:5 -> main
+    2:2:void main(java.lang.String[]):51 -> main
+    3:4:void main(java.lang.String[]):51:52 -> main
+    5:5:java.lang.String describe(com.example.enums.Color):33:33 -> main
+    5:5:void main(java.lang.String[]):52 -> main
+    6:6:java.lang.String describe(com.example.enums.Color):36:36 -> main
+    6:6:void main(java.lang.String[]):52 -> main
+    7:7:java.lang.String describe(com.example.enums.Color):35:35 -> main
+    7:7:void main(java.lang.String[]):52 -> main
+    8:8:java.lang.String describe(com.example.enums.Color):34:34 -> main
+    8:8:void main(java.lang.String[]):52 -> main
+    9:10:void main(java.lang.String[]):52:53 -> main
+    11:11:com.example.enums.Color com.example.enums.Color.valueOf(java.lang.String):5:5 -> main
+    11:11:void main(java.lang.String[]):53 -> main
+    12:12:void main(java.lang.String[]):53:53 -> main
+    13:13:com.example.enums.Planet[] com.example.enums.Planet.values():7:7 -> main
+    13:13:void main(java.lang.String[]):54 -> main
+    14:15:void main(java.lang.String[]):54:55 -> main
+    16:16:com.example.enums.Op[] com.example.enums.Op.values():15:15 -> main
+    16:16:void main(java.lang.String[]):56 -> main
+    17:17:void main(java.lang.String[]):56:56 -> main
+    18:18:com.example.enums.Level[] com.example.enums.Level.values():29:29 -> main
+    18:18:void main(java.lang.String[]):57 -> main
+    19:20:void main(java.lang.String[]):57:58 -> main
+    21:21:int severity(com.example.enums.Level):41:41 -> main
+    21:21:void main(java.lang.String[]):58 -> main
+    22:22:void main(java.lang.String[]):58:58 -> main
+    23:23:void main(java.lang.String[]):60:60 -> main
+    24:24:void main(java.lang.String[]):55:55 -> main
+    25:25:com.example.enums.Color com.example.enums.Color.valueOf(java.lang.String):5:5 -> main
+    25:25:void main(java.lang.String[]):53 -> main
+com.example.enums.Op -> R8$$REMOVED$$CLASS$$2:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.enums.Planet -> R8$$REMOVED$$CLASS$$3:
+# {"id":"sourceFile","fileName":"Main.java"}

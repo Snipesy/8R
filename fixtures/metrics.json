@@ -8,6 +8,15 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "compose_basic_r94": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 550,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "dontobfuscate": {
     "Body": 0,
     "ClassName": 3,
@@ -35,11 +44,29 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "kotlin_basic_r94": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 84,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "kotlin_serialization": {
     "Body": 0,
     "ClassName": 1,
     "Lines": 0,
     "MemberName": 523,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "kotlin_serialization_r94": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 522,
     "Package": 1,
     "Signature": 0,
     "SourceFile": 0
@@ -59,6 +86,33 @@
     "Lines": 0,
     "MemberName": 32,
     "Package": 2,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "r94_enum": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 2,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "r94_merging": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 9,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "r94_outline": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 1,
+    "Package": 1,
     "Signature": 0,
     "SourceFile": 0
   },

@@ -83,10 +83,12 @@ fn renaming_is_a_consistent_bijection() {
         let before = load(std::slice::from_ref(&bytes));
         let mut after = load(&out_files(&out));
         inverse(&outcome.renaming, &before).apply(&mut after);
-        assert!(
-            eightr_ir::print::program(&before) == eightr_ir::print::program(&after),
-            "{name}: applying the inverse renaming to the output doesn't restore the input"
-        );
+        let (a, b) = (eightr_ir::print::program(&before), eightr_ir::print::program(&after));
+        if a != b {
+            let first = a.lines().zip(b.lines()).position(|(x, y)| x != y).unwrap_or(0);
+            let ctx = |t: &str| t.lines().skip(first.saturating_sub(3)).take(6).collect::<Vec<_>>().join("\n");
+            panic!("{name}: applying the inverse renaming to the output doesn't restore the input (line {first}):\n--- input\n{}\n--- restored\n{}", ctx(&a), ctx(&b));
+        }
     }
 }
 

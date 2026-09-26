@@ -170,6 +170,22 @@ pub fn value(v: &crate::value::Value, s: &Interner) -> String {
 }
 
 fn encoded_annotation(a: &crate::value::EncodedAnnotation, s: &Interner) -> String {
+    // A generic signature is split into arbitrary string pieces; only the joined text is
+    // semantic, so render it joined.
+    if s.get(a.ty) == "Ldalvik/annotation/Signature;" {
+        if let [(n, crate::value::Value::Array(parts))] = a.elements.as_slice() {
+            let joined: Option<String> = parts
+                .iter()
+                .map(|p| match p {
+                    crate::value::Value::String(x) => Some(s.get(*x)),
+                    _ => None,
+                })
+                .collect();
+            if let Some(j) = joined {
+                return format!("@{}({}=signature {j:?})", s.get(a.ty), s.get(*n));
+            }
+        }
+    }
     // Element order is not semantic (the writer sorts by name), so render sorted.
     let mut els: Vec<String> = a.elements.iter().map(|(n, v)| format!("{}={}", s.get(*n), value(v, s))).collect();
     els.sort();
