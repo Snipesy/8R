@@ -1,6 +1,6 @@
 {
   "coverage": {
-    "inlined_occurrences": 159894,
+    "inlined_occurrences": 159899,
     "recall": 0.02,
     "touched": 3256
   },
@@ -39,6 +39,7 @@
     "kotlin_serialization_r94",
     "names_stress",
     "opcodes",
+    "protobuf_lite",
     "r94_desugar",
     "r94_enum",
     "r94_enum_probe",
@@ -98,7 +99,7 @@
   "inlined-instance-call@r8-9": {
     "base_rate": 0.527,
     "hints": 1023,
-    "lift": 1.382,
+    "lift": 1.383,
     "precision": 0.728
   },
   "param-null-check": {

@@ -1,0 +1,642 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '037'
+Class #0            -
+  Class descriptor  : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Access flags      : 0x0401 (PUBLIC ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/google/protobuf/GeneratedMessageLite;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+000848:                                        |[000848] com.google.protobuf.GeneratedMessageLite.<init>:()V
+000858: 7010 1000 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0010
+00085e: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=4
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/google/protobuf/GeneratedMessageLite;
+
+  Virtual methods   -
+    #0              : (in Lcom/google/protobuf/GeneratedMessageLite;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0404 (PROTECTED ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lcom/google/protobuf/GeneratedMessageLite;)
+      name          : 'toString'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 1
+      insns size    : 5 16-bit code units
+00082c:                                        |[00082c] com.google.protobuf.GeneratedMessageLite.toString:()Ljava/lang/String;
+00083c: 6e10 0d00 0100                         |0000: invoke-virtual {v1}, Lcom/google/protobuf/GeneratedMessageLite;.describe:()Ljava/lang/String; // method@000d
+000842: 0c00                                   |0003: move-result-object v0
+000844: 1100                                   |0004: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=9
+      locals        :
+        0x0000 - 0x0005 reg=1 this Lcom/google/protobuf/GeneratedMessageLite;
+
+  source_file_idx   : 9 (GeneratedMessageLite.java)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/pb/ExistenceFilter;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'COUNT_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #1              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'TARGET_ID_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #2              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'UNCHANGED_NAMES_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'count_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'targetId_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'unchangedNames_'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : '<init>'
+      type          : '(IILjava/lang/String;)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 1
+      insns size    : 10 16-bit code units
+000548:                                        |[000548] com.example.pb.ExistenceFilter.<init>:(IILjava/lang/String;)V
+000558: 7010 0c00 0000                         |0000: invoke-direct {v0}, Lcom/google/protobuf/GeneratedMessageLite;.<init>:()V // method@000c
+00055e: 5901 0400                              |0003: iput v1, v0, Lcom/example/pb/ExistenceFilter;.targetId_:I // field@0004
+000562: 5902 0300                              |0005: iput v2, v0, Lcom/example/pb/ExistenceFilter;.count_:I // field@0003
+000566: 5b03 0500                              |0007: iput-object v3, v0, Lcom/example/pb/ExistenceFilter;.unchangedNames_:Ljava/lang/String; // field@0005
+00056a: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=13
+        0x0003 line=14
+        0x0005 line=15
+        0x0007 line=16
+        0x0009 line=17
+      locals        :
+        0x0000 - 0x000a reg=0 this Lcom/example/pb/ExistenceFilter;
+        0x0000 - 0x000a reg=1 targetId I
+        0x0000 - 0x000a reg=2 count I
+        0x0000 - 0x000a reg=3 unchangedNames Ljava/lang/String;
+
+  Virtual methods   -
+    #0              : (in Lcom/example/pb/ExistenceFilter;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0004 (PROTECTED)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 2
+      insns size    : 44 16-bit code units
+0004e0:                                        |[0004e0] com.example.pb.ExistenceFilter.describe:()Ljava/lang/String;
+0004f0: 5250 0400                              |0000: iget v0, v5, Lcom/example/pb/ExistenceFilter;.targetId_:I // field@0004
+0004f4: 5251 0300                              |0002: iget v1, v5, Lcom/example/pb/ExistenceFilter;.count_:I // field@0003
+0004f8: 5452 0500                              |0004: iget-object v2, v5, Lcom/example/pb/ExistenceFilter;.unchangedNames_:Ljava/lang/String; // field@0005
+0004fc: 2203 0c00                              |0006: new-instance v3, Ljava/lang/StringBuilder; // type@000c
+000500: 7010 1100 0300                         |0008: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@0011
+000506: 1a04 0700                              |000b: const-string v4, "E:" // string@0007
+00050a: 6e20 1400 4300                         |000d: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000510: 0c03                                   |0010: move-result-object v3
+000512: 6e20 1300 0300                         |0011: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+000518: 0c00                                   |0014: move-result-object v0
+00051a: 1a03 0000                              |0015: const-string v3, "," // string@0000
+00051e: 6e20 1400 3000                         |0017: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000524: 0c00                                   |001a: move-result-object v0
+000526: 6e20 1300 1000                         |001b: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+00052c: 0c00                                   |001e: move-result-object v0
+00052e: 6e20 1400 3000                         |001f: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000534: 0c00                                   |0022: move-result-object v0
+000536: 6e20 1400 2000                         |0023: invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+00053c: 0c00                                   |0026: move-result-object v0
+00053e: 6e10 1500 0000                         |0027: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0015
+000544: 0c00                                   |002a: move-result-object v0
+000546: 1100                                   |002b: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=18
+      locals        :
+        0x0000 - 0x002c reg=5 this Lcom/example/pb/ExistenceFilter;
+
+  source_file_idx   : 8 (ExistenceFilter.java)
+
+Class #2            -
+  Class descriptor  : 'Lcom/example/pb/LatLng;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/pb/LatLng;)
+      name          : 'LATITUDE_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lcom/example/pb/LatLng;)
+      name          : 'LONGITUDE_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+  Instance fields   -
+    #0              : (in Lcom/example/pb/LatLng;)
+      name          : 'latitude_'
+      type          : 'D'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lcom/example/pb/LatLng;)
+      name          : 'longitude_'
+      type          : 'D'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lcom/example/pb/LatLng;)
+      name          : '<init>'
+      type          : '(DD)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 5
+      outs          : 1
+      insns size    : 8 16-bit code units
+0005c0:                                        |[0005c0] com.example.pb.LatLng.<init>:(DD)V
+0005d0: 7010 0c00 0000                         |0000: invoke-direct {v0}, Lcom/google/protobuf/GeneratedMessageLite;.<init>:()V // method@000c
+0005d6: 5a01 0800                              |0003: iput-wide v1, v0, Lcom/example/pb/LatLng;.latitude_:D // field@0008
+0005da: 5a03 0900                              |0005: iput-wide v3, v0, Lcom/example/pb/LatLng;.longitude_:D // field@0009
+0005de: 0e00                                   |0007: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=11
+        0x0003 line=12
+        0x0005 line=13
+        0x0007 line=14
+      locals        :
+        0x0000 - 0x0008 reg=0 this Lcom/example/pb/LatLng;
+        0x0000 - 0x0008 reg=1 latitude D
+        0x0000 - 0x0008 reg=3 longitude D
+
+  Virtual methods   -
+    #0              : (in Lcom/example/pb/LatLng;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0004 (PROTECTED)
+      code          -
+      registers     : 7
+      ins           : 1
+      outs          : 3
+      insns size    : 34 16-bit code units
+00056c:                                        |[00056c] com.example.pb.LatLng.describe:()Ljava/lang/String;
+00057c: 5360 0800                              |0000: iget-wide v0, v6, Lcom/example/pb/LatLng;.latitude_:D // field@0008
+000580: 5362 0900                              |0002: iget-wide v2, v6, Lcom/example/pb/LatLng;.longitude_:D // field@0009
+000584: 2204 0c00                              |0004: new-instance v4, Ljava/lang/StringBuilder; // type@000c
+000588: 7010 1100 0400                         |0006: invoke-direct {v4}, Ljava/lang/StringBuilder;.<init>:()V // method@0011
+00058e: 1a05 0c00                              |0009: const-string v5, "L:" // string@000c
+000592: 6e20 1400 5400                         |000b: invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000598: 0c04                                   |000e: move-result-object v4
+00059a: 6e30 1200 0401                         |000f: invoke-virtual {v4, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0012
+0005a0: 0c00                                   |0012: move-result-object v0
+0005a2: 1a01 0000                              |0013: const-string v1, "," // string@0000
+0005a6: 6e20 1400 1000                         |0015: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0005ac: 0c00                                   |0018: move-result-object v0
+0005ae: 6e30 1200 2003                         |0019: invoke-virtual {v0, v2, v3}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0012
+0005b4: 0c00                                   |001c: move-result-object v0
+0005b6: 6e10 1500 0000                         |001d: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0015
+0005bc: 0c00                                   |0020: move-result-object v0
+0005be: 1100                                   |0021: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=15
+      locals        :
+        0x0000 - 0x0022 reg=6 this Lcom/example/pb/LatLng;
+
+  source_file_idx   : 18 (LatLng.java)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/pb/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/pb/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+0005e0:                                        |[0005e0] com.example.pb.Main.<init>:()V
+0005f0: 7010 1000 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0010
+0005f6: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/pb/Main;
+
+    #1              : (in Lcom/example/pb/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 10
+      ins           : 1
+      outs          : 5
+      insns size    : 64 16-bit code units
+0005f8:                                        |[0005f8] com.example.pb.Main.main:([Ljava/lang/String;)V
+000608: 2190                                   |0000: array-length v0, v9
+00060a: 6201 1c00                              |0001: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+00060e: 2202 0200                              |0003: new-instance v2, Lcom/example/pb/ExistenceFilter; // type@0002
+000612: 1a03 4600                              |0005: const-string v3, "u" // string@0046
+000616: 1224                                   |0007: const/4 v4, #int 2 // #2
+000618: 7040 0000 0234                         |0008: invoke-direct {v2, v0, v4, v3}, Lcom/example/pb/ExistenceFilter;.<init>:(IILjava/lang/String;)V // method@0000
+00061e: 6e20 0f00 2100                         |000b: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000f
+000624: 6201 1c00                              |000e: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000628: 2202 0300                              |0010: new-instance v2, Lcom/example/pb/LatLng; // type@0003
+00062c: 8305                                   |0012: int-to-double v5, v0
+00062e: 1907 e03f                              |0013: const-wide/high16 v7, #long 4602678819172646912 // #3fe0
+000632: cb75                                   |0015: add-double/2addr v5, v7
+000634: 1907 f83f                              |0016: const-wide/high16 v7, #long 4609434218613702656 // #3ff8
+000638: 7058 0200 5276                         |0018: invoke-direct {v2, v5, v6, v7, v8}, Lcom/example/pb/LatLng;.<init>:(DD)V // method@0002
+00063e: 6e20 0f00 2100                         |001b: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000f
+000644: 6201 1c00                              |001e: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000648: 2202 0500                              |0020: new-instance v2, Lcom/example/pb/Twin1; // type@0005
+00064c: 1213                                   |0022: const/4 v3, #int 1 // #1
+00064e: 7040 0600 0243                         |0023: invoke-direct {v2, v0, v3, v4}, Lcom/example/pb/Twin1;.<init>:(III)V // method@0006
+000654: 6e20 0f00 2100                         |0026: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000f
+00065a: 6201 1c00                              |0029: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+00065e: 2202 0600                              |002b: new-instance v2, Lcom/example/pb/Twin2; // type@0006
+000662: 7040 0800 4230                         |002d: invoke-direct {v2, v4, v0, v3}, Lcom/example/pb/Twin2;.<init>:(III)V // method@0008
+000668: 6e20 0f00 2100                         |0030: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000f
+00066e: 6201 1c00                              |0033: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000672: 2202 0700                              |0035: new-instance v2, Lcom/example/pb/Unbundled; // type@0007
+000676: 1233                                   |0037: const/4 v3, #int 3 // #3
+000678: 1244                                   |0038: const/4 v4, #int 4 // #4
+00067a: 7040 0a00 0243                         |0039: invoke-direct {v2, v0, v3, v4}, Lcom/example/pb/Unbundled;.<init>:(III)V // method@000a
+000680: 6e20 0f00 2100                         |003c: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000f
+000686: 0e00                                   |003f: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+        0x0001 line=6
+        0x000e line=7
+        0x001e line=8
+        0x0029 line=9
+        0x0033 line=10
+        0x003f line=11
+      locals        :
+        0x0001 - 0x0040 reg=0 n I
+        0x0000 - 0x0040 reg=9 args [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 31 (Main.java)
+
+Class #4            -
+  Class descriptor  : 'Lcom/example/pb/Twin1;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/pb/Twin1;)
+      name          : 'A_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lcom/example/pb/Twin1;)
+      name          : 'B_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Lcom/example/pb/Twin1;)
+      name          : 'C_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in Lcom/example/pb/Twin1;)
+      name          : 'a_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lcom/example/pb/Twin1;)
+      name          : 'b_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Lcom/example/pb/Twin1;)
+      name          : 'c_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lcom/example/pb/Twin1;)
+      name          : '<init>'
+      type          : '(III)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 1
+      insns size    : 10 16-bit code units
+0006f0:                                        |[0006f0] com.example.pb.Twin1.<init>:(III)V
+000700: 7010 0c00 0000                         |0000: invoke-direct {v0}, Lcom/google/protobuf/GeneratedMessageLite;.<init>:()V // method@000c
+000706: 5901 0d00                              |0003: iput v1, v0, Lcom/example/pb/Twin1;.a_:I // field@000d
+00070a: 5902 0e00                              |0005: iput v2, v0, Lcom/example/pb/Twin1;.b_:I // field@000e
+00070e: 5903 0f00                              |0007: iput v3, v0, Lcom/example/pb/Twin1;.c_:I // field@000f
+000712: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=13
+        0x0003 line=14
+        0x0005 line=15
+        0x0007 line=16
+        0x0009 line=17
+      locals        :
+        0x0000 - 0x000a reg=0 this Lcom/example/pb/Twin1;
+        0x0000 - 0x000a reg=1 a I
+        0x0000 - 0x000a reg=2 b I
+        0x0000 - 0x000a reg=3 c I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/pb/Twin1;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0004 (PROTECTED)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 2
+      insns size    : 44 16-bit code units
+000688:                                        |[000688] com.example.pb.Twin1.describe:()Ljava/lang/String;
+000698: 5250 0d00                              |0000: iget v0, v5, Lcom/example/pb/Twin1;.a_:I // field@000d
+00069c: 5251 0e00                              |0002: iget v1, v5, Lcom/example/pb/Twin1;.b_:I // field@000e
+0006a0: 5252 0f00                              |0004: iget v2, v5, Lcom/example/pb/Twin1;.c_:I // field@000f
+0006a4: 2203 0c00                              |0006: new-instance v3, Ljava/lang/StringBuilder; // type@000c
+0006a8: 7010 1100 0300                         |0008: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@0011
+0006ae: 1a04 2000                              |000b: const-string v4, "T:" // string@0020
+0006b2: 6e20 1400 4300                         |000d: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0006b8: 0c03                                   |0010: move-result-object v3
+0006ba: 6e20 1300 0300                         |0011: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0006c0: 0c00                                   |0014: move-result-object v0
+0006c2: 1a03 0000                              |0015: const-string v3, "," // string@0000
+0006c6: 6e20 1400 3000                         |0017: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0006cc: 0c00                                   |001a: move-result-object v0
+0006ce: 6e20 1300 1000                         |001b: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0006d4: 0c00                                   |001e: move-result-object v0
+0006d6: 6e20 1400 3000                         |001f: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0006dc: 0c00                                   |0022: move-result-object v0
+0006de: 6e20 1300 2000                         |0023: invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0006e4: 0c00                                   |0026: move-result-object v0
+0006e6: 6e10 1500 0000                         |0027: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0015
+0006ec: 0c00                                   |002a: move-result-object v0
+0006ee: 1100                                   |002b: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=18
+      locals        :
+        0x0000 - 0x002c reg=5 this Lcom/example/pb/Twin1;
+
+  source_file_idx   : 34 (Twin1.java)
+
+Class #5            -
+  Class descriptor  : 'Lcom/example/pb/Twin2;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/pb/Twin2;)
+      name          : 'A_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lcom/example/pb/Twin2;)
+      name          : 'B_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Lcom/example/pb/Twin2;)
+      name          : 'C_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in Lcom/example/pb/Twin2;)
+      name          : 'a_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lcom/example/pb/Twin2;)
+      name          : 'b_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Lcom/example/pb/Twin2;)
+      name          : 'c_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lcom/example/pb/Twin2;)
+      name          : '<init>'
+      type          : '(III)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 1
+      insns size    : 10 16-bit code units
+00077c:                                        |[00077c] com.example.pb.Twin2.<init>:(III)V
+00078c: 7010 0c00 0000                         |0000: invoke-direct {v0}, Lcom/google/protobuf/GeneratedMessageLite;.<init>:()V // method@000c
+000792: 5901 1300                              |0003: iput v1, v0, Lcom/example/pb/Twin2;.a_:I // field@0013
+000796: 5902 1400                              |0005: iput v2, v0, Lcom/example/pb/Twin2;.b_:I // field@0014
+00079a: 5903 1500                              |0007: iput v3, v0, Lcom/example/pb/Twin2;.c_:I // field@0015
+00079e: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=13
+        0x0003 line=14
+        0x0005 line=15
+        0x0007 line=16
+        0x0009 line=17
+      locals        :
+        0x0000 - 0x000a reg=0 this Lcom/example/pb/Twin2;
+        0x0000 - 0x000a reg=1 a I
+        0x0000 - 0x000a reg=2 b I
+        0x0000 - 0x000a reg=3 c I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/pb/Twin2;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0004 (PROTECTED)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 2
+      insns size    : 44 16-bit code units
+000714:                                        |[000714] com.example.pb.Twin2.describe:()Ljava/lang/String;
+000724: 5250 1300                              |0000: iget v0, v5, Lcom/example/pb/Twin2;.a_:I // field@0013
+000728: 5251 1400                              |0002: iget v1, v5, Lcom/example/pb/Twin2;.b_:I // field@0014
+00072c: 5252 1500                              |0004: iget v2, v5, Lcom/example/pb/Twin2;.c_:I // field@0015
+000730: 2203 0c00                              |0006: new-instance v3, Ljava/lang/StringBuilder; // type@000c
+000734: 7010 1100 0300                         |0008: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@0011
+00073a: 1a04 2000                              |000b: const-string v4, "T:" // string@0020
+00073e: 6e20 1400 4300                         |000d: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000744: 0c03                                   |0010: move-result-object v3
+000746: 6e20 1300 0300                         |0011: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+00074c: 0c00                                   |0014: move-result-object v0
+00074e: 1a03 0000                              |0015: const-string v3, "," // string@0000
+000752: 6e20 1400 3000                         |0017: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000758: 0c00                                   |001a: move-result-object v0
+00075a: 6e20 1300 1000                         |001b: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+000760: 0c00                                   |001e: move-result-object v0
+000762: 6e20 1400 3000                         |001f: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000768: 0c00                                   |0022: move-result-object v0
+00076a: 6e20 1300 2000                         |0023: invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+000770: 0c00                                   |0026: move-result-object v0
+000772: 6e10 1500 0000                         |0027: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0015
+000778: 0c00                                   |002a: move-result-object v0
+00077a: 1100                                   |002b: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=18
+      locals        :
+        0x0000 - 0x002c reg=5 this Lcom/example/pb/Twin2;
+
+  source_file_idx   : 35 (Twin2.java)
+
+Class #6            -
+  Class descriptor  : 'Lcom/example/pb/Unbundled;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lcom/google/protobuf/GeneratedMessageLite;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/pb/Unbundled;)
+      name          : 'X_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lcom/example/pb/Unbundled;)
+      name          : 'Y_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Lcom/example/pb/Unbundled;)
+      name          : 'Z_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 7
+  Instance fields   -
+    #0              : (in Lcom/example/pb/Unbundled;)
+      name          : 'x_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lcom/example/pb/Unbundled;)
+      name          : 'y_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Lcom/example/pb/Unbundled;)
+      name          : 'z_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lcom/example/pb/Unbundled;)
+      name          : '<init>'
+      type          : '(III)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 4
+      ins           : 4
+      outs          : 1
+      insns size    : 10 16-bit code units
+000808:                                        |[000808] com.example.pb.Unbundled.<init>:(III)V
+000818: 7010 0c00 0000                         |0000: invoke-direct {v0}, Lcom/google/protobuf/GeneratedMessageLite;.<init>:()V // method@000c
+00081e: 5901 1900                              |0003: iput v1, v0, Lcom/example/pb/Unbundled;.x_:I // field@0019
+000822: 5902 1a00                              |0005: iput v2, v0, Lcom/example/pb/Unbundled;.y_:I // field@001a
+000826: 5903 1b00                              |0007: iput v3, v0, Lcom/example/pb/Unbundled;.z_:I // field@001b
+00082a: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=13
+        0x0003 line=14
+        0x0005 line=15
+        0x0007 line=16
+        0x0009 line=17
+      locals        :
+        0x0000 - 0x000a reg=0 this Lcom/example/pb/Unbundled;
+        0x0000 - 0x000a reg=1 x I
+        0x0000 - 0x000a reg=2 y I
+        0x0000 - 0x000a reg=3 z I
+
+  Virtual methods   -
+    #0              : (in Lcom/example/pb/Unbundled;)
+      name          : 'describe'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0004 (PROTECTED)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 2
+      insns size    : 44 16-bit code units
+0007a0:                                        |[0007a0] com.example.pb.Unbundled.describe:()Ljava/lang/String;
+0007b0: 5250 1900                              |0000: iget v0, v5, Lcom/example/pb/Unbundled;.x_:I // field@0019
+0007b4: 5251 1a00                              |0002: iget v1, v5, Lcom/example/pb/Unbundled;.y_:I // field@001a
+0007b8: 5252 1b00                              |0004: iget v2, v5, Lcom/example/pb/Unbundled;.z_:I // field@001b
+0007bc: 2203 0c00                              |0006: new-instance v3, Ljava/lang/StringBuilder; // type@000c
+0007c0: 7010 1100 0300                         |0008: invoke-direct {v3}, Ljava/lang/StringBuilder;.<init>:()V // method@0011
+0007c6: 1a04 2400                              |000b: const-string v4, "U:" // string@0024
+0007ca: 6e20 1400 4300                         |000d: invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0007d0: 0c03                                   |0010: move-result-object v3
+0007d2: 6e20 1300 0300                         |0011: invoke-virtual {v3, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0007d8: 0c00                                   |0014: move-result-object v0
+0007da: 1a03 0000                              |0015: const-string v3, "," // string@0000
+0007de: 6e20 1400 3000                         |0017: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0007e4: 0c00                                   |001a: move-result-object v0
+0007e6: 6e20 1300 1000                         |001b: invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0007ec: 0c00                                   |001e: move-result-object v0
+0007ee: 6e20 1400 3000                         |001f: invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+0007f4: 0c00                                   |0022: move-result-object v0
+0007f6: 6e20 1300 2000                         |0023: invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+0007fc: 0c00                                   |0026: move-result-object v0
+0007fe: 6e10 1500 0000                         |0027: invoke-virtual {v0}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0015
+000804: 0c00                                   |002a: move-result-object v0
+000806: 1100                                   |002b: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=18
+      locals        :
+        0x0000 - 0x002c reg=5 this Lcom/example/pb/Unbundled;
+
+  source_file_idx   : 38 (Unbundled.java)
+

@@ -11,6 +11,7 @@ pub mod output;
 pub mod passes;
 pub mod pipeline;
 pub mod program;
+pub mod protobuf;
 pub mod report;
 pub mod compose;
 pub mod composables;

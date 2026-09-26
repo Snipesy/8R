@@ -33,7 +33,8 @@ fn load(fixture: &str, variant: &str) -> Vec<DexInput> {
 }
 
 fn outcome(fixture: &str, variant: &str) -> Outcome {
-    run(&load(fixture, variant), &Config { verbose_labels: true, ..Default::default() }).unwrap()
+    let resources = eightr_core::input::dir_resources(&fixtures_root().join(fixture).join("resources"));
+    run(&load(fixture, variant), &Config { verbose_labels: true, resources, ..Default::default() }).unwrap()
 }
 
 /// A class `r8/rebox-enum` re-created: an enum class absent from the input.
@@ -721,4 +722,20 @@ fn inlining_hints_precision_recall() {
             }
         }
     }
+}
+
+/// protobuf-lite classes named from the bundled .proto (fixture protobuf_lite): only the unique
+/// message with three or more fields gets an S name; the others (two fields, identical twins,
+/// not bundled) stay structural.
+#[test]
+fn protobuf_messages_named_from_bundled_protos() {
+    let out = outcome("protobuf_lite", "r8");
+    let p = &out.program;
+    let named: Vec<String> = out
+        .labels
+        .iter()
+        .filter(|(_, l)| l.rules.contains(&eightr_rules::PROTOBUF_MESSAGE_NAME))
+        .filter_map(|(_, l)| l.value.clone())
+        .collect();
+    assert_eq!(named, ["ExistenceFilter"], "{:?}", p.model.classes.len());
 }

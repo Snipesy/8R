@@ -99,6 +99,7 @@ pub struct Rule {
 use Attribute as A;
 
 pub const IDENTITY: &str = "core/identity";
+pub const PROTOBUF_MESSAGE_NAME: &str = "r8/protobuf-message-name";
 pub const DATA_CLASS_NAME: &str = "kotlinc/data-class-name";
 pub const DATA_CLASS_PROPERTY: &str = "kotlinc/data-class-property";
 pub const SIGDB_METHOD_NAME: &str = "r8/sigdb-method-name";
@@ -352,6 +353,19 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["r94_outline", "kotlin_serialization", "r94_desugar"],
+    },
+    Rule {
+        id: PROTOBUF_MESSAGE_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::ClassName],
+        summary: "A protobuf-lite message class's simple name from the package's bundled .proto sources: its kept <FIELD>_FIELD_NUMBER constants equal exactly one message's fields.",
+        preconditions: &[
+            "The class's static int <STEM>_FIELD_NUMBER constants, as (STEM, value), equal exactly one bundled message's (upper-cased field name, number) set, of at least 3 fields (smaller sets may coincide with a message not bundled: hint only).",
+            "The simple name is claimed by one class of the package and taken by no other; the class isn't pinned or already named.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["protobuf_lite"],
     },
     Rule {
         id: REBOX_ENUM,

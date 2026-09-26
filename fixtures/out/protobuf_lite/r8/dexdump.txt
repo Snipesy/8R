@@ -1,0 +1,650 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '037'
+Class #0            -
+  Class descriptor  : 'Lb;'
+  Access flags      : 0x0401 (PUBLIC ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lb;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lb;)
+      name          : 'toString'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 5 16-bit code units
+000504:                                        |[000504] b.toString:()Ljava/lang/String;
+000514: 6e10 0200 0000                         |0000: invoke-virtual {v0}, Lb;.a:()Ljava/lang/String; // method@0002
+00051a: 0c00                                   |0003: move-result-object v0
+00051c: 1100                                   |0004: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x0005 reg=0 this Lb;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #1            -
+  Class descriptor  : 'La;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lb;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in La;)
+      name          : 'COUNT_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #1              : (in La;)
+      name          : 'TARGET_ID_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #2              : (in La;)
+      name          : 'UNCHANGED_NAMES_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in La;)
+      name          : 'count_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in La;)
+      name          : 'targetId_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in La;)
+      name          : 'unchangedNames_'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in La;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 13 16-bit code units
+0004d8:                                        |[0004d8] a.<init>:(I)V
+0004e8: 7010 0e00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000e
+0004ee: 5901 0400                              |0003: iput v1, v0, La;.targetId_:I // field@0004
+0004f2: 1221                                   |0005: const/4 v1, #int 2 // #2
+0004f4: 5901 0300                              |0006: iput v1, v0, La;.count_:I // field@0003
+0004f8: 1a01 3600                              |0008: const-string v1, "u" // string@0036
+0004fc: 5b01 0500                              |000a: iput-object v1, v0, La;.unchangedNames_:Ljava/lang/String; // field@0005
+000500: 0e00                                   |000c: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+        0x000c line=13
+      locals        :
+        0x0000 - 0x000d reg=0 this La;
+        0x0000 - 0x000d reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in La;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 35 16-bit code units
+000480:                                        |[000480] a.a:()Ljava/lang/String;
+000490: 5240 0400                              |0000: iget v0, v4, La;.targetId_:I // field@0004
+000494: 5241 0300                              |0002: iget v1, v4, La;.count_:I // field@0003
+000498: 5444 0500                              |0004: iget-object v4, v4, La;.unchangedNames_:Ljava/lang/String; // field@0005
+00049c: 2202 0c00                              |0006: new-instance v2, Ljava/lang/StringBuilder; // type@000c
+0004a0: 1a03 0700                              |0008: const-string v3, "E:" // string@0007
+0004a4: 7020 0f00 3200                         |000a: invoke-direct {v2, v3}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@000f
+0004aa: 6e20 1100 0200                         |000d: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0004b0: 1a00 0000                              |0010: const-string v0, "," // string@0000
+0004b4: 6e20 1200 0200                         |0012: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0004ba: 6e20 1100 1200                         |0015: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0004c0: 6e20 1200 0200                         |0018: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0004c6: 6e20 1200 4200                         |001b: invoke-virtual {v2, v4}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0004cc: 6e10 1300 0200                         |001e: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0013
+0004d2: 0c04                                   |0021: move-result-object v4
+0004d4: 1104                                   |0022: return-object v4
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x0023 reg=4 this La;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #2            -
+  Class descriptor  : 'Lc;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lb;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lc;)
+      name          : 'LATITUDE_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lc;)
+      name          : 'LONGITUDE_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+  Instance fields   -
+    #0              : (in Lc;)
+      name          : 'latitude_'
+      type          : 'D'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lc;)
+      name          : 'longitude_'
+      type          : 'D'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lc;)
+      name          : '<init>'
+      type          : '(D)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 1
+      insns size    : 10 16-bit code units
+000568:                                        |[000568] c.<init>:(D)V
+000578: 7010 0e00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000e
+00057e: 5a01 0800                              |0003: iput-wide v1, v0, Lc;.latitude_:D // field@0008
+000582: 1901 f83f                              |0005: const-wide/high16 v1, #long 4609434218613702656 // #3ff8
+000586: 5a01 0900                              |0007: iput-wide v1, v0, Lc;.longitude_:D // field@0009
+00058a: 0e00                                   |0009: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+      locals        :
+        0x0000 - 0x000a reg=0 this Lc;
+        0x0000 - 0x000a reg=1 (null) D
+
+  Virtual methods   -
+    #0              : (in Lc;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 3
+      insns size    : 27 16-bit code units
+000520:                                        |[000520] c.a:()Ljava/lang/String;
+000530: 5350 0800                              |0000: iget-wide v0, v5, Lc;.latitude_:D // field@0008
+000534: 5352 0900                              |0002: iget-wide v2, v5, Lc;.longitude_:D // field@0009
+000538: 2205 0c00                              |0004: new-instance v5, Ljava/lang/StringBuilder; // type@000c
+00053c: 1a04 0a00                              |0006: const-string v4, "L:" // string@000a
+000540: 7020 0f00 4500                         |0008: invoke-direct {v5, v4}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@000f
+000546: 6e30 1000 0501                         |000b: invoke-virtual {v5, v0, v1}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0010
+00054c: 1a00 0000                              |000e: const-string v0, "," // string@0000
+000550: 6e20 1200 0500                         |0010: invoke-virtual {v5, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+000556: 6e30 1000 2503                         |0013: invoke-virtual {v5, v2, v3}, Ljava/lang/StringBuilder;.append:(D)Ljava/lang/StringBuilder; // method@0010
+00055c: 6e10 1300 0500                         |0016: invoke-virtual {v5}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0013
+000562: 0c05                                   |0019: move-result-object v5
+000564: 1105                                   |001a: return-object v5
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x001b reg=5 this Lc;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #3            -
+  Class descriptor  : 'Lcom/example/pb/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/pb/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 7
+      ins           : 1
+      outs          : 3
+      insns size    : 56 16-bit code units
+00070c:                                        |[00070c] com.example.pb.Main.main:([Ljava/lang/String;)V
+00071c: 2166                                   |0000: array-length v6, v6
+00071e: 6200 1c00                              |0001: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000722: 2201 0200                              |0003: new-instance v1, La; // type@0002
+000726: 7020 0000 6100                         |0005: invoke-direct {v1, v6}, La;.<init>:(I)V // method@0000
+00072c: 6e20 0d00 1000                         |0008: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000d
+000732: 6200 1c00                              |000b: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000736: 2201 0400                              |000d: new-instance v1, Lc; // type@0004
+00073a: 8362                                   |000f: int-to-double v2, v6
+00073c: 1904 e03f                              |0010: const-wide/high16 v4, #long 4602678819172646912 // #3fe0
+000740: cb42                                   |0012: add-double/2addr v2, v4
+000742: 7030 0400 2103                         |0013: invoke-direct {v1, v2, v3}, Lc;.<init>:(D)V // method@0004
+000748: 6e20 0d00 1000                         |0016: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000d
+00074e: 6200 1c00                              |0019: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000752: 2201 0600                              |001b: new-instance v1, Ld; // type@0006
+000756: 7020 0700 6100                         |001d: invoke-direct {v1, v6}, Ld;.<init>:(I)V // method@0007
+00075c: 6e20 0d00 1000                         |0020: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000d
+000762: 6200 1c00                              |0023: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+000766: 2201 0700                              |0025: new-instance v1, Le; // type@0007
+00076a: 7020 0900 6100                         |0027: invoke-direct {v1, v6}, Le;.<init>:(I)V // method@0009
+000770: 6e20 0d00 1000                         |002a: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000d
+000776: 6200 1c00                              |002d: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@001c
+00077a: 2201 0800                              |002f: new-instance v1, Lf; // type@0008
+00077e: 7020 0b00 6100                         |0031: invoke-direct {v1, v6}, Lf;.<init>:(I)V // method@000b
+000784: 6e20 0d00 1000                         |0034: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/Object;)V // method@000d
+00078a: 0e00                                   |0037: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+        0x000c line=13
+        0x000d line=14
+        0x000e line=15
+        0x000f line=16
+        0x0010 line=17
+        0x0011 line=18
+        0x0012 line=19
+        0x0013 line=20
+        0x0014 line=21
+        0x0015 line=22
+        0x0016 line=23
+        0x0017 line=24
+        0x0018 line=25
+        0x0019 line=26
+        0x001a line=27
+        0x001b line=28
+        0x001c line=29
+        0x001d line=30
+        0x001e line=31
+        0x001f line=32
+        0x0020 line=33
+        0x0021 line=34
+        0x0022 line=35
+        0x0023 line=36
+        0x0024 line=37
+        0x0025 line=38
+        0x0026 line=39
+        0x0027 line=40
+        0x0028 line=41
+        0x0029 line=42
+        0x002a line=43
+        0x002b line=44
+        0x002c line=45
+        0x002d line=46
+        0x002e line=47
+        0x002f line=48
+        0x0030 line=49
+        0x0031 line=50
+        0x0032 line=51
+        0x0033 line=52
+        0x0034 line=53
+        0x0035 line=54
+        0x0036 line=55
+        0x0037 line=56
+      locals        :
+        0x0000 - 0x0038 reg=6 (null) [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #4            -
+  Class descriptor  : 'Ld;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lb;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Ld;)
+      name          : 'A_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Ld;)
+      name          : 'B_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Ld;)
+      name          : 'C_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in Ld;)
+      name          : 'a_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Ld;)
+      name          : 'b_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Ld;)
+      name          : 'c_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Ld;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 12 16-bit code units
+0005e4:                                        |[0005e4] d.<init>:(I)V
+0005f4: 7010 0e00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000e
+0005fa: 5901 0d00                              |0003: iput v1, v0, Ld;.a_:I // field@000d
+0005fe: 1211                                   |0005: const/4 v1, #int 1 // #1
+000600: 5901 0e00                              |0006: iput v1, v0, Ld;.b_:I // field@000e
+000604: 1221                                   |0008: const/4 v1, #int 2 // #2
+000606: 5901 0f00                              |0009: iput v1, v0, Ld;.c_:I // field@000f
+00060a: 0e00                                   |000b: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+      locals        :
+        0x0000 - 0x000c reg=0 this Ld;
+        0x0000 - 0x000c reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Ld;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 35 16-bit code units
+00058c:                                        |[00058c] d.a:()Ljava/lang/String;
+00059c: 5240 0d00                              |0000: iget v0, v4, Ld;.a_:I // field@000d
+0005a0: 5241 0e00                              |0002: iget v1, v4, Ld;.b_:I // field@000e
+0005a4: 5244 0f00                              |0004: iget v4, v4, Ld;.c_:I // field@000f
+0005a8: 2202 0c00                              |0006: new-instance v2, Ljava/lang/StringBuilder; // type@000c
+0005ac: 1a03 1c00                              |0008: const-string v3, "T:" // string@001c
+0005b0: 7020 0f00 3200                         |000a: invoke-direct {v2, v3}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@000f
+0005b6: 6e20 1100 0200                         |000d: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0005bc: 1a00 0000                              |0010: const-string v0, "," // string@0000
+0005c0: 6e20 1200 0200                         |0012: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0005c6: 6e20 1100 1200                         |0015: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0005cc: 6e20 1200 0200                         |0018: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0005d2: 6e20 1100 4200                         |001b: invoke-virtual {v2, v4}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0005d8: 6e10 1300 0200                         |001e: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0013
+0005de: 0c04                                   |0021: move-result-object v4
+0005e0: 1104                                   |0022: return-object v4
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x0023 reg=4 this Ld;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #5            -
+  Class descriptor  : 'Le;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lb;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Le;)
+      name          : 'A_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Le;)
+      name          : 'B_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Le;)
+      name          : 'C_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 3
+  Instance fields   -
+    #0              : (in Le;)
+      name          : 'a_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Le;)
+      name          : 'b_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Le;)
+      name          : 'c_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Le;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 2
+      outs          : 1
+      insns size    : 12 16-bit code units
+000664:                                        |[000664] e.<init>:(I)V
+000674: 7010 0e00 0100                         |0000: invoke-direct {v1}, Ljava/lang/Object;.<init>:()V // method@000e
+00067a: 1220                                   |0003: const/4 v0, #int 2 // #2
+00067c: 5910 1300                              |0004: iput v0, v1, Le;.a_:I // field@0013
+000680: 5912 1400                              |0006: iput v2, v1, Le;.b_:I // field@0014
+000684: 1212                                   |0008: const/4 v2, #int 1 // #1
+000686: 5912 1500                              |0009: iput v2, v1, Le;.c_:I // field@0015
+00068a: 0e00                                   |000b: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+      locals        :
+        0x0000 - 0x000c reg=1 this Le;
+        0x0000 - 0x000c reg=2 (null) I
+
+  Virtual methods   -
+    #0              : (in Le;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 35 16-bit code units
+00060c:                                        |[00060c] e.a:()Ljava/lang/String;
+00061c: 5240 1300                              |0000: iget v0, v4, Le;.a_:I // field@0013
+000620: 5241 1400                              |0002: iget v1, v4, Le;.b_:I // field@0014
+000624: 5244 1500                              |0004: iget v4, v4, Le;.c_:I // field@0015
+000628: 2202 0c00                              |0006: new-instance v2, Ljava/lang/StringBuilder; // type@000c
+00062c: 1a03 1c00                              |0008: const-string v3, "T:" // string@001c
+000630: 7020 0f00 3200                         |000a: invoke-direct {v2, v3}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@000f
+000636: 6e20 1100 0200                         |000d: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+00063c: 1a00 0000                              |0010: const-string v0, "," // string@0000
+000640: 6e20 1200 0200                         |0012: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+000646: 6e20 1100 1200                         |0015: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+00064c: 6e20 1200 0200                         |0018: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+000652: 6e20 1100 4200                         |001b: invoke-virtual {v2, v4}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+000658: 6e10 1300 0200                         |001e: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0013
+00065e: 0c04                                   |0021: move-result-object v4
+000660: 1104                                   |0022: return-object v4
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x0023 reg=4 this Le;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
+Class #6            -
+  Class descriptor  : 'Lf;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lb;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lf;)
+      name          : 'X_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 1
+    #1              : (in Lf;)
+      name          : 'Y_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 2
+    #2              : (in Lf;)
+      name          : 'Z_FIELD_NUMBER'
+      type          : 'I'
+      access        : 0x0019 (PUBLIC STATIC FINAL)
+      value         : 7
+  Instance fields   -
+    #0              : (in Lf;)
+      name          : 'x_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #1              : (in Lf;)
+      name          : 'y_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+    #2              : (in Lf;)
+      name          : 'z_'
+      type          : 'I'
+      access        : 0x0002 (PRIVATE)
+  Direct methods    -
+    #0              : (in Lf;)
+      name          : '<init>'
+      type          : '(I)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 12 16-bit code units
+0006e4:                                        |[0006e4] f.<init>:(I)V
+0006f4: 7010 0e00 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@000e
+0006fa: 5901 1900                              |0003: iput v1, v0, Lf;.x_:I // field@0019
+0006fe: 1231                                   |0005: const/4 v1, #int 3 // #3
+000700: 5901 1a00                              |0006: iput v1, v0, Lf;.y_:I // field@001a
+000704: 1241                                   |0008: const/4 v1, #int 4 // #4
+000706: 5901 1b00                              |0009: iput v1, v0, Lf;.z_:I // field@001b
+00070a: 0e00                                   |000b: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+      locals        :
+        0x0000 - 0x000c reg=0 this Lf;
+        0x0000 - 0x000c reg=1 (null) I
+
+  Virtual methods   -
+    #0              : (in Lf;)
+      name          : 'a'
+      type          : '()Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 35 16-bit code units
+00068c:                                        |[00068c] f.a:()Ljava/lang/String;
+00069c: 5240 1900                              |0000: iget v0, v4, Lf;.x_:I // field@0019
+0006a0: 5241 1a00                              |0002: iget v1, v4, Lf;.y_:I // field@001a
+0006a4: 5244 1b00                              |0004: iget v4, v4, Lf;.z_:I // field@001b
+0006a8: 2202 0c00                              |0006: new-instance v2, Ljava/lang/StringBuilder; // type@000c
+0006ac: 1a03 1e00                              |0008: const-string v3, "U:" // string@001e
+0006b0: 7020 0f00 3200                         |000a: invoke-direct {v2, v3}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@000f
+0006b6: 6e20 1100 0200                         |000d: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0006bc: 1a00 0000                              |0010: const-string v0, "," // string@0000
+0006c0: 6e20 1200 0200                         |0012: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0006c6: 6e20 1100 1200                         |0015: invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0006cc: 6e20 1200 0200                         |0018: invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0012
+0006d2: 6e20 1100 4200                         |001b: invoke-virtual {v2, v4}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0011
+0006d8: 6e10 1300 0200                         |001e: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0013
+0006de: 0c04                                   |0021: move-result-object v4
+0006e0: 1104                                   |0022: return-object v4
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+      locals        :
+        0x0000 - 0x0023 reg=4 this Lf;
+
+  source_file_idx   : 51 (r8-map-id-0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5)
+
