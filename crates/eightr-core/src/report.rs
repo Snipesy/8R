@@ -16,6 +16,9 @@ pub struct Report {
     pub rules: Vec<RuleUsage>,
     /// Per attribute: how many (item, attribute) pairs ended up S, D, N, or untouched.
     pub summary: BTreeMap<Attribute, Counts>,
+    /// Structural rewrites performed (outlines inlined back, classes split, ...).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rewrites: Vec<crate::rewrites::RewriteRecord>,
     /// Every non-identity label, when `Config::verbose_labels` is set.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<LabelEntry>,
