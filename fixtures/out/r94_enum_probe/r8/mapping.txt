@@ -1,0 +1,44 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 26
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 6dc902bcfd75310e29ce6fda9e34a9a9c54790b095e182a61ebff51381775943
+# pg_map_hash: SHA-256 6dc902bcfd75310e29ce6fda9e34a9a9c54790b095e182a61ebff51381775943
+com.example.probe.Color -> R8$$REMOVED$$CLASS$$0:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.probe.Color$EnumUnboxingSharedUtility -> a:
+# {"id":"sourceFile","fileName":"R8$$SyntheticClass"}
+# {"id":"com.android.tools.r8.synthesized"}
+    1:1:void Color$EnumUnboxingSharedUtility.<clinit>():0:0 -> <clinit>
+      # {"id":"com.android.tools.r8.synthesized"}
+    1:1:java.lang.String Color$EnumUnboxingSharedUtility.name(int):0:0 -> a
+      # {"id":"com.android.tools.r8.synthesized"}
+com.example.probe.Main -> com.example.probe.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    int sink -> a
+    boolean flag -> b
+    byte b -> c
+    1:1:void main(java.lang.String[]):30:30 -> main
+    2:2:void takeBool(boolean):10:10 -> main
+    2:2:void p1(int):15 -> main
+    2:2:void main(java.lang.String[]):31 -> main
+    3:3:void takeByte(byte):11:11 -> main
+    3:3:void p1(int):16 -> main
+    3:3:void main(java.lang.String[]):31 -> main
+    4:4:void p1(int):17:17 -> main
+    4:4:void main(java.lang.String[]):31 -> main
+    5:5:void takeBool(boolean):10:10 -> main
+    5:5:void p1(int):18 -> main
+    5:5:void main(java.lang.String[]):31 -> main
+    6:6:void takeByte(byte):11:11 -> main
+    6:6:void p1(int):19 -> main
+    6:6:void main(java.lang.String[]):31 -> main
+    7:9:void p2(int):24:26 -> main
+    7:9:void main(java.lang.String[]):32 -> main
+    10:10:void main(java.lang.String[]):33:33 -> main
+    11:11:com.example.probe.Color com.example.probe.Color.valueOf(java.lang.String):3:3 -> main
+    11:11:void main(java.lang.String[]):33 -> main
+    12:13:void main(java.lang.String[]):33:34 -> main
+    14:14:com.example.probe.Color com.example.probe.Color.valueOf(java.lang.String):3:3 -> main
+    14:14:void main(java.lang.String[]):33 -> main

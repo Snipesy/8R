@@ -49,25 +49,39 @@ const MESSAGE: &str = "No enum constant ";
 type ValueKey = (Reg, Vec<usize>);
 
 
-/// The narrow constant `reg` holds when `at` executes, found by walking back through code with
-/// a single predecessor to its definition.
+/// The narrow constant `reg` holds when `at` executes: walking back along every path to its
+/// definitions, which must all be the same constant (bounded search).
 fn const_before(body: &Body, cfg: &Cfg, at: u32, reg: Reg) -> Option<i32> {
-    let mut i = at;
-    for _ in 0..256 {
-        let blk = &cfg.blocks[cfg.block_of[i as usize] as usize];
-        if i > blk.start {
-            i -= 1;
-        } else {
-            let [pred] = blk.preds.as_slice() else { return None };
-            i = cfg.blocks[*pred as usize].last();
+    let mut value = None;
+    // (block, scan the instructions before this index in it)
+    let mut stack = vec![(cfg.block_of[at as usize], at)];
+    let mut seen = BTreeSet::new();
+    let mut budget = 4096u32;
+    'next: while let Some((b, before)) = stack.pop() {
+        if !seen.insert((b, before)) {
+            continue;
         }
-        match &body.insns[i as usize].op {
-            Op::Const { dst, value: Const::Narrow(k) } if *dst == reg => return Some(*k),
-            op if op.def().is_some_and(|(r, w)| r == reg || (w && r + 1 == reg)) => return None,
-            _ => {}
+        let blk = &cfg.blocks[b as usize];
+        for i in (blk.start..before).rev() {
+            budget = budget.checked_sub(1)?;
+            match &body.insns[i as usize].op {
+                Op::Const { dst, value: Const::Narrow(k) } if *dst == reg => {
+                    if value.is_some_and(|v| v != *k) {
+                        return None;
+                    }
+                    value = Some(*k);
+                    continue 'next;
+                }
+                op if op.def().is_some_and(|(r, w)| r == reg || (w && r + 1 == reg)) => return None,
+                _ => {}
+            }
         }
+        if blk.preds.is_empty() {
+            return None; // the entry, with no definition on this path
+        }
+        stack.extend(blk.preds.iter().map(|&pb| (pb, cfg.blocks[pb as usize].end)));
     }
-    None
+    value
 }
 
 /// Inlined `valueOf` chains in one method: per tested string value, literal → the value `k` the
@@ -78,7 +92,8 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
     let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
     let rd = ReachingDefs::compute(body, &cfg);
     // Equals tests: (input value, literal, success instruction).
-    let mut tests: BTreeMap<ValueKey, Vec<(String, u32, u32)>> = BTreeMap::new();
+    // (literal, success, failure, the `if` testing the result)
+    let mut tests: BTreeMap<ValueKey, Vec<(String, u32, u32, u32)>> = BTreeMap::new();
     for (i, insn) in body.insns.iter().enumerate() {
         let Op::Invoke { method, args, .. } = &insn.op else { continue };
         if p.str(method.name) != "equals" || p.str(method.proto) != "(Ljava/lang/Object;)Z" || args.len() != 2 {
@@ -98,7 +113,7 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
             _ => continue,
         };
         let defs = rd.uses[i as usize].as_ref().and_then(|u| u.iter().find(|(x, _)| *x == input)).map(|(_, d)| d.clone()).unwrap_or_default();
-        tests.entry((input, defs)).or_default().push((name, success, failure));
+        tests.entry((input, defs)).or_default().push((name, success, failure, i + 2));
     }
     let mut out = Vec::new();
     for (_, list) in tests {
@@ -106,7 +121,7 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
         // that only jumps to the join yields that register's current constant.
         let defined: BTreeSet<Reg> = list
             .iter()
-            .filter_map(|(_, s, _)| match body.insns.get(*s as usize).map(|x| &x.op) {
+            .filter_map(|(_, s, _, _)| match body.insns.get(*s as usize).map(|x| &x.op) {
                 Some(Op::Const { dst, value: Const::Narrow(_) }) | Some(Op::Move { dst, .. }) => Some(*dst),
                 _ => None,
             })
@@ -114,14 +129,22 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
         let [result] = defined.into_iter().collect::<Vec<_>>()[..] else { continue };
         let mut table: BTreeMap<i32, Option<String>> = BTreeMap::new();
         let mut produced = Vec::new();
-        for (name, s, _) in &list {
+        for (name, s, _, test) in &list {
             let k = match body.insns.get(*s as usize).map(|x| &x.op) {
                 Some(Op::Const { dst, value: Const::Narrow(k) }) if *dst == result => Some(*k),
                 Some(Op::Move { dst, src, .. }) if *dst == result => const_at(body, &rd, *s, *src),
-                Some(Op::Goto { .. }) => const_before(body, &cfg, *s, result),
-                _ => None,
+                // A jump to the join, or the join itself (fallthrough): the result register
+                // already holds the value.
+                // (On a fallthrough into the join, the value is the register's at the test.)
+                Some(_) => const_before(body, &cfg, if *s == test + 1 { *test } else { *s }, result),
+                None => None,
             };
-            let Some(k) = k.filter(|k| *k >= 1) else { continue };
+            // Every test must account for a value: a partial table isn't proof of the enum.
+            let Some(k) = k.filter(|k| *k >= 1) else {
+                table.clear();
+                table.insert(0, None);
+                break;
+            };
             produced.push((*s, result));
             let slot = table.entry(k).or_insert_with(|| Some(name.clone()));
             if slot.as_deref() != Some(name.as_str()) {
@@ -133,7 +156,7 @@ pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
         // IllegalArgumentException("No enum constant X.")`, a few instructions in).
         let messages: BTreeSet<String> = list
             .iter()
-            .flat_map(|(_, _, f)| body.insns.iter().skip(*f as usize).take(4))
+            .flat_map(|(_, _, f, _)| body.insns.iter().skip(*f as usize).take(4))
             .filter_map(|x| match &x.op {
                 Op::ConstString { value, .. } => p.str(*value).strip_prefix(MESSAGE).and_then(|r| r.strip_suffix('.')).filter(|n| !n.is_empty()).map(str::to_string),
                 _ => None,

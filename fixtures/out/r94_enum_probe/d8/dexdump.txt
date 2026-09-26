@@ -1,0 +1,392 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/probe/Color;'
+  Access flags      : 0x4010 (FINAL ENUM)
+  Superclass        : 'Ljava/lang/Enum;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/probe/Color;)
+      name          : '$VALUES'
+      type          : '[Lcom/example/probe/Color;'
+      access        : 0x101a (PRIVATE STATIC FINAL SYNTHETIC)
+    #1              : (in Lcom/example/probe/Color;)
+      name          : 'BLUE'
+      type          : 'Lcom/example/probe/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #2              : (in Lcom/example/probe/Color;)
+      name          : 'GREEN'
+      type          : 'Lcom/example/probe/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+    #3              : (in Lcom/example/probe/Color;)
+      name          : 'RED'
+      type          : 'Lcom/example/probe/Color;'
+      access        : 0x4019 (PUBLIC STATIC FINAL ENUM)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/probe/Color;)
+      name          : '$values'
+      type          : '()[Lcom/example/probe/Color;'
+      access        : 0x100a (PRIVATE STATIC SYNTHETIC)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 11 16-bit code units
+0003e8:                                        |[0003e8] com.example.probe.Color.$values:()[Lcom/example/probe/Color;
+0003f8: 6200 0300                              |0000: sget-object v0, Lcom/example/probe/Color;.RED:Lcom/example/probe/Color; // field@0003
+0003fc: 6201 0200                              |0002: sget-object v1, Lcom/example/probe/Color;.GREEN:Lcom/example/probe/Color; // field@0002
+000400: 6202 0100                              |0004: sget-object v2, Lcom/example/probe/Color;.BLUE:Lcom/example/probe/Color; // field@0001
+000404: 2430 0f00 1002                         |0006: filled-new-array {v0, v1, v2}, [Lcom/example/probe/Color; // type@000f
+00040a: 0c00                                   |0009: move-result-object v0
+00040c: 1100                                   |000a: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+    #1              : (in Lcom/example/probe/Color;)
+      name          : '<clinit>'
+      type          : '()V'
+      access        : 0x10008 (STATIC CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 0
+      outs          : 3
+      insns size    : 37 16-bit code units
+000434:                                        |[000434] com.example.probe.Color.<clinit>:()V
+000444: 2200 0200                              |0000: new-instance v0, Lcom/example/probe/Color; // type@0002
+000448: 1a01 1d00                              |0002: const-string v1, "RED" // string@001d
+00044c: 1202                                   |0004: const/4 v2, #int 0 // #0
+00044e: 7030 0200 1002                         |0005: invoke-direct {v0, v1, v2}, Lcom/example/probe/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+000454: 6900 0300                              |0008: sput-object v0, Lcom/example/probe/Color;.RED:Lcom/example/probe/Color; // field@0003
+000458: 2200 0200                              |000a: new-instance v0, Lcom/example/probe/Color; // type@0002
+00045c: 1a01 0900                              |000c: const-string v1, "GREEN" // string@0009
+000460: 1212                                   |000e: const/4 v2, #int 1 // #1
+000462: 7030 0200 1002                         |000f: invoke-direct {v0, v1, v2}, Lcom/example/probe/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+000468: 6900 0200                              |0012: sput-object v0, Lcom/example/probe/Color;.GREEN:Lcom/example/probe/Color; // field@0002
+00046c: 2200 0200                              |0014: new-instance v0, Lcom/example/probe/Color; // type@0002
+000470: 1a01 0800                              |0016: const-string v1, "BLUE" // string@0008
+000474: 1222                                   |0018: const/4 v2, #int 2 // #2
+000476: 7030 0200 1002                         |0019: invoke-direct {v0, v1, v2}, Lcom/example/probe/Color;.<init>:(Ljava/lang/String;I)V // method@0002
+00047c: 6900 0100                              |001c: sput-object v0, Lcom/example/probe/Color;.BLUE:Lcom/example/probe/Color; // field@0001
+000480: 7100 0000 0000                         |001e: invoke-static {}, Lcom/example/probe/Color;.$values:()[Lcom/example/probe/Color; // method@0000
+000486: 0c00                                   |0021: move-result-object v0
+000488: 6900 0000                              |0022: sput-object v0, Lcom/example/probe/Color;.$VALUES:[Lcom/example/probe/Color; // field@0000
+00048c: 0e00                                   |0024: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+    #2              : (in Lcom/example/probe/Color;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;I)V'
+      access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      code          -
+      registers     : 3
+      ins           : 3
+      outs          : 3
+      insns size    : 4 16-bit code units
+000490:                                        |[000490] com.example.probe.Color.<init>:(Ljava/lang/String;I)V
+0004a0: 7030 0f00 1002                         |0000: invoke-direct {v0, v1, v2}, Ljava/lang/Enum;.<init>:(Ljava/lang/String;I)V // method@000f
+0004a6: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/probe/Color;
+        0x0000 - 0x0004 reg=1 (null) Ljava/lang/String;
+        0x0000 - 0x0004 reg=2 (null) I
+
+    #3              : (in Lcom/example/probe/Color;)
+      name          : 'valueOf'
+      type          : '(Ljava/lang/String;)Lcom/example/probe/Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 9 16-bit code units
+0003c4:                                        |[0003c4] com.example.probe.Color.valueOf:(Ljava/lang/String;)Lcom/example/probe/Color;
+0003d4: 1c00 0200                              |0000: const-class v0, Lcom/example/probe/Color; // type@0002
+0003d8: 7120 1000 1000                         |0002: invoke-static {v0, v1}, Ljava/lang/Enum;.valueOf:(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum; // method@0010
+0003de: 0c00                                   |0005: move-result-object v0
+0003e0: 1f00 0200                              |0006: check-cast v0, Lcom/example/probe/Color; // type@0002
+0003e4: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+        0x0000 - 0x0009 reg=1 name Ljava/lang/String;
+
+    #4              : (in Lcom/example/probe/Color;)
+      name          : 'values'
+      type          : '()[Lcom/example/probe/Color;'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 1
+      ins           : 0
+      outs          : 1
+      insns size    : 9 16-bit code units
+000410:                                        |[000410] com.example.probe.Color.values:()[Lcom/example/probe/Color;
+000420: 6200 0000                              |0000: sget-object v0, Lcom/example/probe/Color;.$VALUES:[Lcom/example/probe/Color; // field@0000
+000424: 6e10 1700 0000                         |0002: invoke-virtual {v0}, [Lcom/example/probe/Color;.clone:()Ljava/lang/Object; // method@0017
+00042a: 0c00                                   |0005: move-result-object v0
+00042c: 1f00 0f00                              |0006: check-cast v0, [Lcom/example/probe/Color; // type@000f
+000430: 1100                                   |0008: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=3
+      locals        :
+
+  Virtual methods   -
+  source_file_idx   : 28 (Main.java)
+
+Class #1            -
+  Class descriptor  : 'Lcom/example/probe/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+    #0              : (in Lcom/example/probe/Main;)
+      name          : 'b'
+      type          : 'B'
+      access        : 0x0008 (STATIC)
+    #1              : (in Lcom/example/probe/Main;)
+      name          : 'flag'
+      type          : 'Z'
+      access        : 0x0008 (STATIC)
+    #2              : (in Lcom/example/probe/Main;)
+      name          : 'sink'
+      type          : 'I'
+      access        : 0x0008 (STATIC)
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/probe/Main;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 1
+      insns size    : 4 16-bit code units
+0004a8:                                        |[0004a8] com.example.probe.Main.<init>:()V
+0004b8: 7010 1100 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0011
+0004be: 0e00                                   |0003: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=5
+      locals        :
+        0x0000 - 0x0004 reg=0 this Lcom/example/probe/Main;
+
+    #1              : (in Lcom/example/probe/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 7
+      ins           : 1
+      outs          : 2
+      insns size    : 71 16-bit code units
+0004c0:                                        |[0004c0] com.example.probe.Main.main:([Ljava/lang/String;)V
+0004d0: 2160                                   |0000: array-length v0, v6
+0004d2: 7110 0900 0000                         |0001: invoke-static {v0}, Lcom/example/probe/Main;.p1:(I)V // method@0009
+0004d8: 7110 0a00 0000                         |0004: invoke-static {v0}, Lcom/example/probe/Main;.p2:(I)V // method@000a
+0004de: 6201 0700                              |0007: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+0004e2: 1252                                   |0009: const/4 v2, #int 5 // #5
+0004e4: 3720 0500                              |000a: if-le v0, v2, 000f // +0005
+0004e8: 1a02 0800                              |000c: const-string v2, "BLUE" // string@0008
+0004ec: 2803                                   |000e: goto 0011 // +0003
+0004ee: 1a02 0900                              |000f: const-string v2, "GREEN" // string@0009
+0004f2: 7110 0500 0200                         |0011: invoke-static {v2}, Lcom/example/probe/Color;.valueOf:(Ljava/lang/String;)Lcom/example/probe/Color; // method@0005
+0004f8: 0c02                                   |0014: move-result-object v2
+0004fa: 6e10 0400 0200                         |0015: invoke-virtual {v2}, Lcom/example/probe/Color;.ordinal:()I // method@0004
+000500: 0a02                                   |0018: move-result v2
+000502: 6e20 0d00 2100                         |0019: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(I)V // method@000d
+000508: 6201 0700                              |001c: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+00050c: 6002 0600                              |001e: sget v2, Lcom/example/probe/Main;.sink:I // field@0006
+000510: 6303 0500                              |0020: sget-boolean v3, Lcom/example/probe/Main;.flag:Z // field@0005
+000514: 6404 0400                              |0022: sget-byte v4, Lcom/example/probe/Main;.b:B // field@0004
+000518: 2205 0b00                              |0024: new-instance v5, Ljava/lang/StringBuilder; // type@000b
+00051c: 7010 1200 0500                         |0026: invoke-direct {v5}, Ljava/lang/StringBuilder;.<init>:()V // method@0012
+000522: 6e20 1300 2500                         |0029: invoke-virtual {v5, v2}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+000528: 0c02                                   |002c: move-result-object v2
+00052a: 1a05 0000                              |002d: const-string v5, " " // string@0000
+00052e: 6e20 1400 5200                         |002f: invoke-virtual {v2, v5}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000534: 0c02                                   |0032: move-result-object v2
+000536: 6e20 1500 3200                         |0033: invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;.append:(Z)Ljava/lang/StringBuilder; // method@0015
+00053c: 0c02                                   |0036: move-result-object v2
+00053e: 6e20 1400 5200                         |0037: invoke-virtual {v2, v5}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+000544: 0c02                                   |003a: move-result-object v2
+000546: 6e20 1300 4200                         |003b: invoke-virtual {v2, v4}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0013
+00054c: 0c02                                   |003e: move-result-object v2
+00054e: 6e10 1600 0200                         |003f: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0016
+000554: 0c02                                   |0042: move-result-object v2
+000556: 6e20 0e00 2100                         |0043: invoke-virtual {v1, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@000e
+00055c: 0e00                                   |0046: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=30
+        0x0001 line=31
+        0x0004 line=32
+        0x0007 line=33
+        0x001c line=34
+        0x0046 line=35
+      locals        :
+        0x0001 - 0x0047 reg=0 n I
+        0x0000 - 0x0047 reg=6 args [Ljava/lang/String;
+
+    #2              : (in Lcom/example/probe/Main;)
+      name          : 'p1'
+      type          : '(I)V'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 2
+      insns size    : 32 16-bit code units
+000560:                                        |[000560] com.example.probe.Main.p1:(I)V
+000570: 1250                                   |0000: const/4 v0, #int 5 // #5
+000572: 3704 0500                              |0001: if-le v4, v0, 0006 // +0005
+000576: 6200 0300                              |0003: sget-object v0, Lcom/example/probe/Color;.RED:Lcom/example/probe/Color; // field@0003
+00057a: 2803                                   |0005: goto 0008 // +0003
+00057c: 6200 0100                              |0006: sget-object v0, Lcom/example/probe/Color;.BLUE:Lcom/example/probe/Color; // field@0001
+000580: 1211                                   |0008: const/4 v1, #int 1 // #1
+000582: 7110 0b00 0100                         |0009: invoke-static {v1}, Lcom/example/probe/Main;.takeBool:(Z)V // method@000b
+000588: 7110 0c00 0100                         |000c: invoke-static {v1}, Lcom/example/probe/Main;.takeByte:(B)V // method@000c
+00058e: 6202 0700                              |000f: sget-object v2, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+000592: 6e10 0300 0000                         |0011: invoke-virtual {v0}, Lcom/example/probe/Color;.name:()Ljava/lang/String; // method@0003
+000598: 0c03                                   |0014: move-result-object v3
+00059a: 6e20 0e00 3200                         |0015: invoke-virtual {v2, v3}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@000e
+0005a0: 7110 0b00 0100                         |0018: invoke-static {v1}, Lcom/example/probe/Main;.takeBool:(Z)V // method@000b
+0005a6: 1231                                   |001b: const/4 v1, #int 3 // #3
+0005a8: 7110 0c00 0100                         |001c: invoke-static {v1}, Lcom/example/probe/Main;.takeByte:(B)V // method@000c
+0005ae: 0e00                                   |001f: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=14
+        0x0008 line=15
+        0x000c line=16
+        0x000f line=17
+        0x0018 line=18
+        0x001b line=19
+        0x001f line=20
+      locals        :
+        0x0008 - 0x0020 reg=0 c Lcom/example/probe/Color;
+        0x0000 - 0x0020 reg=4 n I
+
+    #3              : (in Lcom/example/probe/Main;)
+      name          : 'p2'
+      type          : '(I)V'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 8
+      ins           : 1
+      outs          : 2
+      insns size    : 53 16-bit code units
+0005b0:                                        |[0005b0] com.example.probe.Main.p2:(I)V
+0005c0: 1250                                   |0000: const/4 v0, #int 5 // #5
+0005c2: 3707 0500                              |0001: if-le v7, v0, 0006 // +0005
+0005c6: 6200 0200                              |0003: sget-object v0, Lcom/example/probe/Color;.GREEN:Lcom/example/probe/Color; // field@0002
+0005ca: 2803                                   |0005: goto 0008 // +0003
+0005cc: 6200 0300                              |0006: sget-object v0, Lcom/example/probe/Color;.RED:Lcom/example/probe/Color; // field@0003
+0005d0: 1221                                   |0008: const/4 v1, #int 2 // #2
+0005d2: 1202                                   |0009: const/4 v2, #int 0 // #0
+0005d4: 1213                                   |000a: const/4 v3, #int 1 // #1
+0005d6: 3717 0400                              |000b: if-le v7, v1, 000f // +0004
+0005da: 0134                                   |000d: move v4, v3
+0005dc: 2802                                   |000e: goto 0010 // +0002
+0005de: 0124                                   |000f: move v4, v2
+0005e0: 2311 1100                              |0010: new-array v1, v1, [Z // type@0011
+0005e4: 4e03 0102                              |0012: aput-boolean v3, v1, v2
+0005e8: 4e04 0103                              |0014: aput-boolean v4, v1, v3
+0005ec: 6204 0700                              |0016: sget-object v4, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+0005f0: 6e10 0300 0000                         |0018: invoke-virtual {v0}, Lcom/example/probe/Color;.name:()Ljava/lang/String; // method@0003
+0005f6: 0c05                                   |001b: move-result-object v5
+0005f8: 4702 0102                              |001c: aget-boolean v2, v1, v2
+0005fc: 2206 0b00                              |001e: new-instance v6, Ljava/lang/StringBuilder; // type@000b
+000600: 7010 1200 0600                         |0020: invoke-direct {v6}, Ljava/lang/StringBuilder;.<init>:()V // method@0012
+000606: 6e20 1400 5600                         |0023: invoke-virtual {v6, v5}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0014
+00060c: 0c05                                   |0026: move-result-object v5
+00060e: 6e20 1500 2500                         |0027: invoke-virtual {v5, v2}, Ljava/lang/StringBuilder;.append:(Z)Ljava/lang/StringBuilder; // method@0015
+000614: 0c02                                   |002a: move-result-object v2
+000616: 6e10 1600 0200                         |002b: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0016
+00061c: 0c02                                   |002e: move-result-object v2
+00061e: 6e20 0e00 2400                         |002f: invoke-virtual {v4, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@000e
+000624: 6a03 0500                              |0032: sput-boolean v3, Lcom/example/probe/Main;.flag:Z // field@0005
+000628: 0e00                                   |0034: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=23
+        0x0008 line=24
+        0x0016 line=25
+        0x0032 line=26
+        0x0034 line=27
+      locals        :
+        0x0008 - 0x0035 reg=0 c Lcom/example/probe/Color;
+        0x0016 - 0x0035 reg=1 arr [Z
+        0x0000 - 0x0035 reg=7 n I
+
+    #4              : (in Lcom/example/probe/Main;)
+      name          : 'takeBool'
+      type          : '(Z)V'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 3
+      ins           : 1
+      outs          : 2
+      insns size    : 26 16-bit code units
+00062c:                                        |[00062c] com.example.probe.Main.takeBool:(Z)V
+00063c: 6a02 0500                              |0000: sput-boolean v2, Lcom/example/probe/Main;.flag:Z // field@0005
+000640: 6000 0600                              |0002: sget v0, Lcom/example/probe/Main;.sink:I // field@0006
+000644: 3802 0400                              |0004: if-eqz v2, 0008 // +0004
+000648: 1231                                   |0006: const/4 v1, #int 3 // #3
+00064a: 2802                                   |0007: goto 0009 // +0002
+00064c: 1271                                   |0008: const/4 v1, #int 7 // #7
+00064e: b010                                   |0009: add-int/2addr v0, v1
+000650: 6700 0600                              |000a: sput v0, Lcom/example/probe/Main;.sink:I // field@0006
+000654: 6000 0600                              |000c: sget v0, Lcom/example/probe/Main;.sink:I // field@0006
+000658: 1301 e803                              |000e: const/16 v1, #int 1000 // #3e8
+00065c: 3710 0900                              |0010: if-le v0, v1, 0019 // +0009
+000660: 6200 0700                              |0012: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+000664: 1a01 4000                              |0014: const-string v1, "x" // string@0040
+000668: 6e20 0e00 1000                         |0016: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@000e
+00066e: 0e00                                   |0019: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=10
+      locals        :
+        0x0000 - 0x001a reg=2 x Z
+
+    #5              : (in Lcom/example/probe/Main;)
+      name          : 'takeByte'
+      type          : '(B)V'
+      access        : 0x0008 (STATIC)
+      code          -
+      registers     : 3
+      ins           : 1
+      outs          : 2
+      insns size    : 21 16-bit code units
+000670:                                        |[000670] com.example.probe.Main.takeByte:(B)V
+000680: 6b02 0400                              |0000: sput-byte v2, Lcom/example/probe/Main;.b:B // field@0004
+000684: 6000 0600                              |0002: sget v0, Lcom/example/probe/Main;.sink:I // field@0006
+000688: b020                                   |0004: add-int/2addr v0, v2
+00068a: 6700 0600                              |0005: sput v0, Lcom/example/probe/Main;.sink:I // field@0006
+00068e: 6000 0600                              |0007: sget v0, Lcom/example/probe/Main;.sink:I // field@0006
+000692: 1301 e803                              |0009: const/16 v1, #int 1000 // #3e8
+000696: 3710 0900                              |000b: if-le v0, v1, 0014 // +0009
+00069a: 6200 0700                              |000d: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0007
+00069e: 1a01 4100                              |000f: const-string v1, "y" // string@0041
+0006a2: 6e20 0e00 1000                         |0011: invoke-virtual {v0, v1}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@000e
+0006a8: 0e00                                   |0014: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=11
+      locals        :
+        0x0000 - 0x0015 reg=2 x B
+
+  Virtual methods   -
+  source_file_idx   : 28 (Main.java)
+
