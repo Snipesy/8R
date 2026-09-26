@@ -19,6 +19,7 @@ then compiler plugins, then kotlinc.
 | r8.googlesource.com/r8, tag `8.10.9-dev` (depth 1) | `a7ad18a70460b799d0482e497c109a75bf7f91de` (2025-02-18). This is the jar in `build-tools/36.0.0/lib/d8.jar`. |
 | Release tags spot-checked through gitiles `?format=TEXT` | 8.10.40, 8.11.34, 8.12.31, 8.13.22, 9.0.45, 9.1.43, 9.2.25, 9.3.27, 9.4.23 |
 | R8 9.4.23 jar (`dl.google.com/android/maven2/com/android/tools/r8/9.4.23/`) | build `25f587b70bc319f276b9979f2e2b0181d7fb5168` |
+| R8 9.4.24 jar (fixture toolchain, `fixtures/out/*_r94`, `fixtures/out/r94_*`) | build `61dc59bf271ddb314b5e0953231bd22df0ffb17e`. Source of the **[V-exp 9.4.24]** outline facts (§2, §4.5), together with the real app Gretio (**[V-exp Gretio]**, not reproducible from the repo). |
 | Experiment toolchain | javac 26.0.2 `--release 17`, kotlinc 2.4.20 (borrowed from `scratchpad/agents/kotlinc`), android-36 `android.jar`, dexdump 36.0.0 |
 
 Source paths are relative to `src/main/java/com/android/tools/r8/`. Unless marked "HEAD only" or
@@ -47,7 +48,7 @@ Every one below was produced by stock R8 with no dictionary:
 | C4 | `a.Rep`, `b.Rep`, and root-package `Rep` | `-keep,allowrepackage`. The simple name is original but the **package isn't**. | [V-exp] 8.10.9 and 9.4.23 |
 | C5 | 4+ character minified names (`a00` is index 963 in lowercase) | A namespace with more than 34,658 classes in lowercase mode. R8 ≥ 9.0 repackages *everything* into the root package by default, so large apps hit this. | [V-src], [I] for real apps |
 | C6 | `work$1` | `-dontobfuscate`. A fresh name is created after unused-argument removal collides. | [V-exp] |
-| C7 | `Foo$$ExternalSyntheticLambda0`, `-$$Nest$fgetx`, `$r8$classId`, `Foo$-CC`, `…$EnumUnboxingLocalUtility` | `-dontobfuscate`, or any D8-built code. | [V-src], D8 [V-exp] |
+| C7 | `Foo$$ExternalSyntheticLambda0` (≤ 8.x) / `Foo$0` (9.4), `-$$Nest$fgetx`, `$r8$classId`, `Foo$-CC`, `…$EnumUnboxingLocalUtility` | `-dontobfuscate`, or any D8-built code. | [V-src], D8 [V-exp]; `Foo$N` [V-exp 9.4.24] |
 | C8 | `j$.time.LocalDate` and similar | Core-library desugaring (L8). The name isn't the app's own original. It's `java.time.LocalDate` rewritten. | [V-src] `Minifier.L8MinificationClassNamingStrategy` |
 | C9 | Classes `A`–`Z`, `Ab`, … | R8 **≤ 8.12** without `-dontusemixedcaseclassnames` uses mixed-case class names. The current class check is case-insensitive, so it handles this. It's listed so the version table (§1.2) is complete. | [V-exp] 8.10.9 |
 
@@ -221,6 +222,10 @@ may_be_minified_member(name, cls)  = name ∈ G_mixed ∧ len ≤ L(members) ∧
   `$r8$`, `$-CC`, `-IA`, `$EnumUnboxing`, `$Wrapper`, `$VivifiedWrapper`, or matches
   `.*\$[0-9]+$` produced by `createFreshMethodNameWithoutHolder` (`name$N`,
   `name$holder$N`; graph/DexItemFactory.java).
+* **9.4 synthetic classes are `Outer$N`** (§2), the same shape as a javac anonymous class
+  `Outer$1`, so no name marker excludes them. Exclude by the class's `ACC_SYNTHETIC` flag
+  instead (javac/kotlinc anonymous and lambda classes don't carry it) [V-exp 9.4.24 for the
+  names, I for the flag argument].
 
 ### 1.7 Detecting the unverifiable preconditions
 
@@ -238,16 +243,21 @@ may_be_minified_member(name, cls)  = name ∈ G_mixed ∧ len ≤ L(members) ∧
 
 ## 2. Synthetic naming and shape after minification
 
-`synthesis/SyntheticNaming.java` defines the kinds. The pre-minification name is
-`<context>$$ExternalSynthetic<Kind><id>` (or `$$InternalSynthetic`). Single-method synthetics
-name their method `m` (`INTERNAL_SYNTHETIC_METHOD_NAME`). In R8 release, **all of these are
-minified**, and **R8 horizontally merges synthetics across kinds**. For example, the outline method
-ended up inside the `EnumUnboxingSharedUtility` class [V-exp `opt/`]. So a residual class can mix
-kinds, and identification has to be **per method**.
+`synthesis/SyntheticNaming.java` defines the kinds. In 8.10 the pre-minification name is
+`<context>$$ExternalSynthetic<Kind><id>` (or `$$InternalSynthetic`). **R8 and D8 9.4.24 name
+them `<context>$<N>` instead** (`Main$0`, `Main$1`, `Account$0`, `Big$0`; no kind in the name),
+with mapping `sourceFile "R8$$SyntheticClass"` and, in D8 output, DEX `SourceFile`
+`"D8$$SyntheticClass"` [V-exp 9.4.24]. Single-method synthetics name their method `m`
+(`INTERNAL_SYNTHETIC_METHOD_NAME`). In R8 release, **all of these are minified**, and **R8
+horizontally merges synthetics across kinds**. For example, the outline method ended up inside
+the `EnumUnboxingSharedUtility` class [V-exp `opt/`], and in 9.4.24 a bottom-up outline
+`Account$0.m(String,int,Object,int)V` sits in a merged lambda group (`$r8$classId` field,
+`<init>(byte)`, `invoke()`) [V-exp 9.4.24 `kotlin_serialization_r94`]. So a residual class can
+mix kinds, and identification has to be **per method**.
 
 The mapping-only markers `# {"id":"com.android.tools.r8.synthesized"}` and
-`sourceFile "R8$$SyntheticClass"` don't exist in the DEX. The DEX `SourceFile` is just
-`"SourceFile"`.
+`sourceFile "R8$$SyntheticClass"` don't exist in the DEX. The DEX `SourceFile` of an R8 build is
+`"SourceFile"` in 8.10 and `r8-map-id-<pg-map-id>` by default in 9.4.24 (§5).
 
 Class access flags from `synthesis/SyntheticClassBuilder.build()`: always
 `ACC_PUBLIC|ACC_SYNTHETIC`, and final unless it's abstract or an interface.
@@ -256,10 +266,11 @@ Class access flags from `synthesis/SyntheticClassBuilder.build()`: always
 |---|---|---|---|
 | `$$ExternalSyntheticLambda<N>` | Class minified; the method keeps the **functional-interface name** (a library override) | `PUBLIC FINAL SYNTHETIC` (0x1011). Super `Object`, one interface, captured values in final instance fields. The body calls a (possibly inlined) impl. No `INSTANCE` field; a new instance is created per evaluation. | [V-exp] |
 | `$r8$lambda$…` / `lambda$main$0` impl methods | Minified, often inlined into the lambda class or the caller | none left once inlined | [V-exp] |
-| `…$$ExternalSyntheticBackport<N>` | **Usually disappears: inlined at every call site.** Seen with 12 kept callers of `Math.multiplyExact(JJ)`. | An inlined template fragment. See §3. | [V-exp `bp/`] |
+| `…$$ExternalSyntheticBackport<N>` | **Usually disappears: inlined at every call site.** Seen with 12 kept callers of `Math.multiplyExact(JJ)`. D8 keeps it: 9.4.24 `Main$0.m(J)I` (`Long.hashCode`), `PUBLIC STATIC SYNTHETIC` in a `PUBLIC FINAL SYNTHETIC` holder, pure arithmetic (no call), which is how §4.5 tells it from an outline. | An inlined template fragment. See §3. | [V-exp `bp/`, 9.4.24 `r94_desugar` D8] |
 | `…$$ExternalSyntheticApiModelOutline<N>` | Class minified (`PUBLIC ABSTRACT SYNTHETIC`, 0x1401). Methods are static, sometimes `BRIDGE\|SYNTHETIC` (0x1049). | The body is exactly one call to a library member above min-api, a `new-instance`+`<init>` or an `invoke-*`, then return. Call sites are behind `SDK_INT` checks. | [V-exp `syn/`] |
-| `…$$ExternalSyntheticOutline<N>` | Merged into another synthetic class; the method is `PUBLIC STATIC` **without** SYNTHETIC | A static, straight-line library-call sequence (for example `new StringBuilder`, `append`×k, `toString`) whose arguments are the "holes". The threshold is **20** call sites, the size 3–99 instructions (`InternalOptions.OutlineOptions`). | [V-exp `opt/`] |
-| `$-CC` (interface companion) | Class minified, `PUBLIC ABSTRACT SYNTHETIC` | Static methods whose first parameter has the interface type (the default methods), plus the interface's static and private methods. The interface itself keeps only abstract methods. | [V-exp `itf/`] |
+| `…$$ExternalSyntheticOutline<N>` (8.10) / `Outer$N` (9.4) — classic outline | 8.10: merged into another synthetic class. 9.4.24: its own `PUBLIC ABSTRACT SYNTHETIC` (0x1401) holder, or merged. The method is `PUBLIC STATIC` (0x0009) **without** SYNTHETIC. Mapping: `synthesized` + `com.android.tools.r8.outline`; callers carry `outlineCallsite`. | A static, straight-line sequence of library calls and arithmetic on its "holes" (for example `new StringBuilder`, `append`×k, `toString`), returning a value or void (it may append into a builder passed in, or `add-int` two parameters). The threshold is **20** call sites [V-src 8.10], the size 3–99 instructions (`InternalOptions.OutlineOptions`); the 9.4.24 fixture has 24–26 sites per outline. See §4.5. | [V-exp `opt/`, 9.4.24] |
+| Bottom-up (throw) outline, `Outer$N.m` (R8 ≥ 9) | Holder `PUBLIC FINAL SYNTHETIC` (0x1011), own class or a merged lambda group; method `PUBLIC STATIC SYNTHETIC` (0x1009). Mapping: **only** `synthesized`, no `outline` marker, original `void Outer$N.m(…)`. | Builds an exception (`new-instance`, often a `StringBuilder` message; possibly via a classic outline [V-src `outlines.rs`]) and ends in `throw`; returns void. Each call site is followed by a dead default return (`const/4 v, 0; return v` or `return-void`). The exception may be an app class (commit 88be64e, from Gretio). See §4.5. | [V-exp 9.4.24 `r94_outline`, `kotlin_serialization_r94`] |
+| `$-CC` (interface companion) | Class minified, `PUBLIC ABSTRACT SYNTHETIC` (R8); D8 9.4.24 emits `Shape$-CC` as `PUBLIC FINAL SYNTHETIC` [V-exp 9.4.24 `r94_desugar`] | Static methods whose first parameter has the interface type (the default methods), plus the interface's static and private methods. The interface itself keeps only abstract methods. | [V-exp `itf/`] |
 | `-$$Nest$m<name>`, `-$$Nest$fget<name>`, `…$sm`, `$sfget`, `$fput`, `$sfput` (ir/desugar/nest/NestBasedAccessDesugaring.java) | Minified, `PUBLIC STATIC BRIDGE SYNTHETIC` (0x1049) | The first parameter is the owner type. The body is exactly one `iget`/`iput`/`invoke-direct` of a **private** member of the same class, then return. | [V-exp `itf/`]. In R8 the bridges often vanish anyway: they get inlined, or access modification makes them unnecessary. |
 | `$r8$classId` (horizontalclassmerging/ClassMerger.java `CLASS_ID_FIELD_PREFIX`) | Field minified, `PUBLIC FINAL SYNTHETIC` int | The field is written first in the synthetic `<init>(…, I)`. Reads feed a `packed-switch`. See §4.1. | [V-exp] |
 | `$EnumUnboxingLocalUtility` / `$EnumUnboxingSharedUtility` | Minified, `PUBLIC ABSTRACT SYNTHETIC` | A static `int[]` `$VALUES` filled with `{1..n}` in `<clinit>`. `ordinal(I)I` = `if-eqz → throw null` then `-1`. Also `name(I)`/`toString`/`valueOf` switches. See §4.3. | [V-exp] |
@@ -376,14 +387,80 @@ gone. So it can't be N.
 `Holder`/`In` in `syn/` disappeared entirely, and their fields became locals. There is no
 fingerprint. **D·id.**
 
-### 4.5 Outlining [V-exp `opt/`, V-src `ir/optimize/outliner/`]
+### 4.5 Outlining [V-exp `opt/`, 9.4.24, Gretio; V-src `ir/optimize/outliner/`]
 
-The fingerprint is in §2. Each call site is `invoke-static outline(args…)` followed by
-`move-result`, replacing the sequence. The outline body is *pure library calls on its
-parameters*, so inlining it back is exact code motion (modulo registers). **D**, matching the
-DESIGN row. It can't be S, because a hand-written static helper with the same shape is possible.
-Detection tightening: ≥ 2 callers, straight-line code, only library invokes, and all parameters
-used in order.
+Implemented as `r8/outline-inline` (classic) and `r8/bu-outline-inline` (bottom-up/throw),
+`crates/eightr-core/src/rewrites/outlines.rs`. Both **D**: a hand-written static helper can have
+the same shape, and inlining it is still behavior-preserving. A pre-desugared library (D8/R8 CF
+output as input) makes an outline original code; D still holds.
+
+**Two kinds** (fingerprints in §2):
+* **Classic.** Each call site is `invoke-static outline(holes…)` [+ `move-result`], replacing
+  the sequence. The body is library calls plus arithmetic on the holes; it may return void and
+  write into a builder parameter, and parameter order is not source order (`b.a(StringBuilder,
+  I, C, I, I)I` = `append(I)`, `append(C)`, `add-int`). So "pure library calls on its
+  parameters, all used in order" is **wrong**.
+* **Bottom-up (throw), R8 ≥ 9.** `Outer$N.m(…)V` builds and throws an exception; the call site
+  is followed by a dead default return. Only `synthesized` in the mapping, no `outline` marker.
+  A throw outline may call a classic outline for its message [V-src `outlines.rs`; the fixtures
+  build the message inline or at the call site].
+
+**Detection (structural, never by name; α-invariant).**
+1. Holder: `ACC_SYNTHETIC`, not an interface, **no `<clinit>` in it or its superclass chain**
+   (inlining must not skip a class initialization), **no program subclasses** (its statics could
+   be reached through them). Flags beyond SYNTHETIC don't matter: 9.4 holders are abstract or
+   final, standalone or merged with lambdas (§2). "`PUBLIC ABSTRACT SYNTHETIC` with only static
+   methods" (audit §3.7) is not a valid discriminator in 9.4.
+2. Method: static, not native/abstract, no try blocks, straight-line (only invoke,
+   new-instance, arithmetic, move/move-result/const, and a final return or throw; any branch,
+   field, array, cast or monitor op rejects).
+3. Reached by `invoke-static` from **≥ 2** sites and never referenced otherwise (method
+   handles, encoded values, annotations, non-static invokes).
+4. Classic: ends in return, **≥ 3 operations** (R8's minimum outline size; invoke/new-instance/
+   arithmetic count), **≥ 1 call**, and every invoked or instantiated class is a **library**
+   (non-program) class; no `const-string`.
+5. Throw: ends in `throw`, contains a `new-instance`, ≥ 2 operations; may use app classes,
+   strings and other outlines. (The code doesn't check that the thrown register is the new
+   instance.)
+
+Look-alikes excluded [V-exp 9.4.24 `r94_desugar`, Gretio]: D8 backports (`Main$0.m(J)I`
+`Long.hashCode`: no call), interface companions `$-CC` (call app code), API-model outlines
+(`new-instance`+`<init>`: 2 operations), hand-written helpers in non-synthetic classes (Compose
+`PreconditionsKt.throwIllegalArgumentException`, `ArraysKt.copyInto`).
+
+**Inlining mechanics** (`eightr_ir::{inline, liveness, edit, refs}`), per call site, all or
+nothing:
+* Outlines calling outlines are inlined callee-first, so every copy is final; cycles (never
+  produced by R8) are skipped.
+* Accessibility is checked per site: program classes public or same package, program members
+  resolved through superclasses/interfaces to the declaring class (protected treated as
+  package-private). Inaccessible sites keep the call.
+* The callee runs in caller registers **dead across the call** (backward liveness over the CFG,
+  exceptional edges included). Parameter/`this` registers and registers holding a debug local
+  there are never borrowed; an argument register that dies at the call (and is passed once)
+  becomes the callee's parameter directly. Overlapping wide pairs in the callee are allocated as
+  one contiguous block.
+* Otherwise a register gap is opened: below the parameters, else at the highest position that
+  splits no caller wide pair, else at 0. A later site in the same caller can reuse the gap.
+* If an instruction becomes unencodable (`NotEncodable`, register width), or the frame would
+  exceed 65535 registers, the site keeps its call.
+* After inlining a throw outline, unreachable code (the dead default return) is removed and
+  handlers covering only dead blocks are dropped.
+* An outline with no remaining callers is deleted; its holder is removed only if this rewrite
+  emptied it and nothing mentions its type (structural references, `refs::class_types`) or
+  names it reflectively (`Class.forName` constants).
+
+**Validation.** `oracle.rs::outline_detection_matches_mapping`: truth = methods with the
+`outline` marker, plus `synthesized` `void m(…)` in an `Outer$N` holder ending in `throw`;
+precision and recall are both 100% on every fixture mapping (classic and bottom-up;
+the test asserts ≥ 8 detections and ≥ 5 bottom-up outlines in total).
+`exec.rs::art_verifies_every_output_class` runs whole-program ART verification
+(`dex2oat64 --compiler-filter=verify` on an emulator); it catches wide-pair register bugs that
+executing `main` misses. `output.rs::every_program_reference_resolves` catches deleted methods
+still in use. Gretio [V-exp Gretio, commit 88be64e]: 132 outlines detected (47 classic, 85
+bottom-up), 107 removed entirely, 12441 of 12567 call sites inlined, every class verifies, the
+app reaches its main activity. (The 47 classic / 85 bottom-up split is from the same session's
+run, not recorded in the repo.)
 
 ### 4.6 Argument removal, return-value removal, staticizing, devirtualization [V-exp `dontobf/`]
 
@@ -448,7 +525,7 @@ Fields that are always constant are removed, and uses are folded (`Point.y = 2` 
 
   | Config | Value in DEX |
   |---|---|
-  | full mode, `SourceFile` not kept | `"SourceFile"` |
+  | full mode, `SourceFile` not kept | `"SourceFile"` (8.10); **`r8-map-id-<pg-map-id>` in 9.4.24 with no template**, kept or not [V-exp 9.4.24 fixtures] |
   | full mode, `-keepattributes SourceFile`, minifying or optimizing, no rename | `"SourceFile"` (still) [V-exp] |
   | `-renamesourcefileattribute X` | `X` |
   | `--source-file-template r8-map-id-%MAP_ID` (AGP) | `r8-map-id-<pg-map-id>`, the same id as in the marker [V-exp] |
@@ -485,7 +562,7 @@ Fields that are always constant are removed, and uses are folded (`Point.y = 2` 
 | Horizontal merge | **D** partition; **S** lower bound on count | §4.1 |
 | Vertical merge, class inlining, arg removal, staticizing, value propagation | **D·id** | No residue; the preimage is unbounded |
 | Enum unboxing | **D** class; **S** ordinals and names *if strings exist* | §4.3 |
-| Outlines | **D** | A hand-written look-alike is possible |
+| Outlines, classic and bottom-up (throw) | **D** | A hand-written look-alike in a synthetic class is possible (§4.5) |
 | Kotlin `checkNotNullParameter` names | **D (hint)** | Inlined-callee counterexample |
 | Lines | **D·id** | Compacted |
 | SourceFile | **S** only in compat or unoptimized builds | §5 |
@@ -562,9 +639,12 @@ Every fixture should record the R8 version, and ideally be built with two versio
 19. `backport-d8`: the same code through D8 release. The synthetic body equals the template
     (anchor for §3's per-version table).
 20. `backport-strictmath`: `StrictMath.floorMod` vs `Math.floorMod`. Identical bodies, so N.
-21. `apimodel-outline`: `new NotificationChannel(…)` at min-api 21, behind `SDK_INT`.
+21. `apimodel-outline`: `new NotificationChannel(…)` at min-api 21, behind `SDK_INT`. The
+    outline rules must leave it alone (2 operations).
 22. `outline-stringbuilder`: 25 kept methods with the same `StringBuilder` chain. The outline
-    method lands in a merged synthetic class.
+    method lands in a merged synthetic class (8.10) or its own abstract holder (9.4). **Done**
+    as `r94_outline` (with throw blocks for the bottom-up outliner); look-alikes in
+    `r94_desugar`.
 23. `itf-companion`: default, static and private interface methods at min-api 21 (`$-CC`).
 24. `nest-bridges`: an inner class touching an outer private field and method, with members
     pinned so the bridges survive.

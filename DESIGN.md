@@ -144,9 +144,9 @@ approach would be an unaccounted choice, so it's not done (shown for the record)
 | **Repackaging** (`-repackageclasses`, and **by default**: R8 ≤8.x moves packages to `a`, `b`, …; ≥9.0 repackages into the root) | **S** | **D**: structural package clustering. A kept class name in a possible repackaging target has a **D** package; a trailing-digit name there is a collision suffix candidate (N: `{Rep1, Rep}`). |
 | **Aggressive overloading** (same name, different return type) | **S** | **D**: split into distinct `_{hash}` names |
 | **Line numbers** (compaction, pc-encoding) | **S** | D·id: pc-lines are stripped, not fabricated. ✗N: inventing plausible line numbers. |
-| **Source file attribute** (plain R8 writes `SourceFile`; AGP may write `r8-map-id-…`) | **S** | **D**: `{OuterClass}_{hash}.kt`/`.java`, with the language from Kotlin evidence. ✗N: guessing `FooKt` file facades. |
+| **Source file attribute** (plain R8 8.x writes `SourceFile`; R8 9.4 and AGP write `r8-map-id-…`) | **S** | **D**: `{OuterClass}_{hash}.kt`/`.java`, with the language from Kotlin evidence. ✗N: guessing `FooKt` file facades. |
 | **Inlining** | **D**: frame-guided extraction (§4.6). The body *may* equal the original, but 8R can't prove that R8 didn't optimize across the boundary after inlining, so it's labelled D. Specialized per-site copies are also D. | D·id. ✗N: splitting methods into guessed callees with no frame boundaries. |
-| **Outlining** | **S**: `outlineCallsite` gives exact positions, and inlining back is pure code motion. | **D**: synthetic + static + leaf + shape match. It might inline a genuine synthetic helper, which is still readable and still correct. |
+| **Outlining** (classic, and R8 ≥ 9 bottom-up throw outlines) | **S**: `outlineCallsite` gives exact positions, and inlining back is pure code motion. | **D** (`r8/outline-inline`, `r8/bu-outline-inline`): static straight-line method in an `ACC_SYNTHETIC` holder, ≥ 2 `invoke-static` sites, plus a body shape per kind (r8-desugar.md §4.5). It might inline a genuine synthetic helper, which is still readable and still correct. |
 | **Lambda desugaring** | **S** when re-sugared to `invoke-custom` with the body method named from the mapping (min-api permitting). **D** when emitted as a named inner class (the default). | **D** |
 | **Backports** (usually *inlined* by R8, even with many callers) | **S** | Where a synthetic survives: **S** if the body matches exactly one version-keyed template; **N** when templates are shared (e.g. `Math.X`/`StrictMath.X` compile to byte-identical dex). |
 | **API-model outlines** | **S** | **S** (exact template shape, unique target) |
@@ -365,11 +365,16 @@ un-inlining (§4.6).
 
 ### 4.3 Outlines
 
-R8's outliner hoists common instruction sequences into static synthetic methods. With
-`outlineCallsite` metadata, each call site maps precisely back to original positions. Inlining
-an outline back is pure code motion, so it's always semantics-preserving once register
-allocation is redone. Without metadata, 8R matches the synthetic by naming and shape: static,
-synthetic, leaf, only called from call sites.
+R8's outliner hoists common instruction sequences into static methods of synthetic classes;
+R8 ≥ 9 also outlines throw blocks bottom-up. With `outlineCallsite` metadata, each call site
+maps precisely back to original positions. Inlining an outline back is code motion; it
+preserves semantics when the holder chain has no `<clinit>`, the holder has no program
+subclasses, the body's references are accessible from the caller, and registers are
+re-allocated correctly. **Implemented (Phase 1)** without metadata and **never by name**
+(α-invariance): an `ACC_SYNTHETIC` holder, a static straight-line method reached only by
+`invoke-static` from ≥ 2 sites, and a per-kind body shape (classic: ≥ 3 operations incl. a
+call, library classes only; throw: builds and throws an exception). Details, look-alikes,
+register allocation and validation: `docs/sources/r8-desugar.md` §4.5.
 
 ### 4.4 Class un-merging
 
@@ -591,9 +596,12 @@ it. Every fixture runs in both modes (with and without the mapping) across the R
   reported, and still semantically equal.
 
 **Outlining**
-- `outline/basic`: a repeated StringBuilder sequence at 5+ sites gets outlined. Expect it
-  inlined back, and the outline class gone.
-- `outline/no-metadata`: the same fixture with the mapping stripped.
+- `outline/basic` (**done**: `r94_outline`): a repeated StringBuilder sequence at ≥ 20 sites
+  (R8's threshold; the fixture uses 24–26) and repeated throw blocks get outlined. Expect them
+  inlined back, and the outline class gone. There's no separate "no-metadata" variant: the
+  mapping is never an input.
+- `outline/look-alikes` (**done**: `r94_desugar`): backports, `$-CC`, API-model outlines at a low
+  min-api. Expect them left alone.
 
 **Synthetics / desugaring**
 - `synth/lambda-java`, `synth/lambda-kotlin`, `synth/method-ref`, `synth/capturing-lambda`.
@@ -715,7 +723,7 @@ consumable by jadx) + `report.json`; `--resugar …`; `--no-tighten`; `8r diff a
 - **M1 Names.** Canonical DEX writer. Rename-only undo with mapping (exact). Lines and source
   files. No-mapping inference sources 1–7 plus structural fallback names. `--emit
   mapping-only`. Determinism/idempotence property tests green.
-- **M2 Synthetics.** Outlines, API-model outlines, backports, `$-CC`, nest bridges, lambdas
+- **M2 Synthetics.** Outlines (**done**, Phase 1), API-model outlines, backports, `$-CC`, nest bridges, lambdas
   (as inner classes, and optionally re-sugared).
 - **M3 Signatures & inlining.** Residual signatures, un-staticize, frame-guided un-inlining.
   ART semantic tier live.
@@ -803,6 +811,17 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
   exactly, overrides preserved and none created, unique field names, mapping matches both
   sides, D8 accepts the output, 8R is idempotent, jadx shows recovered names, and the α test
   requires the **emitted dex to be byte-identical** under scrambling.
+- **Body rewrites (Phases 0.3–1):** an execution-equivalence harness (`tests/exec.rs`: JVM via
+  dex2jar, ART on an emulator, plus whole-program ART verification with `dex2oat64
+  --compiler-filter=verify`, which catches register/wide-pair bugs no `main` reaches); IR edit
+  utilities (`eightr_ir::{edit, inline, liveness, refs}`: splicing, unreachable-code removal,
+  static-call inlining into dead registers or a register gap); a rewrite phase in the pipeline;
+  and the first rewrites, `r8/outline-inline` and `r8/bu-outline-inline` (D). Tests: outline
+  detection matches every fixture mapping exactly (precision and recall), every program
+  reference in the output resolves (`tests/output.rs`), ART verifies every output class. On a
+  real app (Gretio): 132 outlines, 12441 of 12567 call sites inlined, all classes verify. The
+  renamer now parses generic signatures properly (`types::signature_class_ranges`; it used to
+  miss class types after primitives, e.g. `(ILa/B<…>;)V`).
 - **α-invariance test** (`crates/eightr-core/tests/alpha.rs`): for each R8 fixture, permutes
   the names R8 generated (known from the held-back mapping), rewrites and randomly splits the
   program across dex files, and requires the pipeline's output to be *equivariant*: every
