@@ -141,6 +141,10 @@ impl Ctx<'_> {
     fn s_member(&self, item: ItemId) -> bool {
         self.labels.get(item, Attribute::MemberName).is_some_and(|l| l.class == Class::Solved)
     }
+    /// A name another rule recovered (S, or a D value such as a Compose singleton's `lambda$K`).
+    fn recovered_member(&self, item: ItemId) -> bool {
+        self.labels.get(item, Attribute::MemberName).is_some_and(|l| l.value.is_some())
+    }
     fn s_class(&self, id: ClassId) -> bool {
         self.s_classes.contains(&id)
     }
@@ -633,6 +637,7 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     for id in p.class_ids() {
         for (i, f) in p.class(id).fields.iter().enumerate() {
             if cx.s_member(ItemId::Field { class: id, index: i as u32 })
+                || cx.recovered_member(ItemId::Field { class: id, index: i as u32 })
                 || is_structural_name(p.str(f.name))
                 || pins.field(p.descriptor(id), p.str(f.name))
             {

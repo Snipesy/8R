@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "inlined_occurrences": 63037,
-    "recall": 0.03,
-    "touched": 1879
+    "inlined_occurrences": 83318,
+    "recall": 0.027,
+    "touched": 2278
   },
   "discarded-getclass": {
-    "hints": 1535,
-    "precision": 0.687
+    "hints": 1853,
+    "precision": 0.682
   },
   "discarded-getclass@r8-8": {
     "base_rate": 0.518,
@@ -15,10 +15,10 @@
     "precision": 0.83
   },
   "discarded-getclass@r8-9": {
-    "base_rate": 0.517,
-    "hints": 1400,
-    "lift": 1.301,
-    "precision": 0.673
+    "base_rate": 0.521,
+    "hints": 1718,
+    "lift": 1.287,
+    "precision": 0.671
   },
   "fixtures": [
     "compose_basic",
@@ -26,6 +26,9 @@
     "compose_shapes",
     "compose_shapes_k21",
     "compose_witness",
+    "compose_witness2",
+    "compose_witness2_k2110p",
+    "compose_witness2_nss",
     "compose_witness_k21",
     "dontobfuscate",
     "hello",
@@ -46,10 +49,10 @@
     "sigdb_app"
   ],
   "idiom:areEqual": {
-    "hints": 306,
-    "occurrences": 315,
-    "precision": 0.895,
-    "recall": 0.87
+    "hints": 384,
+    "occurrences": 402,
+    "precision": 0.893,
+    "recall": 0.853
   },
   "idiom:areEqual@r8-8": {
     "base_rate": 0.518,
@@ -58,16 +61,16 @@
     "precision": 0.843
   },
   "idiom:areEqual@r8-9": {
-    "base_rate": 0.517,
-    "hints": 255,
-    "lift": 1.751,
-    "precision": 0.906
+    "base_rate": 0.521,
+    "hints": 333,
+    "lift": 1.73,
+    "precision": 0.901
   },
   "idiom:collectionSizeOrDefault": {
-    "hints": 16,
-    "occurrences": 18,
-    "precision": 0.375,
-    "recall": 0.5
+    "hints": 22,
+    "occurrences": 24,
+    "precision": 0.409,
+    "recall": 0.583
   },
   "idiom:collectionSizeOrDefault@r8-8": {
     "base_rate": 0.518,
@@ -76,14 +79,14 @@
     "precision": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-9": {
-    "base_rate": 0.517,
-    "hints": 14,
-    "lift": 0.69,
-    "precision": 0.357
+    "base_rate": 0.521,
+    "hints": 20,
+    "lift": 0.768,
+    "precision": 0.4
   },
   "inlined-instance-call": {
-    "hints": 567,
-    "precision": 0.721
+    "hints": 686,
+    "precision": 0.727
   },
   "inlined-instance-call@r8-8": {
     "base_rate": 0.518,
@@ -92,14 +95,14 @@
     "precision": 0.903
   },
   "inlined-instance-call@r8-9": {
-    "base_rate": 0.517,
-    "hints": 505,
-    "lift": 1.351,
-    "precision": 0.699
+    "base_rate": 0.521,
+    "hints": 624,
+    "lift": 1.363,
+    "precision": 0.71
   },
   "param-null-check": {
-    "hints": 501,
-    "precision": 0.275
+    "hints": 641,
+    "precision": 0.264
   },
   "param-null-check@r8-8": {
     "base_rate": 0.518,
@@ -108,9 +111,9 @@
     "precision": 0.0
   },
   "param-null-check@r8-9": {
-    "base_rate": 0.517,
-    "hints": 500,
-    "lift": 0.534,
-    "precision": 0.276
+    "base_rate": 0.521,
+    "hints": 640,
+    "lift": 0.507,
+    "precision": 0.264
   }
 }

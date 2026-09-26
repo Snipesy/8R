@@ -138,6 +138,9 @@ fn composable_parameter_roles_match_ground_truth() {
                 d8_changed_found += c.changed.len();
             }
             d8_defaults += pn.iter().filter(|n| n.starts_with("$default")).count();
+            if std::env::var_os("EIGHTR_DEBUG_MISSES").is_some() && pn.iter().filter(|n| n.starts_with("$default")).count() > c.defaults.len() {
+                eprintln!("MISS $default: {ctx}");
+            }
             d8_defaults_found += c.defaults.len();
             // Real params come before $composer; slot j (the dispatch receiver takes the last).
             let composer = c.composer.unwrap();
@@ -172,8 +175,10 @@ fn composable_parameter_roles_match_ground_truth() {
             let gcomposer = pn.iter().position(|n| n == "$composer").unwrap();
             let slots = gcomposer as u32 + u32::from(!gstatic);
             assert!(c.slots_at_least <= slots, "{ctx}: slot bound {} > original {slots}", c.slots_at_least);
-            let real = types.len() - 1 - c.changed.len() - c.defaults.len();
-            assert!(c.removed_at_least as usize <= slots as usize - real.min(slots as usize), "{ctx}: removed bound");
+            // Not from 8R's own role claims (a false `$default` would loosen its own bound): the
+            // residual has at least `params - 1 - (D8's synthetic ints)` real params left.
+            let real_left = types.len().saturating_sub(1 + count("$changed") + count("$default"));
+            assert!(c.removed_at_least as usize <= (slots as usize).saturating_sub(real_left), "{ctx}: removed bound {} ({pn:?})", c.removed_at_least);
             // A primitive stays the same primitive; a reference stays a reference.
             let kind = |t: &str| if t.starts_with('L') || t.starts_with('[') { "L".to_string() } else { t.to_string() };
             if count("$changed") == 1 {

@@ -20,6 +20,7 @@ use crate::program::{ClassId, ItemId};
 
 pub const COMPOSABLE: &str = "Leightr/Composable;";
 pub const RESTART_SCOPE: &str = "Leightr/RestartScope;";
+pub const COMPOSABLE_SINGLETON: &str = "Leightr/ComposableSingleton;";
 
 pub struct ComposeParams;
 

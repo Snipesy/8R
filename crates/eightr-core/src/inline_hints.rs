@@ -157,15 +157,25 @@ pub const ANNOTATION: &str = "Leightr/Inlined;";
 /// Removes 8R's own build annotations (hints, Compose records): re-running 8R on its output must
 /// not see them.
 pub fn strip(p: &mut Model) {
-    let ours: Vec<_> = [ANNOTATION, crate::passes::compose_params::COMPOSABLE, crate::passes::compose_params::RESTART_SCOPE]
+    let ours: Vec<_> = [
+        ANNOTATION,
+        crate::passes::compose_params::COMPOSABLE,
+        crate::passes::compose_params::RESTART_SCOPE,
+        crate::passes::compose_params::COMPOSABLE_SINGLETON,
+    ]
         .iter()
         .filter_map(|t| p.syms.lookup(t))
         .collect();
     if ours.is_empty() {
         return;
     }
-    for m in p.classes.iter_mut().flat_map(|c| c.methods.iter_mut()) {
-        m.annotations.retain(|a| !ours.contains(&a.annotation.ty));
+    for c in &mut p.classes {
+        for m in &mut c.methods {
+            m.annotations.retain(|a| !ours.contains(&a.annotation.ty));
+        }
+        for f in &mut c.fields {
+            f.annotations.retain(|a| !ours.contains(&a.annotation.ty));
+        }
     }
 }
 

@@ -119,9 +119,11 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
 
     let naming = crate::naming::name(&program, &mut labels, &mut findings)?;
     let mut renaming = naming.renaming;
-    // Recovered S values (e.g. lateinit field names) join the structural names.
+    // Recovered values (S, e.g. lateinit field names; or D from a recovering rule, e.g. Compose
+    // singletons' `lambda$K`) join the structural names.
     for ((item, attr), label) in labels.iter() {
-        let (Some(value), true) = (&label.value, label.class == eightr_rules::Class::Solved) else { continue };
+        let recovered = label.class == eightr_rules::Class::Solved || !label.rules.contains(&eightr_rules::STRUCTURAL_NAME);
+        let (Some(value), true) = (&label.value, recovered) else { continue };
         if *attr != Attribute::MemberName {
             continue;
         }
