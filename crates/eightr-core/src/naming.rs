@@ -409,7 +409,7 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
     let cx = Ctx { p, labels, s_classes };
     // Members and classes looked up reflectively by a name string that can't be rewritten
     // keep their names (renaming them would break the lookup).
-    let pins = eightr_ir::reflect::Pins::of(&eightr_ir::reflect::sites(&p.model));
+    let pins = eightr_ir::reflect::pins(&p.model);
     let class_label = class_labels(&cx);
 
     // Supertype closure within the program; library supertypes per class.

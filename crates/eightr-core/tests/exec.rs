@@ -168,6 +168,19 @@ fn outputs_behave_like_inputs() {
     }
     let work = Path::new(env!("CARGO_TARGET_TMPDIR")).join("exec");
     let mut compared = 0;
+    // ART is the reference when present: a backend whose run of the *unmodified* build
+    // disagrees with ART can't be trusted for that fixture.
+    let art_baselines: std::collections::BTreeMap<String, Run> = backends
+        .iter()
+        .filter(|b| b.name().starts_with("art"))
+        .flat_map(|b| {
+            fixtures_with_main().into_iter().map(move |(fixture, main)| {
+                let input = fs::read(root().join("fixtures/out").join(&fixture).join("r8/classes.dex")).unwrap();
+                let run = b.run(std::slice::from_ref(&input), &main, &Path::new(env!("CARGO_TARGET_TMPDIR")).join("exec").join("art-ref"));
+                (fixture, run)
+            })
+        })
+        .collect();
     for backend in &backends {
         for (fixture, main) in fixtures_with_main() {
             let input = fs::read(root().join("fixtures/out").join(&fixture).join("r8/classes.dex")).unwrap();
@@ -175,6 +188,12 @@ fn outputs_behave_like_inputs() {
             if let Some(why) = base.backend_failure() {
                 eprintln!("[{}] {fixture}: skipped, backend can't run the unmodified build ({why})", backend.name());
                 continue;
+            }
+            if let Some(reference) = art_baselines.get(&fixture) {
+                if reference.stdout != base.stdout || reference.exit != base.exit {
+                    eprintln!("[{}] {fixture}: skipped, backend disagrees with ART on the unmodified build", backend.name());
+                    continue;
+                }
             }
             assert!(!base.stdout.is_empty(), "[{}] {fixture}: baseline printed nothing", backend.name());
             // A fixture whose own output varies between runs (timing, identity hashes) can't be

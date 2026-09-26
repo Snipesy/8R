@@ -1,0 +1,26 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 26
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 774f63a243f6c0ec97db4cd0ccfa852423d14939b0986207eaa9178195ba3746
+# pg_map_hash: SHA-256 774f63a243f6c0ec97db4cd0ccfa852423d14939b0986207eaa9178195ba3746
+com.example.reflect.Main -> com.example.reflect.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:2:void main(java.lang.String[]):50:51 -> main
+    3:6:void com.example.reflect.Msg.<init>(int,java.lang.String,long):16:19 -> main
+    3:6:void main(java.lang.String[]):51 -> main
+    7:8:void main(java.lang.String[]):51:52 -> main
+    9:11:void com.example.reflect.Pair.<init>(int):30:32 -> main
+    9:11:void main(java.lang.String[]):52 -> main
+    12:12:void main(java.lang.String[]):52:52 -> main
+com.example.reflect.Msg -> com.example.reflect.a:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:void <clinit>():14:14 -> <clinit>
+com.example.reflect.Pair -> com.example.reflect.b:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:void <clinit>():28:28 -> <clinit>
+com.example.reflect.Reader -> a:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:5:java.lang.String dump(java.lang.Object,java.lang.String[]):38:42 -> a
+    6:6:java.lang.String dump(java.lang.Object,java.lang.String[]):44:44 -> a
