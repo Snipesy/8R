@@ -99,6 +99,7 @@ pub struct Rule {
 use Attribute as A;
 
 pub const IDENTITY: &str = "core/identity";
+pub const SIGDB_METHOD_NAME: &str = "r8/sigdb-method-name";
 pub const STRUCTURAL_NAME: &str = "core/structural-name";
 pub const STRUCTURAL_TIE: &str = "core/structural-tie";
 pub const KEPT_NAME: &str = "r8/kept-name";
@@ -339,6 +340,19 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["r94_enum"],
+    },
+    Rule {
+        id: SIGDB_METHOD_NAME,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::MemberName],
+        summary: "Name a library method from the signature DB (sigdb::matcher): exact body or string-set hash unique on both sides, then call-graph alignment, unique proto and mutual-best similarity within voted class pairs, each round conflict-free. Annotated @eightr.Original(name, via).",
+        preconditions: &[
+            "The match is conflict-free on both sides (docs/research/sigdb.md §3); D: the DB is no exhaustive universe and exact stages are 97-99% precise.",
+            "Only methods outside any override group (static, private, or virtual in a class without program subclasses that overrides nothing in the program), without an S or recovered name, and whose new name collides with nothing in the class.",
+        ],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["sigdb_app"],
     },
     Rule {
         id: SPLIT_MERGED_CLASS,

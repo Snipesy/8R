@@ -367,6 +367,13 @@ impl Renaming {
                 string_rewrites.push((x.class, x.method, insn, new));
             }
         }
+        // A string shared by lookups that would need different names can't be rewritten
+        // (callers pin such targets; this keeps an inconsistent renaming from half-applying).
+        let mut wanted: BTreeMap<(usize, usize, u32), BTreeSet<String>> = BTreeMap::new();
+        for (ci, mi, insn, new) in &string_rewrites {
+            wanted.entry((*ci, *mi, *insn)).or_default().insert(new.clone());
+        }
+        string_rewrites.retain(|(ci, mi, insn, _)| wanted[&(*ci, *mi, *insn)].len() == 1);
         let mut syms = std::mem::take(&mut p.syms);
         for (ci, mi, insn, new) in &string_rewrites {
             let sym = syms.intern(new);

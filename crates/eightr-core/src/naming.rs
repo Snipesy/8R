@@ -291,15 +291,7 @@ fn class_labels(cx: &Ctx) -> Vec<String> {
             let ci = id.0 as usize;
             for (mi, m) in p.class(id).methods.iter().enumerate() {
                 let Some(body) = &m.code else { continue };
-                let text = eightr_ir::print::method(&model.classes[norm_of[ci]].methods[mi], &model.syms);
-                let mh = hash_hex(&text);
-                if let Some(dir) = std::env::var_os("EIGHTR_NAMING_DEBUG_METHODS") {
-                    use std::io::Write;
-                    let path = std::path::Path::new(&dir).join("methods.txt");
-                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                        let _ = writeln!(f, "{mh}\t{}", text.replace('\n', "\u{1}"));
-                    }
-                }
+                let mh = hash_hex(&eightr_ir::print::method(&model.classes[norm_of[ci]].methods[mi], &model.syms));
                 for (k, insn) in body.insns.iter().enumerate() {
                     for d in op_types(p, &insn.op) {
                         if let Some(x) = p.find(d.trim_start_matches('[')) {
@@ -627,7 +619,8 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
         } else {
             "Class"
         };
-        let hint = from_name.or(from_super).unwrap_or_else(|| kind.to_string());
+        let from_hint = p.class_hints.get(&id).and_then(|h| sanitize(h));
+        let hint = from_hint.or(from_name).or(from_super).unwrap_or_else(|| kind.to_string());
         class_cands.push((class_label[id.0 as usize].clone(), hint, id));
     }
     class_cands.sort();

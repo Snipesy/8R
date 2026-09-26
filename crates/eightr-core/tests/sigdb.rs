@@ -82,3 +82,69 @@ fn fingerprints_ignore_program_names() {
     assert!(only_a.is_empty(), "{} fingerprints differ after renaming, e.g. {:?}", only_a.len(), &only_a[..only_a.len().min(2)]);
     assert_eq!(pa, pb);
 }
+
+/// The matcher (crates/eightr-core/src/sigdb/matcher.rs) on sigdb_app, graded by its mapping:
+/// precision per stage, recall over the library methods the DB knows. Names are D, so the bar is
+/// a ratchet, not 100%.
+#[test]
+fn matcher_precision_recall_on_sigdb_app() {
+    use eightr_mapping::{Mapping, MemberKind, Metadata};
+    let dir = root().join("fixtures/out/sigdb_app/r8");
+    let mut model = load(&dir.join("classes.dex"));
+    let program: std::collections::BTreeSet<String> = model.classes.iter().map(|c| model.syms.get(c.ty).to_string()).collect();
+    eightr_core::rewrites::run_all(&mut model).unwrap();
+    let mapping = Mapping::parse_normalized(&fs::read_to_string(dir.join("mapping.txt")).unwrap()).unwrap();
+    let dbs = eightr_core::sigdb::matcher::embedded();
+    let matches = eightr_core::sigdb::matcher::match_program(&model, dbs);
+    let desc = |dotted: &str| format!("L{};", dotted.replace('.', "/"));
+    // (residual class, residual name) → original (owner, name), when unambiguous.
+    let truth = |class: &str, name: &str| -> Option<(String, String)> {
+        let cm = mapping.classes.iter().find(|c| desc(&c.obfuscated) == class)?;
+        let cands: std::collections::BTreeSet<(String, String)> = cm
+            .outermost_methods()
+            .into_iter()
+            .filter(|(m, md)| m.obfuscated == name && !md.iter().any(|x| x.parsed == Metadata::Synthesized))
+            .map(|(m, _)| (desc(m.original_owner.as_deref().unwrap_or(&cm.original)), m.original_name.clone()))
+            .collect();
+        let _ = MemberKind::Field;
+        (cands.len() == 1).then(|| cands.into_iter().next().unwrap())
+    };
+    let db_classes: std::collections::BTreeSet<&str> = dbs.iter().flat_map(|d| d.classes.iter().map(String::as_str)).collect();
+    let mut per: std::collections::BTreeMap<&str, (usize, usize)> = std::collections::BTreeMap::new();
+    let mut matched_truth = 0;
+    for m in &matches.methods {
+        let c = &model.classes[m.class];
+        let (cd, mn) = (model.syms.get(c.ty), model.syms.get(c.methods[m.method].name));
+        let db = &dbs[m.key.0 as usize];
+        let (kc, kn, _) = &db.methods[m.key.1 as usize];
+        let got = (db.classes[*kc as usize].clone(), kn.clone());
+        let Some(t) = truth(cd, mn) else { continue };
+        let e = per.entry(m.via).or_default();
+        e.1 += 1;
+        if t == got {
+            e.0 += 1;
+            matched_truth += 1;
+        }
+    }
+    // Recall: library methods of the app (original owner known to the DB), in original classes.
+    let mut total = 0;
+    for c in &model.classes {
+        let cd = model.syms.get(c.ty);
+        if !program.contains(cd) {
+            continue;
+        }
+        for m in c.methods.iter().filter(|m| m.code.is_some()) {
+            let n = model.syms.get(m.name);
+            if n == "<init>" || n == "<clinit>" {
+                continue;
+            }
+            if truth(cd, n).is_some_and(|(o, _)| db_classes.contains(o.as_str())) {
+                total += 1;
+            }
+        }
+    }
+    let (ok, all): (usize, usize) = per.values().fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    eprintln!("sigdb matcher: {per:?}; precision {ok}/{all}, recall {matched_truth}/{total}; {} class pairs", matches.classes.len());
+    assert!(all > 0 && ok * 100 >= all * 92, "precision {ok}/{all}");
+    assert!(matched_truth * 100 >= total * 68, "recall {matched_truth}/{total}");
+}

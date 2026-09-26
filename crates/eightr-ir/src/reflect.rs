@@ -3,7 +3,7 @@
 //! rewrites these strings when it renames the target, so renaming must do the same, or pin
 //! the target when the string can't be tied to exactly one declaration.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cfg::Cfg;
 use crate::defs::{DefSite, ReachingDefs};
@@ -208,7 +208,29 @@ impl Pins {
 ///   up by name (library-agnostic; costs only a rename, never behavior);
 /// * `native` methods and their classes: native code binds to them by name (JNI).
 pub fn pins(p: &Program) -> Pins {
-    let mut pins = Pins::of(&sites(p));
+    let all = sites(p);
+    let mut pins = Pins::of(&all);
+    // One name string feeding several lookups (Guava's AbstractFuture: `"a"` for the updaters of
+    // two classes): the string can only follow one rename, so every target keeps its name.
+    let mut by_string: BTreeMap<(usize, usize, u32), Vec<&Site>> = BTreeMap::new();
+    for x in &all {
+        if let Some(insn) = x.string_insn {
+            by_string.entry((x.class, x.method, insn)).or_default().push(x);
+        }
+    }
+    for group in by_string.values().filter(|g| g.len() > 1) {
+        for x in group {
+            match x.kind {
+                Kind::Class => {
+                    pins.classes.insert(format!("L{};", x.name.replace('.', "/")));
+                }
+                _ => {
+                    pins.fields.insert((x.owner.clone(), x.name.clone()));
+                    pins.methods.insert((x.owner.clone(), x.name.clone()));
+                }
+            }
+        }
+    }
     let s = &p.syms;
     for c in &p.classes {
         let owner = s.get(c.ty).to_string();
