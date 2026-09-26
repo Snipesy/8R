@@ -11,10 +11,14 @@ pub mod cfg;
 pub mod dataflow;
 pub mod defs;
 pub mod lift;
+pub mod model;
 pub mod op;
 pub mod print;
+pub mod rename;
+mod resolve;
 pub mod sym;
 pub mod types;
+pub mod value;
 
 pub use cfg::{BlockId, Cfg, Edge, EdgeKind};
 pub use lift::{lift, Body, Insn};

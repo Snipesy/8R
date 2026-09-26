@@ -7,6 +7,7 @@ use crate::cfg::{Cfg, EdgeKind};
 use crate::lift::Body;
 use crate::op::*;
 use crate::sym::Interner;
+use crate::value::{HandleMember, MethodHandleRef};
 
 fn regs(rs: &[Reg]) -> String {
     rs.iter().map(|r| format!("v{r}")).collect::<Vec<_>>().join(", ")
@@ -32,6 +33,14 @@ fn width(w: Width) -> &'static str {
     }
 }
 
+pub fn method_handle(h: &MethodHandleRef, s: &Interner) -> String {
+    let member = match h.member {
+        HandleMember::Field(f) => format!("{}->{}:{}", s.get(f.class), s.get(f.name), s.get(f.ty)),
+        HandleMember::Method(m) => format!("{}->{}{}", s.get(m.class), s.get(m.name), s.get(m.proto)),
+    };
+    format!("{:?}@{member}", h.kind)
+}
+
 pub fn op(o: &Op, s: &Interner) -> String {
     let f = |r: &FieldRef| format!("{}->{}:{}", s.get(r.class), s.get(r.name), s.get(r.ty));
     let m = |r: &MethodRef| format!("{}->{}{}", s.get(r.class), s.get(r.name), s.get(r.proto));
@@ -46,7 +55,7 @@ pub fn op(o: &Op, s: &Interner) -> String {
         Op::Const { dst, value: Const::Wide(v) } => format!("const-wide v{dst}, {v}"),
         Op::ConstString { dst, value } => format!("const-string v{dst}, {:?}", s.get(*value)),
         Op::ConstClass { dst, ty } => format!("const-class v{dst}, {}", s.get(*ty)),
-        Op::ConstMethodHandle { dst, handle } => format!("const-method-handle v{dst}, {}", s.get(*handle)),
+        Op::ConstMethodHandle { dst, handle } => format!("const-method-handle v{dst}, {}", method_handle(handle, s)),
         Op::ConstMethodType { dst, proto } => format!("const-method-type v{dst}, {}", s.get(*proto)),
         Op::MonitorEnter { obj } => format!("monitor-enter v{obj}"),
         Op::MonitorExit { obj } => format!("monitor-exit v{obj}"),
@@ -89,12 +98,13 @@ pub fn op(o: &Op, s: &Interner) -> String {
         Op::InvokePolymorphic { method, proto, args } => {
             format!("invoke-polymorphic {{{}}}, {}, {}", regs(args), m(method), s.get(*proto))
         }
-        Op::InvokeCustom { name, proto, bootstrap, args } => format!(
-            "invoke-custom {{{}}}, {}{} via {}",
+        Op::InvokeCustom { call_site, args } => format!(
+            "invoke-custom {{{}}}, {}{} via {}{}",
             regs(args),
-            s.get(*name),
-            s.get(*proto),
-            s.get(*bootstrap)
+            s.get(call_site.name),
+            s.get(call_site.proto),
+            method_handle(&call_site.bootstrap, s),
+            if call_site.extra.is_empty() { String::new() } else { format!(" +{} args", call_site.extra.len()) }
         ),
         Op::Unop { op, dst, src } => format!("{op:?} v{dst}, v{src}"),
         Op::Binop { op, ty, dst, a, b } => {
@@ -131,6 +141,139 @@ pub fn body(b: &Body, cfg: &Cfg, s: &Interner) -> String {
             let insn = &b.insns[idx as usize];
             let _ = writeln!(out, "  @{idx:<3} {:04x}: {}", insn.pc, op(&insn.op, s));
         }
+    }
+    out
+}
+
+pub fn value(v: &crate::value::Value, s: &Interner) -> String {
+    use crate::value::Value::*;
+    match v {
+        Byte(x) => format!("byte {x}"),
+        Short(x) => format!("short {x}"),
+        Char(x) => format!("char {x}"),
+        Int(x) => format!("int {x}"),
+        Long(x) => format!("long {x}"),
+        Float(b) => format!("float {:#x}", b),
+        Double(b) => format!("double {:#x}", b),
+        MethodType(p) => format!("method-type {}", s.get(*p)),
+        MethodHandle(h) => format!("method-handle {}", method_handle(h, s)),
+        String(x) => format!("string {:?}", s.get(*x)),
+        Type(t) => format!("type {}", s.get(*t)),
+        Field(f) => format!("field {}->{}:{}", s.get(f.class), s.get(f.name), s.get(f.ty)),
+        Method(m) => format!("method {}->{}{}", s.get(m.class), s.get(m.name), s.get(m.proto)),
+        Enum(f) => format!("enum {}->{}:{}", s.get(f.class), s.get(f.name), s.get(f.ty)),
+        Array(a) => format!("[{}]", a.iter().map(|x| value(x, s)).collect::<Vec<_>>().join(", ")),
+        Annotation(a) => encoded_annotation(a, s),
+        Null => "null".into(),
+        Boolean(b) => format!("{b}"),
+    }
+}
+
+fn encoded_annotation(a: &crate::value::EncodedAnnotation, s: &Interner) -> String {
+    // Element order is not semantic (the writer sorts by name), so render sorted.
+    let mut els: Vec<String> = a.elements.iter().map(|(n, v)| format!("{}={}", s.get(*n), value(v, s))).collect();
+    els.sort();
+    format!("@{}({})", s.get(a.ty), els.join(", "))
+}
+
+fn annotations(out: &mut String, indent: &str, anns: &[crate::value::Annotation], s: &Interner) {
+    // Set order is not semantic either.
+    let mut v: Vec<String> = anns.iter().map(|a| format!("{:?} {}", a.visibility, encoded_annotation(&a.annotation, s))).collect();
+    v.sort();
+    for a in v {
+        let _ = writeln!(out, "{indent}{a}");
+    }
+}
+
+/// Canonical rendering of a method body without pcs (which change on re-encoding): ops,
+/// tries, positions, locals, parameter names.
+pub fn body_semantic(b: &Body, s: &Interner) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "registers {} ins {} outs {}", b.registers, b.ins, b.outs);
+    for (i, insn) in b.insns.iter().enumerate() {
+        let _ = writeln!(out, "  @{i:<3} {}", op(&insn.op, s));
+    }
+    for t in &b.tries {
+        let hs: Vec<String> = t
+            .handlers
+            .iter()
+            .map(|h| format!("{} -> @{}", h.ty.map_or("<any>", |t| s.get(t)), h.target))
+            .collect();
+        let _ = writeln!(out, "  try @{}..@{}: {}", t.start, t.end, hs.join(", "));
+    }
+    for (i, line) in &b.positions {
+        let _ = writeln!(out, "  line @{i} {line}");
+    }
+    for l in &b.locals {
+        let name = l.name.map_or("?", |n| s.get(n));
+        let ty = l.ty.map_or("?", |n| s.get(n));
+        let sig = l.signature.map(|n| format!(" sig {}", s.get(n))).unwrap_or_default();
+        let _ = writeln!(out, "  local v{} {name} {ty}{sig} @{}..@{}", l.reg, l.start, l.end);
+    }
+    if !b.parameter_names.is_empty() {
+        let names: Vec<&str> = b.parameter_names.iter().map(|n| n.map_or("?", |n| s.get(n))).collect();
+        let _ = writeln!(out, "  params {}", names.join(", "));
+    }
+    out
+}
+
+/// Canonical rendering of a whole program. Two programs are semantically equal (for the
+/// round-trip tests) iff their renderings are equal.
+pub fn program(p: &crate::model::Program) -> String {
+    let s = &p.syms;
+    let mut out = String::new();
+    for r in &p.retained_strings {
+        let _ = writeln!(out, "retain {r:?}");
+    }
+    for c in &p.classes {
+        let _ = writeln!(out, "class {} access {:#x}", s.get(c.ty), c.access);
+        if let Some(sup) = c.superclass {
+            let _ = writeln!(out, "  extends {}", s.get(sup));
+        }
+        for i in &c.interfaces {
+            let _ = writeln!(out, "  implements {}", s.get(*i));
+        }
+        if let Some(f) = c.source_file {
+            let _ = writeln!(out, "  source {:?}", s.get(f));
+        }
+        annotations(&mut out, "  ", &c.annotations, s);
+        // Member order within a class isn't semantic; the writer sorts by id.
+        let mut fields: Vec<String> = c
+            .fields
+            .iter()
+            .map(|f| {
+                let mut o = format!("  field {}:{} access {:#x}", s.get(f.name), s.get(f.ty), f.access);
+                // An explicit default and an absent initial value mean the same thing.
+                if let Some(v) = f.static_value.as_ref().filter(|v| !crate::value::is_default(v)) {
+                    o.push_str(&format!(" = {}", value(v, s)));
+                }
+                o.push('\n');
+                annotations(&mut o, "    ", &f.annotations, s);
+                o
+            })
+            .collect();
+        fields.sort();
+        out.extend(fields);
+        let mut methods: Vec<String> = c
+            .methods
+            .iter()
+            .map(|m| {
+                let mut o = format!("  method {}{} access {:#x}\n", s.get(m.name), s.get(m.proto), m.access);
+                annotations(&mut o, "    ", &m.annotations, s);
+                if let Some(ps) = &m.parameter_annotations {
+                    for (i, set) in ps.iter().enumerate() {
+                        let _ = writeln!(o, "    param {i}:");
+                        annotations(&mut o, "      ", set, s);
+                    }
+                }
+                if let Some(b) = &m.code {
+                    o.push_str(&body_semantic(b, s));
+                }
+                o
+            })
+            .collect();
+        methods.sort();
+        out.extend(methods);
     }
     out
 }

@@ -80,11 +80,11 @@ fn solved_names_match_held_back_mapping() {
                 ItemId::Method { class, index } => (class, Some((true, index))),
             };
             let class = p.class(class_id);
-            let obf = dotted(&class.descriptor);
+            let obf = dotted(p.descriptor(class_id));
             let cm = &mapping.classes[*by_obf.get(obf.as_str()).unwrap_or_else(|| panic!("{ctx}: class not in mapping"))];
             // Nothing compiler-synthesized is "original", whatever its name, except the name of a
             // constructor, which is <init>/<clinit> by definition.
-            let ctor_name = matches!(member, Some((true, index)) if matches!(class.methods[index as usize].name.as_str(), "<init>" | "<clinit>"));
+            let ctor_name = matches!(member, Some((true, index)) if matches!(p.str(class.methods[index as usize].name), "<init>" | "<clinit>"));
             assert!(ctor_name || !cm.is_synthesized(), "{ctx}: S label on a synthesized class");
             match (attr, member) {
                 (Attribute::ClassName, None) => {
@@ -97,13 +97,14 @@ fn solved_names_match_held_back_mapping() {
                 }
                 (Attribute::MemberName, Some((false, index))) => {
                     let f = &class.fields[index as usize];
+                    let (f_name, f_ty) = (p.str(f.name), p.str(f.ty));
                     // R8 omits members it neither renamed nor attached line info to, so an
                     // absent member means "unchanged".
                     let matches: Vec<_> = cm
                         .members
                         .iter()
                         .filter_map(|mm| match &mm.kind {
-                            MemberKind::Field(m) if m.obfuscated == f.name && java_to_descriptor(&m.ty) == f.ty => {
+                            MemberKind::Field(m) if m.obfuscated == f_name && java_to_descriptor(&m.ty) == f_ty => {
                                 Some((m, &mm.metadata))
                             }
                             _ => None,
@@ -111,11 +112,12 @@ fn solved_names_match_held_back_mapping() {
                         .collect();
                     for (m, md) in matches {
                         assert!(!md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized field");
-                        assert_eq!(m.original_name, f.name, "{ctx}");
+                        assert_eq!(m.original_name, f_name, "{ctx}");
                     }
                 }
                 (Attribute::MemberName, Some((true, index))) => {
                     let meth = &class.methods[index as usize];
+                    let (meth_name, meth_proto) = (p.str(meth.name), p.str(meth.proto));
                     // Residual entries for this method: same obfuscated name, same class, and a
                     // signature matching the dex proto (or its residualsignature).
                     let matches: Vec<_> = cm
@@ -132,16 +134,16 @@ fn solved_names_match_held_back_mapping() {
                                 Metadata::ResidualSignature(s) => Some(s.clone()),
                                 _ => None,
                             });
-                            m.obfuscated == meth.name && own && residual.unwrap_or(sig) == meth.proto
+                            m.obfuscated == meth_name && own && residual.unwrap_or(sig) == meth_proto
                         })
                         .collect();
                     for (m, md) in matches {
                         // Constructor names are the one exception: every constructor is named
                         // <init>, so the name claim holds even for a synthesized constructor (whose
                         // *signature* isn't original; that's a different attribute).
-                        let ctor = meth.name == "<init>" || meth.name == "<clinit>";
+                        let ctor = meth_name == "<init>" || meth_name == "<clinit>";
                         assert!(ctor || !md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized method");
-                        assert_eq!(m.original_name, meth.name, "{ctx}");
+                        assert_eq!(m.original_name, meth_name, "{ctx}");
                     }
                 }
                 other => panic!("{ctx}: unexpected S label {other:?}"),
@@ -168,24 +170,25 @@ fn solved_names_exist_in_d8_ground_truth() {
             let ctx = format!("{fixture}: {}", o.program.describe(*item));
             let (ItemId::Class { class } | ItemId::Field { class, .. } | ItemId::Method { class, .. }) = *item;
             let c = o.program.class(class);
-            let original = by_obf.get(dotted(&c.descriptor).as_str()).map(|&i| mapping.classes[i].original.clone());
+            let c_desc = o.program.descriptor(class);
+            let original = by_obf.get(dotted(c_desc).as_str()).map(|&i| mapping.classes[i].original.clone());
             let Some(original) = original else { panic!("{ctx}: class not in mapping") };
             let g_desc = format!("L{};", original.replace('.', "/"));
-            let Some(&gid) = g.by_descriptor.get(&g_desc) else {
+            let Some(gid) = g.find(&g_desc) else {
                 // Synthesized classes (e.g. merge targets, enum-unboxing utilities) have no
                 // counterpart in the unoptimized build.
-                assert!(mapping.classes[by_obf[dotted(&c.descriptor).as_str()]].is_synthesized(), "{ctx}: absent from D8 build");
+                assert!(mapping.classes[by_obf[dotted(c_desc).as_str()]].is_synthesized(), "{ctx}: absent from D8 build");
                 continue;
             };
             let gc = g.class(gid);
             match *item {
                 ItemId::Field { index, .. } => {
-                    let n = &c.fields[index as usize].name;
-                    assert!(gc.fields.iter().any(|f| &f.name == n), "{ctx}: field absent from D8 build");
+                    let n = o.program.str(c.fields[index as usize].name);
+                    assert!(gc.fields.iter().any(|f| g.str(f.name) == n), "{ctx}: field absent from D8 build");
                 }
                 ItemId::Method { index, .. } => {
-                    let n = &c.methods[index as usize].name;
-                    assert!(gc.methods.iter().any(|m| &m.name == n), "{ctx}: method absent from D8 build");
+                    let n = o.program.str(c.methods[index as usize].name);
+                    assert!(gc.methods.iter().any(|m| g.str(m.name) == n), "{ctx}: method absent from D8 build");
                 }
                 ItemId::Class { .. } => {}
             }
@@ -263,7 +266,7 @@ fn solved_coverage_ratchet() {
 fn program_ids_ignore_class_def_order() {
     // Program ids are by descriptor; this guards the invariant the report relies on.
     let p: Program = outcome("opcodes", "d8").program;
-    let descs: Vec<_> = p.classes.iter().map(|c| c.descriptor.clone()).collect();
+    let descs: Vec<_> = p.class_ids().map(|id| p.descriptor(id).to_string()).collect();
     let mut sorted = descs.clone();
     sorted.sort();
     assert_eq!(descs, sorted);

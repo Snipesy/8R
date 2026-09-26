@@ -71,7 +71,14 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
         });
     }
     let sources = sources::detect(&dexes, &markers);
-    let mut program = Program::build(&dexes)?;
+    let dex_refs: Vec<&Dex> = dexes.iter().map(|(_, d)| d).collect();
+    let model = eightr_ir::model::Program::load(&dex_refs).map_err(|e| match e {
+        eightr_ir::model::LoadError::Dex { input, error } => Error::Dex { input: dexes[input].0.clone(), error },
+        eightr_ir::model::LoadError::DuplicateClass { descriptor, inputs } => {
+            Error::DuplicateClass { descriptor, inputs: inputs.map(|i| dexes[i].0.clone()) }
+        }
+    })?;
+    let mut program = Program { model };
     let name_stats = name_stats(&dexes, &program);
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
 
@@ -102,7 +109,8 @@ fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {
             }
         }
     }
-    let packages: std::collections::BTreeSet<&str> = program.classes.iter().map(|c| c.package()).collect();
+    let packages: std::collections::BTreeSet<&str> =
+        program.class_ids().map(|id| crate::program::package_of(program.descriptor(id))).collect();
     NameStats { type_descriptors: types.len() as u64, member_names: members.len() as u64, packages: packages.len() as u64 }
 }
 
@@ -128,7 +136,7 @@ fn attributes(program: &Program, item: ItemId) -> &'static [Attribute] {
         ItemId::Class { .. } => &[Package, ClassName, SourceFile],
         ItemId::Field { .. } => &[MemberName, Signature],
         ItemId::Method { class, index } => {
-            if program.class(class).methods[index as usize].code_off.is_some() {
+            if program.class(class).methods[index as usize].code.is_some() {
                 &[MemberName, Signature, Body, Lines]
             } else {
                 &[MemberName, Signature]

@@ -1,0 +1,14 @@
+[package]
+name = "eightr-dexwrite"
+description = "Canonical DEX writer for the 8R program model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+eightr-dex.workspace = true
+eightr-ir.workspace = true
+sha1.workspace = true
+
+[lints]
+workspace = true

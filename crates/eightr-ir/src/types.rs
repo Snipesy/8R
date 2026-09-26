@@ -208,9 +208,8 @@ impl<'a> TypeInference<'a> {
                 }
                 Op::InstanceGet { field, .. } | Op::StaticGet { field, .. } => descs.push(syms.get(field.ty).to_string()),
                 Op::Invoke { method, .. } => add_proto(syms.get(method.proto), &mut descs),
-                Op::InvokePolymorphic { proto, .. } | Op::InvokeCustom { proto, .. } => {
-                    add_proto(syms.get(*proto), &mut descs)
-                }
+                Op::InvokePolymorphic { proto, .. } => add_proto(syms.get(*proto), &mut descs),
+                Op::InvokeCustom { call_site, .. } => add_proto(syms.get(call_site.proto), &mut descs),
                 _ => {}
             }
         }
@@ -410,9 +409,8 @@ impl Forward for TypeInference<'_> {
                 }
                 s.result = self.return_type(self.syms.get(method.proto));
             }
-            Op::InvokePolymorphic { proto, .. } | Op::InvokeCustom { proto, .. } => {
-                s.result = self.return_type(self.syms.get(*proto));
-            }
+            Op::InvokePolymorphic { proto, .. } => s.result = self.return_type(self.syms.get(*proto)),
+            Op::InvokeCustom { call_site, .. } => s.result = self.return_type(self.syms.get(call_site.proto)),
             Op::Unop { op, dst, .. } => s.set_value(*dst, Self::of_num(op.types().1)),
             Op::Binop { ty, dst, .. } => s.set_value(*dst, Self::of_num(*ty)),
         }
