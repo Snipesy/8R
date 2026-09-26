@@ -1,0 +1,63 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 24
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5
+# pg_map_hash: SHA-256 0ee0a13238c1aba719dd48189b40eb723a1e5e28a38579ee6bac2a3d3225eea5
+com.example.pb.ExistenceFilter -> a:
+# {"id":"sourceFile","fileName":"ExistenceFilter.java"}
+    1:3:void com.google.protobuf.GeneratedMessageLite.<init>():4:4 -> <init>
+    1:3:void <init>(int,int,java.lang.String):13 -> <init>
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(I)V"}
+    4:6:void <init>(int,int,java.lang.String):14:14 -> <init>
+    7:8:void <init>(int,int,java.lang.String):15:15 -> <init>
+    9:13:void <init>(int,int,java.lang.String):16:16 -> <init>
+    1:1:java.lang.String describe():18:18 -> a
+com.example.pb.LatLng -> c:
+# {"id":"sourceFile","fileName":"LatLng.java"}
+    1:3:void com.google.protobuf.GeneratedMessageLite.<init>():4:4 -> <init>
+    1:3:void <init>(double,double):11 -> <init>
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(D)V"}
+    4:7:void <init>(double,double):12:12 -> <init>
+    8:10:void <init>(double,double):13:13 -> <init>
+    1:1:java.lang.String describe():15:15 -> a
+com.example.pb.Main -> com.example.pb.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:2:void main(java.lang.String[]):5:6 -> main
+    3:11:void main(java.lang.String[]):6:6 -> main
+    12:25:void main(java.lang.String[]):7:7 -> main
+    26:35:void main(java.lang.String[]):8:8 -> main
+    36:45:void main(java.lang.String[]):9:9 -> main
+    46:56:void main(java.lang.String[]):10:10 -> main
+com.example.pb.Twin1 -> d:
+# {"id":"sourceFile","fileName":"Twin1.java"}
+    1:3:void com.google.protobuf.GeneratedMessageLite.<init>():4:4 -> <init>
+    1:3:void <init>(int,int,int):13 -> <init>
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(I)V"}
+    4:6:void <init>(int,int,int):14:14 -> <init>
+    7:9:void <init>(int,int,int):15:15 -> <init>
+    10:12:void <init>(int,int,int):16:16 -> <init>
+    1:1:java.lang.String describe():18:18 -> a
+com.example.pb.Twin2 -> e:
+# {"id":"sourceFile","fileName":"Twin2.java"}
+    1:4:void com.google.protobuf.GeneratedMessageLite.<init>():4:4 -> <init>
+    1:4:void <init>(int,int,int):13 -> <init>
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(I)V"}
+    5:6:void <init>(int,int,int):14:14 -> <init>
+    7:9:void <init>(int,int,int):15:15 -> <init>
+    10:12:void <init>(int,int,int):16:16 -> <init>
+    1:1:java.lang.String describe():18:18 -> a
+com.example.pb.Unbundled -> f:
+# {"id":"sourceFile","fileName":"Unbundled.java"}
+    1:3:void com.google.protobuf.GeneratedMessageLite.<init>():4:4 -> <init>
+    1:3:void <init>(int,int,int):13 -> <init>
+      # {"id":"com.android.tools.r8.residualsignature","signature":"(I)V"}
+    4:6:void <init>(int,int,int):14:14 -> <init>
+    7:9:void <init>(int,int,int):15:15 -> <init>
+    10:12:void <init>(int,int,int):16:16 -> <init>
+    1:1:java.lang.String describe():18:18 -> a
+com.google.protobuf.GeneratedMessageLite -> b:
+# {"id":"sourceFile","fileName":"GeneratedMessageLite.java"}
+    java.lang.String describe() -> a
+    1:1:java.lang.String toString():9:9 -> toString

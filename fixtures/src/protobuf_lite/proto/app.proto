@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package app.v1;
+
+option java_package = "com.example.pb";
+option java_multiple_files = true;
+
+// Unique, three fields: its class's simple name is S.
+message ExistenceFilter {
+  int32 target_id = 1;
+  int32 count = 2;
+  string unchanged_names = 3;
+}
+
+// Two fields: a message not bundled could coincide; hint only.
+message LatLng {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// Identical field sets: ambiguous, hint only.
+message Twin1 { int32 a = 1; int32 b = 2; int32 c = 3; }
+message Twin2 { int32 a = 1; int32 b = 2; int32 c = 3; }

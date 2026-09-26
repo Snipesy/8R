@@ -9,6 +9,7 @@
 //! plugin = kotlinx-serialization                 # kotlinc plugin (kotlinx-serialization, compose)
 //! plugin_option = <plugin id>:<key>=<value>        # kotlinc -P plugin:<...> option
 //! kotlinc = kotlinc-2.1.21                         # another pinned kotlinc (default: kotlinc)
+//! resource = proto/app.proto                       # copied to out/<name>/resources/ (package resources)
 //! ```
 //!
 //! Libraries are program input to R8 (shrunk into the app, as in a real build) together with
@@ -145,11 +146,14 @@ struct Conf {
     sources: Option<String>,
     /// Pinned kotlinc artifact (default `kotlinc`), for twins built with another compiler.
     kotlinc: Option<String>,
+    /// Files (relative to the fixture source dir) copied to `out/<name>/resources/`: package
+    /// resources the pipeline reads (`.proto` sources, version files).
+    resources: Vec<String>,
 }
 
 fn parse_conf(path: &Path) -> Result<Conf> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), plugin_options: Vec::new(), r8: None, sources: None, kotlinc: None };
+    let mut conf = Conf { min_api: 21, keep: Vec::new(), libs: Vec::new(), plugins: Vec::new(), plugin_options: Vec::new(), r8: None, sources: None, kotlinc: None, resources: Vec::new() };
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let (k, v) = line.split_once('=').ok_or_else(|| format!("bad line in {}: {line}", path.display()))?;
         match k.trim() {
@@ -161,6 +165,7 @@ fn parse_conf(path: &Path) -> Result<Conf> {
             "r8" => conf.r8 = Some(v.trim().to_string()),
             "sources" => conf.sources = Some(v.trim().to_string()),
             "kotlinc" => conf.kotlinc = Some(v.trim().to_string()),
+            "resource" => conf.resources.push(v.trim().to_string()),
             // Entry point for the execution-equivalence tests; not used by the build.
             "main" => {}
             other => return Err(format!("unknown key {other} in {}", path.display())),
@@ -312,6 +317,11 @@ fn fixtures(only: &[String]) -> Result<()> {
         let _ = fs::remove_dir_all(&out);
         for d in [work.join("classes"), out.join("d8"), out.join("r8")] {
             fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+        }
+        for res in &conf.resources {
+            let to = out.join("resources").join(res);
+            fs::create_dir_all(to.parent().unwrap()).map_err(|e| e.to_string())?;
+            fs::copy(src.join(res), &to).map_err(|e| format!("{res}: {e}"))?;
         }
 
         let tc = toolchain()?;

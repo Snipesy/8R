@@ -24,8 +24,8 @@ pub struct Config {
     pub no_rewrites: bool,
     /// Don't annotate methods with their inlining hints in the output (`@eightr.Inlined`).
     pub no_hint_annotations: bool,
-    /// Small text resources of the package (`META-INF/*.version`, root `*.properties`): library
-    /// version evidence (`input::resources`).
+    /// Small text resources of the package (`META-INF/*.version`, root `*.properties`, `*.proto`):
+    /// library versions and protobuf sources (`input::resources`).
     pub resources: Vec<(String, String)>,
 }
 
@@ -35,6 +35,8 @@ pub struct Evidence {
     pub markers: Vec<Marker>,
     pub sources: Vec<DetectedSource>,
     pub name_stats: NameStats,
+    /// Small text resources of the package (`Config::resources`).
+    pub resources: Vec<(String, String)>,
 }
 
 pub struct Outcome {
@@ -113,7 +115,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
     let mut program = Program { model, class_hints: Default::default() };
     let name_stats = name_stats(&dexes, &program);
-    let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats };
+    let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats, resources: config.resources.clone() };
 
     let mut labels = Labels::default();
     for pass in passes::all() {

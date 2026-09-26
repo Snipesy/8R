@@ -73,8 +73,8 @@ pub fn load(path: &Path) -> Result<Vec<DexInput>> {
     Ok(inputs)
 }
 
-/// Small text resources carrying library versions: `META-INF/*.version` and root
-/// `*.properties` of an APK/AAB/zip (AAB: under `base/root/`). Empty for other inputs.
+/// Small text resources carrying library facts: `META-INF/*.version`, root `*.properties` and
+/// `*.proto` sources of an APK/AAB/zip (AAB: under `base/root/`). Empty for other inputs.
 pub fn resources(path: &Path) -> Vec<(String, String)> {
     let Ok(bytes) = fs::read(path) else { return Vec::new() };
     if !bytes.starts_with(b"PK") {
@@ -85,14 +85,35 @@ pub fn resources(path: &Path) -> Vec<(String, String)> {
     for i in 0..zip.len() {
         let Ok(mut f) = zip.by_index(i) else { continue };
         let name = f.name().strip_prefix("base/root/").unwrap_or(f.name()).to_string();
-        let wanted = (name.starts_with("META-INF/") && name.ends_with(".version") && name.matches('/').count() == 1)
+        let small = (name.starts_with("META-INF/") && name.ends_with(".version") && name.matches('/').count() == 1)
             || (name.ends_with(".properties") && !name.contains('/'));
-        if !wanted || f.size() > 4096 {
+        let proto = name.ends_with(".proto");
+        if !(small && f.size() <= 4096 || proto && f.size() <= 512 * 1024) {
             continue;
         }
         let mut text = String::new();
         if f.read_to_string(&mut text).is_ok() {
             out.push((name, text));
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Every file under `dir` (recursively) as (path relative to `dir`, text): a fixture's package
+/// resources (`fixtures/out/<name>/resources/`). Empty when the directory doesn't exist.
+pub fn dir_resources(dir: &Path) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&d) else { continue };
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if let (Ok(rel), Ok(text)) = (p.strip_prefix(dir), fs::read_to_string(&p)) {
+                out.push((rel.to_string_lossy().replace('\\', "/"), text));
+            }
         }
     }
     out.sort();
