@@ -85,6 +85,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     })?;
     // Evidence about the input (the re-boxing rewrite consumes what it's recovered from).
     let enums = crate::passes::enum_unboxing::recover_enums(&model, &model.classes);
+    let (inline_hints, inlining) = crate::inline_hints::collect(&model);
     let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
     let mut program = Program { model };
     let name_stats = name_stats(&dexes, &program);
@@ -122,6 +123,10 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     findings.dedup();
     let mut report = build_report(&program, &labels, summaries, markers, sources, findings, rewrites, config);
     report.enums = enums;
+    report.inlining = inlining;
+    if config.verbose_labels {
+        report.inline_hints = inline_hints;
+    }
     Ok(Outcome { program, labels, report, renaming })
 }
 
@@ -242,6 +247,8 @@ fn build_report(
         rules: Report::rule_usage(&applications),
         rewrites,
         enums: Vec::new(),
+        inlining: Default::default(),
+        inline_hints: Vec::new(),
         summary,
         labels: entries,
     }

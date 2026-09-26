@@ -538,3 +538,118 @@ fn enum_unboxing_evidence_matches_ground_truth() {
         }
     }
 }
+
+/// Phase 4: every inlining-hint kind graded against the mappings' inline frames (the ground
+/// truth for "code here came from an inlined callee"). Precision: a hint's instruction lies in
+/// inlined code (for an idiom: code inlined from that very function). Recall (idioms): the
+/// function's inlined occurrences covered by a hint. Ratcheted in fixtures/inlining-metrics.json
+/// (`EIGHTR_UPDATE_METRICS=1` records): precision and recall must not drop.
+#[test]
+fn inlining_hints_precision_recall() {
+    use eightr_core::inline_hints::{body_hints, line_of, ARE_EQUAL, COLLECTION_SIZE_OR_DEFAULT, DISCARDED_GETCLASS, INLINED_INSTANCE_CALL};
+    let idioms = [(ARE_EQUAL, "areEqual"), (COLLECTION_SIZE_OR_DEFAULT, "collectionSizeOrDefault")];
+    // kind → [tp, fp, fn]
+    let mut stats: BTreeMap<&str, [u64; 3]> = BTreeMap::new();
+    for fixture in fixture_names() {
+        let Ok(text) = fs::read_to_string(fixtures_root().join(&fixture).join("r8/mapping.txt")) else { continue };
+        let mapping = Mapping::parse(&text).unwrap();
+        let by_obf = mapping.by_obfuscated();
+        let bytes = fs::read(fixtures_root().join(&fixture).join("r8/classes.dex")).unwrap();
+        let dex = eightr_dex::Dex::parse(&bytes).unwrap();
+        let model = eightr_ir::model::Program::load(&[&dex]).unwrap();
+        // Idiom occurrences: (class, method, minified range) whose inline stack has the function.
+        let mut occurrences: BTreeMap<&str, std::collections::BTreeSet<(String, String, u32, u32)>> = BTreeMap::new();
+        for cm in &mapping.classes {
+            for (m, _) in cm.methods() {
+                for (kind, func) in idioms {
+                    if m.original_name == func {
+                        if let Some((a, b)) = m.minified_range {
+                            occurrences.entry(kind).or_default().insert((cm.obfuscated.clone(), m.obfuscated.clone(), a, b));
+                        }
+                    }
+                }
+            }
+        }
+        let mut covered: BTreeMap<&str, std::collections::BTreeSet<(String, String, u32, u32)>> = BTreeMap::new();
+        // Every inlined occurrence (an inner frame: its range is shared with an outer one).
+        let mut inlined: std::collections::BTreeSet<(String, String, u32, u32, String)> = std::collections::BTreeSet::new();
+        for cm in &mapping.classes {
+            let outer: std::collections::BTreeSet<(String, u32, u32, String)> =
+                cm.outermost_methods().iter().filter_map(|(m, _)| m.minified_range.map(|(a, b)| (m.obfuscated.clone(), a, b, m.original_name.clone()))).collect();
+            for (m, _) in cm.methods() {
+                if let Some((a, b)) = m.minified_range {
+                    if !outer.contains(&(m.obfuscated.clone(), a, b, m.original_name.clone())) {
+                        inlined.insert((cm.obfuscated.clone(), m.obfuscated.clone(), a, b, m.original_name.clone()));
+                    }
+                }
+            }
+        }
+        let mut hinted: std::collections::BTreeSet<(String, String, u32, u32, String)> = std::collections::BTreeSet::new();
+        for c in &model.classes {
+            let cls = dotted(model.syms.get(c.ty));
+            let Some(&ci) = by_obf.get(cls.as_str()) else { continue };
+            let cm = &mapping.classes[ci];
+            for m in &c.methods {
+                let Some(body) = &m.code else { continue };
+                let name = model.syms.get(m.name);
+                let frames_at = |i: u32| line_of(body, i).map(|l| cm.frames(name, l)).unwrap_or_default();
+                for (i, kind) in body_hints(&model, body) {
+                    if let Some(l) = line_of(body, i) {
+                        for o in inlined.iter().filter(|o| o.0 == cm.obfuscated && o.1 == name && o.2 <= l + 2 && l <= o.3) {
+                            hinted.insert(o.clone());
+                        }
+                    }
+                    let tp = match kind {
+                        DISCARDED_GETCLASS | INLINED_INSTANCE_CALL => (i..i + 3).any(|j| frames_at(j).len() >= 2),
+                        _ => {
+                            let func = idioms.iter().find(|x| x.0 == kind).unwrap().1;
+                            let hit = (i.saturating_sub(4)..i + 8).any(|j| frames_at(j).iter().any(|f| f.method == func));
+                            if hit {
+                                if let Some(l) = line_of(body, i) {
+                                    for o in occurrences.get(kind).into_iter().flatten() {
+                                        if o.0 == cm.obfuscated && o.1 == name && o.2 <= l + 8 && l <= o.3 + 4 {
+                                            covered.entry(kind).or_default().insert(o.clone());
+                                        }
+                                    }
+                                }
+                            }
+                            hit
+                        }
+                    };
+                    stats.entry(kind).or_default()[usize::from(!tp)] += 1;
+                }
+            }
+        }
+        // Coverage: inlined occurrences any hint touches (the honest recall of all hints).
+        let cov = stats.entry("coverage").or_default();
+        cov[0] += hinted.len() as u64;
+        cov[2] += (inlined.len() - hinted.len()) as u64;
+        for (kind, _) in idioms {
+            let total = occurrences.get(kind).map_or(0, |s| s.len());
+            let found = covered.get(kind).map_or(0, |s| s.len());
+            stats.entry(kind).or_default()[2] += (total - found.min(total)) as u64;
+        }
+    }
+    let got: BTreeMap<String, serde_json::Value> = stats
+        .iter()
+        .map(|(k, [tp, fp, fn_])| {
+            let precision = if tp + fp == 0 { 1.0 } else { *tp as f64 / (tp + fp) as f64 };
+            let recall = if tp + fn_ == 0 { 1.0 } else { *tp as f64 / (tp + fn_) as f64 };
+            (k.to_string(), serde_json::json!({ "tp": tp, "fp": fp, "fn": fn_, "precision": (precision * 1000.0).round() / 1000.0, "recall": (recall * 1000.0).round() / 1000.0 }))
+        })
+        .collect();
+    eprintln!("inlining hints: {}", serde_json::to_string_pretty(&got).unwrap());
+    let path = fixtures_root().join("../inlining-metrics.json");
+    if std::env::var_os("EIGHTR_UPDATE_METRICS").is_some() || !path.exists() {
+        fs::write(&path, serde_json::to_string_pretty(&got).unwrap() + "\n").unwrap();
+        return;
+    }
+    let old: BTreeMap<String, serde_json::Value> = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    for (k, v) in &old {
+        let now = got.get(k).unwrap_or_else(|| panic!("hint kind {k} disappeared"));
+        for metric in ["precision", "recall"] {
+            let (was, is) = (v[metric].as_f64().unwrap(), now[metric].as_f64().unwrap());
+            assert!(is + 1e-9 >= was, "{k}: {metric} dropped from {was} to {is} (EIGHTR_UPDATE_METRICS=1 to accept)");
+        }
+    }
+}
