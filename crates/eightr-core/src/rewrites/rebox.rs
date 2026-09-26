@@ -100,7 +100,7 @@ fn replace_reads(op: &Op, from: Reg, to: Reg) -> Op {
     out.map_regs(&mut |r| if r == from { to } else { r });
     if def == Some(from) {
         if let Op::Binop { dst, .. } | Op::Unop { dst, .. } | Op::Move { dst, .. } | Op::Cmp { dst, .. } | Op::InstanceOf { dst, .. }
-        | Op::ArrayLength { dst, .. } | Op::ArrayGet { dst, .. } | Op::InstanceGet { dst, .. } = &mut out
+        | Op::ArrayLength { dst, .. } | Op::ArrayGet { dst, .. } | Op::InstanceGet { dst, .. } | Op::NewArray { dst, .. } = &mut out
         {
             *dst = from;
         }
@@ -109,7 +109,42 @@ fn replace_reads(op: &Op, from: Reg, to: Reg) -> Op {
 }
 
 /// One method's webs for one enum: closes them and plans edits. `None` refuses.
-fn plan_webs(body: &Body, rd: &ReachingDefs, seeds: &[usize], n: i32, values_calls: &BTreeSet<u32>) -> Option<BTreeMap<u32, Vec<Edit>>> {
+/// Does `op` read `reg` only where an `int` is expected (so the adapter's `int` fits)?
+/// `ret`: the method's return type.
+fn int_sink(syms: &eightr_ir::sym::Interner, op: &Op, reg: Reg, ret: &str) -> bool {
+    use eightr_ir::op::NumType;
+    match op {
+        Op::If { .. } | Op::IfZ { .. } | Op::Switch { .. } => true,
+        Op::Binop { ty: NumType::Int, .. } => true,
+        Op::Unop { op: u, .. } => u.types().0 == NumType::Int,
+        Op::ArrayGet { index, array, .. } => *index == reg && *array != reg,
+        Op::ArrayPut { index, src, array, .. } => *index == reg && *src != reg && *array != reg,
+        Op::NewArray { size, .. } => *size == reg,
+        Op::Return { .. } => ret == "I",
+        Op::StaticPut { field, .. } | Op::InstancePut { field, .. } => {
+            let obj_is = matches!(op, Op::InstancePut { obj, .. } if *obj == reg);
+            !obj_is && syms.get(field.ty) == "I"
+        }
+        Op::Invoke { method, args, kind } => {
+            let Some((params, _)) = eightr_ir::types::parse_proto(syms.get(method.proto)) else { return false };
+            // Argument words → parameter types (receiver first for instance calls).
+            let mut words: Vec<&str> = Vec::new();
+            if *kind != InvokeKind::Static {
+                words.push("L");
+            }
+            for t in params {
+                words.push(t);
+                if matches!(t, "J" | "D") {
+                    words.push("");
+                }
+            }
+            args.iter().zip(&words).all(|(a, t)| *a != reg || *t == "I")
+        }
+        _ => false,
+    }
+}
+
+fn plan_webs(syms: &eightr_ir::sym::Interner, ret: &str, body: &Body, rd: &ReachingDefs, seeds: &[usize], n: i32, values_calls: &BTreeSet<u32>) -> Option<BTreeMap<u32, Vec<Edit>>> {
     // Uses of every definition: instructions reading its register with it reaching.
     let mut uses_of: Vec<Vec<u32>> = vec![Vec::new(); rd.defs.len()];
     for (j, u) in rd.uses.iter().enumerate() {
@@ -215,11 +250,24 @@ fn plan_webs(body: &Body, rd: &ReachingDefs, seeds: &[usize], n: i32, values_cal
                     let (w, other) = if wa { (*a, *b) } else { (*b, *a) };
                     match const_of(body, rd, reaching(rd, u, other)) {
                         Some(k) if (0..=n).contains(&k) => edits.entry(u).or_default().push(Edit::CompareConst { web: w, k }),
-                        _ => edits.entry(u).or_default().push(Edit::Adapt(vec![w])),
+                        _ => {
+                            if !int_sink(syms, op, w, ret) {
+                                return None;
+                            }
+                            edits.entry(u).or_default().push(Edit::Adapt(vec![w]));
+                        }
                     }
                 }
             }
-            _ => edits.entry(u).or_default().push(Edit::Adapt(reads)),
+            // Any other use reads the value as an int through the adapter, which only fits
+            // `int` sinks (a byte/boolean/char/short/float or reference sink would fail
+            // verification): refuse the web otherwise.
+            _ => {
+                if !reads.iter().all(|&r| int_sink(syms, op, r, ret)) {
+                    return None;
+                }
+                edits.entry(u).or_default().push(Edit::Adapt(reads));
+            }
         }
     }
     Some(edits)
@@ -267,7 +315,26 @@ fn apply(body: &Body, edits: &MethodEdits, enums: &[Option<Enum>]) -> Option<Bod
     for (&j, es) in edits.iter().rev() {
         let mut op = out.insns[j as usize].op.clone();
         let mut prefix: Vec<Op> = Vec::new();
-        let mut free = free_before(body, &cfg, &live, j).into_iter();
+        // Inside a try, new throwing instructions add handler edges: only where one exists
+        // already (the instruction itself can throw), and scratch registers must not be ones
+        // a handler reads.
+        let covered = body.try_covering(j);
+        let handler_regs: Vec<Reg> = covered
+            .map(|t| {
+                let mut v = Vec::new();
+                for h in &t.handlers {
+                    let live_in = live.block_live_in(cfg.block_of[h.target as usize]);
+                    v.extend((0..body.registers).filter(|&r| live_in.contains(r)));
+                }
+                v
+            })
+            .unwrap_or_default();
+        let may_throw_here = body.insns[j as usize].op.can_throw();
+        let adds_throw = es.iter().any(|(_, e)| matches!(e, Edit::ConstDef(k) | Edit::MoveConst(k) if *k != 0) || matches!(e, Edit::Adapt(_)) || matches!(e, Edit::CompareConst { k, .. } if *k != 0));
+        if covered.is_some() && adds_throw && !may_throw_here {
+            return None;
+        }
+        let mut free = free_before(body, &cfg, &live, j).into_iter().filter(|r| !handler_regs.contains(r));
         for (e, edit) in es {
             let en = enums[*e].as_ref()?;
             match edit {
@@ -523,7 +590,8 @@ impl Rewrite for Rebox {
                         })
                         .map(|(j, _)| j as u32)
                         .collect();
-                    let Some(edits) = plan_webs(body, &rd, &seeds, n, &values_calls) else { continue };
+                    let ret = eightr_ir::types::parse_proto(p.syms.get(m.proto)).map_or("V", |x| x.1).to_string();
+                    let Some(edits) = plan_webs(&p.syms, &ret, body, &rd, &seeds, n, &values_calls) else { continue };
                     // Two webs (of different enums) editing one instruction's definition would
                     // conflict: refuse the later one.
                     let defs_touched: BTreeSet<u32> = edits.iter().filter(|(_, es)| es.iter().any(|x| !matches!(x, Edit::Adapt(_) | Edit::CompareConst { .. }))).map(|(j, _)| *j).collect();
@@ -550,13 +618,15 @@ impl Rewrite for Rebox {
         let mut order: Vec<usize> = (0..recovered.len()).filter(|&e| webs[e] > 0).collect();
         order.sort_by(|a, b| recovered[*a].constants.cmp(&recovered[*b].constants));
         let mut new_classes = Vec::new();
+        let mut assigned: BTreeSet<String> = BTreeSet::new();
         for (i, &e) in order.iter().enumerate() {
             let desc = recovered[e]
                 .canonical_name
                 .as_ref()
                 .map(|f| binary_name(p, f))
-                .filter(|d| p.find(d).is_none())
+                .filter(|d| p.find(d).is_none() && !assigned.contains(d))
                 .unwrap_or_else(|| format!("L$8r$Enum{i};"));
+            assigned.insert(desc.clone());
             let ty = p.syms.intern(&desc);
             let (class, en) = enum_class(p, ty, &recovered[e].constants, origin);
             new_classes.push(class);
@@ -616,7 +686,7 @@ mod tests {
         let cfg = Cfg::build(b).unwrap();
         let rd = ReachingDefs::compute(b, &cfg);
         let seeds = reaching(&rd, compare_at, reg).to_vec();
-        plan_webs(b, &rd, &seeds, 3, &BTreeSet::new())
+        plan_webs(&eightr_ir::sym::Interner::default(), "I", b, &rd, &seeds, 3, &BTreeSet::new())
     }
 
     /// `x = p0 ? 1 : 2; if (x == 1) ..`: constants only — a web; the compare becomes identity
@@ -664,5 +734,35 @@ mod tests {
             Op::Return { width: Width::Single, src: 1 },
         ]);
         assert!(plan(&b, 2, 0).is_none());
+    }
+
+    /// A hoisted constant shared by the web and a `byte` store: the adapter's int can't feed
+    /// that sink, so the web is refused (review finding).
+    #[test]
+    fn shared_constant_with_a_byte_sink_refuses_the_web() {
+        let mut syms = eightr_ir::sym::Interner::default();
+        let f = FieldRef { class: syms.intern("LM;"), name: syms.intern("b"), ty: syms.intern("B") };
+        let b = body(6, 1, vec![
+            Op::Const { dst: 0, value: Const::Narrow(3) },
+            Op::StaticPut { kind: MemKind::Byte, src: 0, field: f },
+            Op::IfZ { cond: Cond::Eq, a: 5, target: 4 },
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::Const { dst: 1, value: Const::Narrow(1) },
+            Op::If { cond: Cond::Eq, a: 0, b: 1, target: 7 },
+            Op::Return { width: Width::Single, src: 0 },
+            Op::Return { width: Width::Single, src: 1 },
+        ]);
+        let cfg = Cfg::build(&b).unwrap();
+        let rd = ReachingDefs::compute(&b, &cfg);
+        let seeds = reaching(&rd, 5, 0).to_vec();
+        assert!(plan_webs(&syms, "I", &b, &rd, &seeds, 3, &BTreeSet::new()).is_none());
+    }
+
+    /// `new-array vA, vA`: the size is read, the array still lands in vA (review finding).
+    #[test]
+    fn replace_reads_keeps_new_array_destination() {
+        let mut syms = eightr_ir::sym::Interner::default();
+        let ty = syms.intern("[I");
+        assert_eq!(replace_reads(&Op::NewArray { dst: 0, size: 0, ty }, 0, 5), Op::NewArray { dst: 0, size: 5, ty });
     }
 }

@@ -98,6 +98,11 @@ impl Liveness {
         live
     }
 
+    /// Registers live on entry to block `b` (e.g. what an exception handler reads).
+    pub fn block_live_in(&self, b: u32) -> &Regs {
+        &self.live_in[b as usize]
+    }
+
     /// Registers whose values instruction `i` must not disturb beyond its own def: those live
     /// after it on the normal path, plus those its exception handlers read.
     pub fn across(&self, body: &Body, cfg: &Cfg, i: u32) -> Regs {

@@ -741,7 +741,9 @@ fn finish(p: &mut Model, plan: &Plan, mut prep: Prepared, new_classes: &mut Vec<
         }
         new_classes.push(Class {
             ty: prep.sub_of[&id],
-            access: access::FINAL | (base.access & (access::PUBLIC | access::SYNTHETIC)),
+            // Not synthetic: each subclass stands for an original class (decompilers hide
+            // synthetic classes, expecting to inline them as anonymous classes or lambdas).
+            access: access::FINAL | (base.access & access::PUBLIC),
             superclass: Some(base.ty),
             interfaces: vec![],
             source_file: base.source_file,
@@ -753,7 +755,7 @@ fn finish(p: &mut Model, plan: &Plan, mut prep: Prepared, new_classes: &mut Vec<
     }
     // The base becomes abstract; its dispatching methods, overridden everywhere, too.
     let base = &mut p.classes[plan.class];
-    base.access = (base.access & !access::FINAL) | access::ABSTRACT;
+    base.access = (base.access & !(access::FINAL | access::SYNTHETIC)) | access::ABSTRACT;
     for &mi in &prep.dispatch {
         let m = &mut base.methods[mi];
         m.access = (m.access & !(access::FINAL | access::SYNCHRONIZED | access::DECLARED_SYNCHRONIZED | access::NATIVE | access::STRICT)) | access::ABSTRACT;
