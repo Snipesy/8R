@@ -56,6 +56,30 @@ fn java_to_descriptor(t: &str) -> String {
     "[".repeat(dims) + &d
 }
 
+/// Residual (dex) descriptor → original descriptor, through the mapping's class renames.
+fn original_desc(d: &str, mapping: &Mapping, by_obf: &std::collections::BTreeMap<&str, usize>) -> String {
+    let dims = d.bytes().take_while(|&b| b == b'[').count();
+    let base = &d[dims..];
+    let orig = match base.strip_prefix('L').and_then(|b| b.strip_suffix(';')) {
+        Some(inner) => match by_obf.get(inner.replace('/', ".").as_str()) {
+            Some(&i) => format!("L{};", mapping.classes[i].original.replace('.', "/")),
+            None => base.to_string(),
+        },
+        None => base.to_string(),
+    };
+    format!("{}{}", &d[..dims], orig)
+}
+
+/// Residual method descriptor → original, through the mapping's class renames.
+fn original_proto(p: &str, mapping: &Mapping, by_obf: &std::collections::BTreeMap<&str, usize>) -> String {
+    let (params, ret) = eightr_ir::types::parse_proto(p).expect("valid proto");
+    format!(
+        "({}){}",
+        params.iter().map(|t| original_desc(t, mapping, by_obf)).collect::<String>(),
+        original_desc(ret, mapping, by_obf)
+    )
+}
+
 fn dotted(descriptor: &str) -> String {
     descriptor.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(descriptor).replace('/', ".")
 }
@@ -105,26 +129,31 @@ fn solved_names_match_held_back_mapping() {
                 (Attribute::MemberName, Some((false, index))) => {
                     let f = &class.fields[index as usize];
                     let (f_name, f_ty) = (p.str(f.name), p.str(f.ty));
+                    let claimed = label.value.as_deref().unwrap_or(f_name);
                     // R8 omits members it neither renamed nor attached line info to, so an
                     // absent member means "unchanged".
                     let matches: Vec<_> = cm
                         .members
                         .iter()
                         .filter_map(|mm| match &mm.kind {
-                            MemberKind::Field(m) if m.obfuscated == f_name && java_to_descriptor(&m.ty) == f_ty => {
+                            MemberKind::Field(m)
+                                if m.obfuscated == f_name && java_to_descriptor(&m.ty) == original_desc(f_ty, &mapping, &by_obf) =>
+                            {
                                 Some((m, &mm.metadata))
                             }
                             _ => None,
                         })
                         .collect();
+                    assert!(!matches.is_empty() || claimed == f_name, "{ctx}: recovered {claimed:?} but R8 didn't rename this field");
                     for (m, md) in matches {
                         assert!(!md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized field");
-                        assert_eq!(m.original_name, f_name, "{ctx}");
+                        assert_eq!(m.original_name, claimed, "{ctx}");
                     }
                 }
                 (Attribute::MemberName, Some((true, index))) => {
                     let meth = &class.methods[index as usize];
                     let (meth_name, meth_proto) = (p.str(meth.name), p.str(meth.proto));
+                    let claimed = label.value.as_deref().unwrap_or(meth_name);
                     // Residual entries for this method: same obfuscated name, same class, and a
                     // signature matching the dex proto (or its residualsignature).
                     let matches: Vec<_> = cm
@@ -141,16 +170,24 @@ fn solved_names_match_held_back_mapping() {
                                 Metadata::ResidualSignature(s) => Some(s.clone()),
                                 _ => None,
                             });
-                            m.obfuscated == meth_name && own && residual.unwrap_or(sig) == meth_proto
+                            // Mapping signatures use original types; a residualsignature entry
+                            // (when present) is in residual types.
+                            m.obfuscated == meth_name
+                                && own
+                                && match residual {
+                                    Some(r) => r == meth_proto,
+                                    None => sig == original_proto(meth_proto, &mapping, &by_obf),
+                                }
                         })
                         .collect();
+                    assert!(!matches.is_empty() || claimed == meth_name, "{ctx}: recovered {claimed:?} but R8 didn't rename this method");
                     for (m, md) in matches {
                         // Constructor names are the one exception: every constructor is named
                         // <init>, so the name claim holds even for a synthesized constructor (whose
                         // *signature* isn't original; that's a different attribute).
                         let ctor = meth_name == "<init>" || meth_name == "<clinit>";
                         assert!(ctor || !md.iter().any(|x| x.parsed == Metadata::Synthesized), "{ctx}: S label on a synthesized method");
-                        assert_eq!(m.original_name, meth_name, "{ctx}");
+                        assert_eq!(m.original_name, claimed, "{ctx}");
                     }
                 }
                 other => panic!("{ctx}: unexpected S label {other:?}"),
@@ -177,6 +214,7 @@ fn solved_names_exist_in_d8_ground_truth() {
                 continue;
             }
             let ctx = format!("{fixture}: {}", o.program.describe(*item));
+            let recovered = label.value.clone();
             let (ItemId::Class { class } | ItemId::Field { class, .. } | ItemId::Method { class, .. }) = *item;
             let c = o.program.class(class);
             let c_desc = o.program.descriptor(class);
@@ -207,6 +245,7 @@ fn solved_names_exist_in_d8_ground_truth() {
                 ItemId::Method { index, .. } => Some(o.program.str(c.methods[index as usize].name)),
                 ItemId::Class { .. } => None,
             };
+            let claimed = recovered.as_deref().or(member_name);
             let from_library = member_name.is_some_and(|n| {
                 cm.members.iter().any(|mm| {
                     let (obf, owner) = match &mm.kind {
@@ -220,13 +259,13 @@ fn solved_names_exist_in_d8_ground_truth() {
                 continue;
             }
             match *item {
-                ItemId::Field { index, .. } => {
-                    let n = o.program.str(c.fields[index as usize].name);
+                ItemId::Field { .. } => {
+                    let n = claimed.expect("member");
                     let found = owners.iter().any(|&id| g.class(id).fields.iter().any(|f| g.str(f.name) == n));
                     assert!(found, "{ctx}: field absent from D8 build");
                 }
-                ItemId::Method { index, .. } => {
-                    let n = o.program.str(c.methods[index as usize].name);
+                ItemId::Method { .. } => {
+                    let n = claimed.expect("member");
                     let found = owners.iter().any(|&id| g.class(id).methods.iter().any(|m| g.str(m.name) == n));
                     assert!(found, "{ctx}: method absent from D8 build");
                 }

@@ -66,6 +66,8 @@ pub struct LabelEntry {
     pub item: String,
     pub attribute: Attribute,
     pub class: Class,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
     pub rules: Vec<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub candidates: Option<Vec<String>>,
