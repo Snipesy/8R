@@ -164,9 +164,15 @@ fn classify(p: &Model, body: &Body) -> Option<Kind> {
             _ => return None, // branches, fields, arrays, casts, monitors, ...
         }
     }
+    // A throw outline throws the exception it builds: the thrown register's (straight-line)
+    // last definition is a `new-instance`.
+    let throws_new = || {
+        let Some(Op::Throw { src }) = body.insns.last().map(|i| &i.op) else { return false };
+        body.insns.iter().rev().skip(1).find(|i| i.op.def().is_some_and(|(r, _)| r == *src)).is_some_and(|i| matches!(i.op, Op::NewInstance { .. }))
+    };
     let ok = match kind {
         Kind::Classic => work >= 3 && calls >= 1 && !app,
-        Kind::Throw => news >= 1 && work >= 2,
+        Kind::Throw => news >= 1 && work >= 2 && throws_new(),
     };
     ok.then_some(kind)
 }
