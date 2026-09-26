@@ -264,7 +264,16 @@ form), `lateinit-jvmname-getter` (must stay D), `lateinit-companion-clash` (fiel
 Without keep rules, `toString` is often removed or inlined if unused. When it's kept, the literals
 survive (`"User(name="`, `", age="`, `", tags="`, `"Circle(r="`, `"Email(s="`, `"Id(v="`). R8's
 StringBuilder optimiser can fold adjacent *constant* appends, but it can't fold a field read, so
-the `name=` boundaries remain.
+the `name=` boundaries remain, except where it propagates a constant field value into the template
+(`", y=q)"`, M7 review): such a template no longer parses and yields nothing.
+
+**Implemented (M7, `passes/data_class.rs`):**
+- `kotlinc/data-class-name` (S) needs `hashCode` and `equals` both reading the template's fields in
+  declaration order.
+- `kotlinc/data-class-property` (S) additionally needs a surviving `copy`/`copy$default`. Otherwise it
+  falls back to `-property-hint` (D). Hand-written Kotlin templates, IDE-generated members and Lombok
+  `@Data` produce the same `toString`/`hashCode`/`equals`; Gretio's `PlatformTextStyle` has a typo in its
+  hand-written template.
 
 ### 5.3 Rules
 - **`kotlinc/data/detect`** (S by template). Preconditions: `toString` matches the template with

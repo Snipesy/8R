@@ -882,11 +882,16 @@ Implemented and tested (`cargo test`: dex, mapping, rules, core):
 - **Library versions (M6):** `report.libraries` from `META-INF/*.version`, root `*.properties`, `name/x.y.z`
   strings, registrar id/version pairs, and the Compose key version sets. Gretio: 176 entries.
 - **SDK extractors (M7):**
-  - `kotlinc/data-class-name` and `-property` (S): a data class's `toString` template plus the
-    `hashCode`/`equals` ensemble. Recovered S class simple names are applied in their package.
-    Gretio: 129 classes, 402 properties.
+  - `kotlinc/data-class-name` (S): a data class's `toString` template, with `hashCode` and `equals`
+    both over the same fields in declaration order. Recovered S class simple names are applied in their
+    package; passes check each other's claims.
+  - Property names: S only when kotlinc's `copy` survives (hand-written or IDE-generated
+    `toString`/`hashCode`/`equals` look the same), otherwise D (`-property-hint`). A hand-written
+    `PlatformTextStyle` with a typo showed why (M7 review).
+  - Gretio: 128 classes, 400 D property names.
   - `r8/protobuf-message-name` (S): kept `*_FIELD_NUMBER` constants matched to the APK's bundled
-    `.proto` sources (a unique match of ≥3 fields). Gretio: 21 messages.
+    `.proto` sources (a unique match of ≥3 fields). The name must also read as kept on a re-run
+    without the `.proto` files (idempotence), otherwise it's a hint. Gretio: 21 messages.
   - kotlinx.serialization descriptors: serial names give D hints for the class and its serializer;
     `report.serialization`. Gretio: 317.
   - Room entity FQNs from schema validation messages (`report.room_entities`). Gretio: 9.

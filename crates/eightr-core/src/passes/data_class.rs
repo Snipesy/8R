@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use eightr_ir::lift::Body;
 use eightr_ir::model::Program as Model;
 use eightr_ir::op::{FieldRef, InvokeKind, Op, Reg};
-use eightr_rules::{Attribute, Source, DATA_CLASS_NAME, DATA_CLASS_PROPERTY};
+use eightr_rules::{Attribute, Source, DATA_CLASS_NAME, DATA_CLASS_PROPERTY, DATA_CLASS_PROPERTY_HINT};
 
 use super::{Context, Pass};
 use crate::error::Result;
@@ -43,14 +43,19 @@ fn template(p: &Model, class: &str, body: &Body) -> Option<(String, Vec<(String,
     }
     let mut regs: BTreeMap<Reg, Val> = BTreeMap::new();
     let mut pieces: Vec<Val> = Vec::new();
+    // R8 reuses the receiver's register: once overwritten it no longer holds `this`.
+    let mut this_live = true;
     for x in &body.insns {
         match &x.op {
             Op::ConstString { dst, value } => {
                 regs.insert(*dst, Val::Lit(s.get(*value).to_string()));
                 continue;
             }
-            Op::InstanceGet { dst, obj, field, .. } if *obj == this && s.get(field.class) == class => {
+            Op::InstanceGet { dst, obj, field, .. } if this_live && *obj == this && s.get(field.class) == class => {
                 regs.insert(*dst, Val::Field(*field));
+                if *dst == this {
+                    this_live = false;
+                }
                 continue;
             }
             Op::Invoke { kind: InvokeKind::Virtual | InvokeKind::Direct, method, args } if s.get(method.class) == "Ljava/lang/StringBuilder;" => {
@@ -65,6 +70,9 @@ fn template(p: &Model, class: &str, body: &Body) -> Option<(String, Vec<(String,
             regs.remove(&d);
             if wide {
                 regs.remove(&(d + 1));
+            }
+            if d == this || (wide && d + 1 == this) {
+                this_live = false;
             }
         }
     }
@@ -97,6 +105,25 @@ fn template(p: &Model, class: &str, body: &Body) -> Option<(String, Vec<(String,
     }
     let distinct: BTreeSet<String> = props.iter().map(|x| s.get(x.1.name).to_string()).collect();
     (distinct.len() == props.len()).then(|| (name.to_string(), props))
+}
+
+/// Whether the class has kotlinc's `copy`: an instance method taking one argument per property
+/// and returning `new C(...)` (or the static `copy$default(C, ..., int, Object)`). Hand-written
+/// `toString`/`hashCode`/`equals` (Kotlin templates, Lombok) look like the generated ones; `copy`
+/// is only generated for data classes.
+fn has_copy(p: &Model, class: &eightr_ir::model::Class, props: usize) -> bool {
+    let s = &p.syms;
+    let ty = s.get(class.ty);
+    class.methods.iter().any(|m| {
+        let Some(b) = &m.code else { return false };
+        let Some((ps, ret)) = eightr_ir::types::parse_proto(s.get(m.proto)) else { return false };
+        let is_static = m.access & eightr_dex::class::access::STATIC != 0;
+        let shape = ret == ty && ((!is_static && ps.len() == props) || (is_static && ps.len() == props + 3 && ps[0] == ty));
+        shape
+            && b.insns.iter().any(|x| matches!(&x.op, Op::NewInstance { ty: t, .. } if *t == class.ty))
+            && b.insns.iter().any(|x| matches!(&x.op, Op::Invoke { kind: InvokeKind::Direct, method, .. } if method.class == class.ty && s.get(method.name) == "<init>"))
+            || (shape && is_static && b.insns.iter().any(|x| matches!(&x.op, Op::Invoke { method, .. } if method.class == class.ty && s.get(method.proto) == format!("({}){ty}", ps[1..=props].concat()))))
+    })
 }
 
 /// The sequence of fields of `class` a method reads (adjacent repeats merged: `equals` reads
@@ -139,8 +166,19 @@ impl Pass for DataClass {
             let Some(ts) = method("toString", "()Ljava/lang/String;") else { continue };
             let Some((name, props)) = template(p, class, ts) else { continue };
             let seq: Vec<FieldRef> = props.iter().map(|x| x.1).collect();
-            let ensemble = [method("hashCode", "()I"), method("equals", "(Ljava/lang/Object;)Z")].into_iter().flatten().any(|b| reads(p, class, b) == seq);
+            // Both generated together, in declaration order (a hand-written equals may compare
+            // in any order).
+            let ensemble = match (method("hashCode", "()I"), method("equals", "(Ljava/lang/Object;)Z")) {
+                (Some(h), Some(e)) => reads(p, class, h) == seq && reads(p, class, e) == seq,
+                _ => false,
+            };
             found.push((ci, name, props, ensemble));
+        }
+        // Names other passes already recovered (e.g. protobuf messages) are taken.
+        for ((item, attr), l) in cx.labels.iter() {
+            if let (ItemId::Class { class }, Attribute::ClassName, Some(v)) = (item, attr, &l.value) {
+                existing.entry(crate::program::package_of(cx.program.descriptor(*class)).to_string()).or_default().insert(v.clone());
+            }
         }
         // A simple name claimed twice in one package, or already there: no S class name.
         let mut claims: BTreeMap<(String, String), usize> = BTreeMap::new();
@@ -167,7 +205,24 @@ impl Pass for DataClass {
             if !ensemble {
                 continue;
             }
+            // Property names are S only with kotlinc's `copy`; otherwise D.
+            let rule = if has_copy(p, &p.classes[ci], props.len()) { DATA_CLASS_PROPERTY } else { DATA_CLASS_PROPERTY_HINT };
+            // Field names of the program supertypes: a property named like one of the same
+            // type would shadow it.
+            let mut inherited: BTreeSet<(String, String)> = BTreeSet::new();
+            let mut sup = p.classes[ci].superclass.and_then(|t| p.find(s.get(t)));
+            while let Some(k) = sup {
+                for (i, f) in p.classes[k].fields.iter().enumerate() {
+                    let fitem = ItemId::Field { class: ClassId(k as u32), index: i as u32 };
+                    let n = cx.labels.get(fitem, Attribute::MemberName).and_then(|l| l.value.clone()).unwrap_or_else(|| s.get(f.name).to_string());
+                    inherited.insert((n, s.get(f.ty).to_string()));
+                }
+                sup = p.classes[k].superclass.and_then(|t| p.find(s.get(t)));
+            }
             for (prop, f) in props {
+                if inherited.contains(&(prop.clone(), s.get(f.ty).to_string())) {
+                    continue;
+                }
                 let Some(index) = p.classes[ci].fields.iter().position(|x| x.name == f.name && x.ty == f.ty) else { continue };
                 let fitem = ItemId::Field { class: ClassId(ci as u32), index: index as u32 };
                 if cx.labels.get(fitem, Attribute::MemberName).is_some() || pins.field(desc, s.get(f.name)) {
@@ -177,14 +232,14 @@ impl Pass for DataClass {
                 if p.classes[ci].fields.iter().enumerate().any(|(i, x)| i != index && s.get(x.name) == prop) {
                     continue;
                 }
-                field_labels.push((fitem, prop));
+                field_labels.push((fitem, prop, rule));
             }
         }
         for (item, name) in class_labels {
             cx.labels.record_value(item, Attribute::ClassName, DATA_CLASS_NAME, None, Some(name))?;
         }
-        for (item, name) in field_labels {
-            cx.labels.record_value(item, Attribute::MemberName, DATA_CLASS_PROPERTY, None, Some(name))?;
+        for (item, name, rule) in field_labels {
+            cx.labels.record_value(item, Attribute::MemberName, rule, None, Some(name))?;
         }
         for (id, name) in hints {
             cx.program.class_hints.entry(id).or_insert(name);
