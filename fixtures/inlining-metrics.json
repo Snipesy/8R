@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "inlined_occurrences": 159918,
+    "inlined_occurrences": 159894,
     "recall": 0.02,
     "touched": 3256
   },
   "discarded-getclass": {
-    "hints": 2946,
-    "precision": 0.698
+    "hints": 2952,
+    "precision": 0.699
   },
   "discarded-getclass@r8-8": {
     "base_rate": 0.518,
@@ -16,9 +16,9 @@
   },
   "discarded-getclass@r8-9": {
     "base_rate": 0.527,
-    "hints": 2811,
-    "lift": 1.311,
-    "precision": 0.691
+    "hints": 2817,
+    "lift": 1.314,
+    "precision": 0.692
   },
   "fixtures": [
     "compose_basic",
@@ -64,7 +64,7 @@
   "idiom:areEqual@r8-9": {
     "base_rate": 0.527,
     "hints": 460,
-    "lift": 1.716,
+    "lift": 1.717,
     "precision": 0.904
   },
   "idiom:collectionSizeOrDefault": {

@@ -23,6 +23,12 @@ fun Flags2(a: String, flags: Int) {
     out("flags2 $s")
 }
 
+// M2 re-review witness: a flags bit selecting a child call whose $changed is ORed with 6<<3
+// (48) looks like the compiler's static-default OR, but after the skip check.
+@Composable fun Two(a: String, b: String) { out("two $a $b") }
+@NonSkippableComposable @Composable
+fun FlagsU(a: String, flags: Int) { if (flags and 8 != 0) Two(a, "k") else out("u") }
+
 // W2: non-restartable callee inlined (single caller) whose intrinsic remember masks the caller-derived $changed.
 @NonRestartableComposable @Composable
 fun Inner(x: Int, y: Int, z: Int) {
@@ -47,7 +53,7 @@ fun Inner3(x: Int, y: Int, z: Int, w: Int) {
 
 @Composable
 fun App(n: Int) {
-    Flags(n, "a$n"); Flags2("b$n", n)
+    Flags(n, "a$n"); Flags2("b$n", n); FlagsU("c$n", n + 8)
     Item(listOf(U(n)), n); Outer(n); Outer2(n, n + 1); Outer3(n); Holder(n)
 }
 

@@ -491,9 +491,10 @@ Classification is by role, so it does not care about R8 argument reordering. It 
     `$changed1`, … in residual order: D).
   - `$default` = an int parameter used only in single-bit tests (captures by the restart lambda are neutral),
     one of which is tied to the dirty bits: its default arm ORs `6<<3s` into a `$changed`-derived value, or it
-    guards a composer `changed(p)` whose result is ORed there (defaults that call composables). A real
-    `flags: Int` bit-tested to pick a value has no such tie (M2 review witness `Flags`, `Item` without
-    strong skipping). Default bindings: the phi (a later read reached both by a def made only on the default
+    guards a composer `changed(p)` whose result is ORed there (defaults that call composables). Ties count only in
+    the dirty-bit prelude (instructions not reachable from the skip check; no recognised skip check, no
+    `$default`): a real `flags: Int` bit-tested to pick a value has no tie there (M2 review witnesses `Flags`,
+    `Item` without strong skipping, and `FlagsU`, whose child call ORs `6<<3` into its `$changed` in the body). Default bindings: the phi (a later read reached both by a def made only on the default
     arm, the region reachable from it without entering what the other arm reaches, and by the parameter).
   - Slot bindings from `changed(p) ? 4<<3s : 2<<3s` (the `$changed` int from the preceding mask test), default
     bindings from the phi, both kept only when unambiguous.
@@ -507,8 +508,8 @@ Classification is by role, so it does not care about R8 argument reordering. It 
   - Graded (tests/compose.rs) against the D8 twins' parameter names: `$changed` 100/100, `$default` 44/46,
     0 wrong roles, every slot/default binding exact. R8 builds are checked against the D8 twin with the same
     key: counts, bounds, types at bound positions.
-  - Gretio: 552/552 restart lambdas, 596 `$changed`, 77 `$default`, 964 slot and 132 default bindings,
-    54 composables with provably removed params.
+  - Gretio: see the report's `compose` section (552/552 restart lambdas, 596 `$changed`). Its skip checks are
+    mixed-era (`getSkipping()` and R8-reordered `shouldExecute(IZ)Z`), both recognised.
 - `compose/singletons` (D): `lambda$K` field names, applied as D names, and
   `@eightr.ComposableSingleton(key = K)` on the field.
   - `ComposableLambdaImpl` is found by behaviour: a method opens the composer's `startRestartGroup` keyed by an
@@ -518,7 +519,7 @@ Classification is by role, so it does not care about R8 argument reordering. It 
     `compose_witness2_k2110p`), and the runtime's own singletons may come from another compiler than the
     app's. Gretio: 150 fields.
 - `compose/runtime-api` body proofs (M2 review): `rememberedValue` / `updateRememberedValue` winners must call
-  another composer method of their shape (`nextSlotForCache` / `updateValue`). Where R8 inlined the wrapper
+  another composer method of their shape (`nextSlotForCache`; `updateCachedValue`/`updateValue`). Where R8 inlined the wrapper
   everywhere, the callers reach the inner method (`compose_witness2`: `updateValue`), which is refused.
 
 **Implemented (M4, `compose_keys.rs`, `passes/compose_libkey.rs`, `cargo xtask compose-keys`).** `compose/lib-key`

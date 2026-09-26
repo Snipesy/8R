@@ -120,7 +120,9 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let naming = crate::naming::name(&program, &mut labels, &mut findings)?;
     let mut renaming = naming.renaming;
     // Recovered values (S, e.g. lateinit field names; or D from a recovering rule, e.g. Compose
-    // singletons' `lambda$K`) join the structural names.
+    // singletons' `lambda$K`) join the structural names. Names looked up reflectively through
+    // strings stay as they are.
+    let pins = eightr_ir::reflect::pins(&program.model);
     for ((item, attr), label) in labels.iter() {
         let recovered = label.class == eightr_rules::Class::Solved || !label.rules.contains(&eightr_rules::STRUCTURAL_NAME);
         let (Some(value), true) = (&label.value, recovered) else { continue };
@@ -136,9 +138,15 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
         let d = program.descriptor(class).to_string();
         if field {
             let f = &c.fields[index as usize];
+            if pins.field(&d, program.str(f.name)) {
+                continue;
+            }
             renaming.fields.insert((d, program.str(f.name).to_string(), program.str(f.ty).to_string()), value.clone());
         } else {
             let m = &c.methods[index as usize];
+            if pins.method(&d, program.str(m.name)) {
+                continue;
+            }
             renaming.methods.insert((d, program.str(m.name).to_string(), program.str(m.proto).to_string()), value.clone());
         }
     }

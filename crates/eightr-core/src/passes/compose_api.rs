@@ -52,8 +52,8 @@ impl Pass for ComposeApi {
         }
         // ComposableSingletons fields: `lambda$K` from Kotlin 2.1.20, `lambda-N` before. No
         // program-wide fact proves the compiler of each module (the runtime's own singletons and
-        // the app's may differ), so the name is D, recorded but not applied; the field is
-        // annotated with its key (`@eightr.ComposableSingleton(key = K)`).
+        // the app's may differ, as in Gretio), so the name is D: applied as a readable name, with
+        // the field annotated with its key (`@eightr.ComposableSingleton(key = K)`).
         let singletons = crate::compose::singletons(&p.model, &c);
         for &(class, index, key) in &singletons {
             let item = ItemId::Field { class: ClassId(class as u32), index: index as u32 };
