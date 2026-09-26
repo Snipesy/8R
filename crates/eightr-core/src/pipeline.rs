@@ -19,6 +19,9 @@ use crate::sources::{self, DetectedSource};
 pub struct Config {
     /// Include every non-identity label in the report.
     pub verbose_labels: bool,
+    /// Skip structural rewrite passes (outline inlining, class un-merging, ...); only
+    /// names are recovered. Used to isolate rewrites in tests.
+    pub no_rewrites: bool,
 }
 
 /// Read-only facts gathered before any pass runs.

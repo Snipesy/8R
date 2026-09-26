@@ -33,7 +33,7 @@ fn load(fixture: &str, variant: &str) -> Vec<DexInput> {
 }
 
 fn outcome(fixture: &str, variant: &str) -> Outcome {
-    run(&load(fixture, variant), &Config { verbose_labels: true }).unwrap()
+    run(&load(fixture, variant), &Config { verbose_labels: true, ..Default::default() }).unwrap()
 }
 
 /// `java.lang.String[]` → `[Ljava/lang/String;`
@@ -289,7 +289,7 @@ fn report_is_deterministic() {
             d
         })
         .collect();
-    let cfg = Config { verbose_labels: true };
+    let cfg = Config { verbose_labels: true, ..Default::default() };
     let a = run(&inputs, &cfg).unwrap().report.to_json();
     inputs.reverse();
     let b = run(&inputs, &cfg).unwrap().report.to_json();
