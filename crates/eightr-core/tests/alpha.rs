@@ -89,7 +89,7 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
     let mut kept: BTreeSet<String> = BTreeSet::from(["<init>".to_string(), "<clinit>".to_string()]);
     for c in &model.classes {
         let desc = s.get(c.ty);
-        let dotted = desc.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
+        let dotted = desc.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(desc).replace('/', ".");
         let cm = by_obf.get(dotted.as_str()).map(|&i| &mapping.classes[i]);
         let names = c.fields.iter().map(|f| s.get(f.name)).chain(c.methods.iter().map(|m| s.get(m.name)));
         for n in names {
@@ -124,7 +124,7 @@ fn random_alpha(model: &Model, mapping: &Mapping, rng: &mut Rng) -> Renaming {
     let mut shuffled = pool.clone();
     rng.shuffle(&mut shuffled);
     let members = pool.into_iter().zip(shuffled).collect();
-    Renaming { classes, members }
+    Renaming { classes, members, ..Default::default() }
 }
 
 /// Inverse of a renaming, applied to descriptors, protos, and member names.
@@ -177,7 +177,10 @@ fn projection(out: &Outcome, inv: &Inverse) -> String {
                 format!("M {}->{}{}", inv.desc(p.descriptor(class)), inv.member(p.str(m.name)), inv.proto(p.str(m.proto)))
             }
         };
-        lines.push(format!("{key} {attr:?} {:?} {:?} {:?}", label.class, label.rules, label.value));
+        // For N labels (structural ties) the representative value may follow input order; the
+        // candidate set is what must be invariant.
+        let value = if label.candidates.is_some() { None } else { label.value.as_ref() };
+        lines.push(format!("{key} {attr:?} {:?} {:?} {:?} {:?}", label.class, label.rules, value, label.candidates));
     }
     lines.sort();
     let r = &out.report;
@@ -207,6 +210,7 @@ fn outputs_are_alpha_invariant() {
         let cfg = Config::default();
         let original = run(&[DexInput { name: "classes.dex".into(), bytes: bytes.clone() }], &cfg).unwrap();
         let expected = projection(&original, &Inverse::identity());
+        let expected_out = eightr_core::output::emit(&original).unwrap();
 
         for seed in 1..=seeds {
             let mut rng = Rng(0x9e37_79b9_7f4a_7c15 ^ seed.wrapping_mul(0x1000_0001) ^ fixture.len() as u64);
@@ -239,6 +243,20 @@ fn outputs_are_alpha_invariant() {
                     expected.lines().nth(first).unwrap_or(""),
                     got.lines().nth(first).unwrap_or("")
                 );
+            }
+            // The strongest form: 8R's emitted program is byte-identical.
+            let got_out = eightr_core::output::emit(&scrambled).unwrap();
+            let same_dex = expected_out.dex.iter().map(|d| &d.1).eq(got_out.dex.iter().map(|d| &d.1));
+            if !same_dex {
+                let dump = |o: &eightr_core::output::Output| {
+                    let dexes: Vec<Dex> = o.dex.iter().map(|d| Dex::parse(&d.1).unwrap()).collect();
+                    let refs: Vec<&Dex> = dexes.iter().collect();
+                    eightr_ir::print::program(&Model::load(&refs).unwrap())
+                };
+                let (a, b) = (dump(&expected_out), dump(&got_out));
+                let first = a.lines().zip(b.lines()).position(|(x, y)| x != y).unwrap_or(0);
+                let ctx = |t: &str| t.lines().skip(first.saturating_sub(4)).take(6).collect::<Vec<_>>().join("\n");
+                panic!("{fixture} seed {seed}: emitted dex differs under scrambling at line {first}:\n--- expected\n{}\n--- got\n{}", ctx(&a), ctx(&b));
             }
         }
     }

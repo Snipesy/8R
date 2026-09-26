@@ -97,6 +97,8 @@ pub struct Rule {
 use Attribute as A;
 
 pub const IDENTITY: &str = "core/identity";
+pub const STRUCTURAL_NAME: &str = "core/structural-name";
+pub const STRUCTURAL_TIE: &str = "core/structural-tie";
 pub const KEPT_NAME: &str = "r8/kept-name";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
@@ -113,6 +115,34 @@ pub static REGISTRY: &[Rule] = &[
         preconditions: &[],
         fallback: None,
         fixtures: &["hello", "shapes", "opcodes"],
+    },
+    Rule {
+        id: STRUCTURAL_NAME,
+        source: Source::Core,
+        class: Class::Deterministic,
+        attributes: &[A::ClassName, A::MemberName],
+        summary: "Every name no rule proved gets a deterministic structural name {hint}_{hash} (Weisfeiler-Lehman over the program with non-S names erased).",
+        preconditions: &[
+            "Renaming must preserve behavior: fields, static and private methods always; a virtual method only if its whole override group lives in classes whose only library supertype is java.lang.Object and it doesn't override an Object method.",
+            "New names are unique program-wide per member kind and per package for classes, so no override, shadowing, or clash is introduced.",
+            "Structurally indistinguishable candidates are suffixed in input order and reported (only truly automorphic ties are alpha-invariant).",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["hello", "shapes", "opcodes", "names_stress", "dontobfuscate", "kotlin_basic", "kotlin_serialization", "compose_basic"],
+    },
+    Rule {
+        id: STRUCTURAL_TIE,
+        source: Source::Core,
+        class: Class::NonDeterministic,
+        attributes: &[A::ClassName, A::MemberName],
+        summary: "Items the structural hash can't tell apart get distinct suffixed names; which item got which suffix is reported as the full candidate set.",
+        preconditions: &[
+            "Exhaustive: the candidate set is every name assigned to the tie group, so the item's name is certainly among them.",
+            "For truly automorphic items (interchangeable, e.g. identical unreferenced interfaces), the emitted program is identical whatever the assignment.",
+        ],
+        // Exhaustive by construction: there is no failure mode to fall back from.
+        fallback: None,
+        fixtures: &["kotlin_basic", "kotlin_serialization", "compose_basic"],
     },
     Rule {
         id: LATEINIT_FIELD_NAME,

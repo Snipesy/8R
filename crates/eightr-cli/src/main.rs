@@ -19,10 +19,14 @@ enum Command {
         /// A .dex, .apk/.aab/.zip, or a directory of classes*.dex.
         input: PathBuf,
     },
-    /// Run the pipeline and write the JSON report. (DEX output arrives with the writer, M1.)
+    /// Run the pipeline. With -o, writes classes*.dex (recovered names applied),
+    /// 8r-mapping.txt (loadable by jadx), and report.json into that directory.
     Undo {
         input: PathBuf,
-        /// Where to write the report (stdout if omitted).
+        /// Output directory.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Where to write the report (stdout if neither this nor -o is given).
         #[arg(long)]
         report: Option<PathBuf>,
         /// Include every label in the report.
@@ -83,13 +87,25 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
-        Command::Undo { input, report, verbose } => {
+        Command::Undo { input, out, report, verbose } => {
             let inputs = input::load(&input)?;
             let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose })?;
             let json = outcome.report.to_json();
+            let write = |p: &PathBuf, bytes: &[u8]| std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()));
+            if let Some(dir) = &out {
+                std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+                let result = eightr_core::output::emit(&outcome)?;
+                for (name, bytes) in &result.dex {
+                    write(&dir.join(name), bytes)?;
+                }
+                write(&dir.join("8r-mapping.txt"), result.mapping.as_bytes())?;
+                write(&dir.join("report.json"), json.as_bytes())?;
+                eprintln!("wrote {} dex file(s), 8r-mapping.txt, report.json to {}", result.dex.len(), dir.display());
+            }
             match report {
-                Some(p) => std::fs::write(&p, json).map_err(|e| format!("{}: {e}", p.display()))?,
-                None => print!("{json}"),
+                Some(p) => write(&p, json.as_bytes())?,
+                None if out.is_none() => print!("{json}"),
+                None => {}
             }
         }
         Command::Rules => {
