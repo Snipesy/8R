@@ -12,6 +12,7 @@ pub mod dataflow;
 pub mod edit;
 pub mod defs;
 pub mod inline;
+pub mod liveness;
 pub mod lift;
 pub mod model;
 pub mod op;

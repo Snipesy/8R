@@ -353,3 +353,56 @@ fn program_ids_ignore_class_def_order() {
     sorted.sort();
     assert_eq!(descs, sorted);
 }
+
+/// Outline detection (`r8/outline-inline`, `r8/bu-outline-inline`) against the mapping:
+/// every inlined method must be one R8 synthesized (precision), and every method R8 marked
+/// `com.android.tools.r8.outline` must be inlined at least at some call site (recall).
+#[test]
+fn outline_detection_matches_mapping() {
+    let mut checked = 0;
+    for fixture in fixture_names() {
+        let map_path = fixtures_root().join(&fixture).join("r8/mapping.txt");
+        let Ok(text) = fs::read_to_string(&map_path) else { continue };
+        let mapping = Mapping::parse(&text).unwrap();
+        let out = outcome(&fixture, "r8");
+        let detected: Vec<(String, String)> = out
+            .report
+            .rewrites
+            .iter()
+            .filter(|r| r.rule == eightr_rules::OUTLINE_INLINE || r.rule == eightr_rules::BU_OUTLINE_INLINE)
+            .map(|r| {
+                let (class, rest) = r.item.split_once("->").unwrap();
+                let name = rest.split('(').next().unwrap();
+                let dotted = class.strip_prefix('L').and_then(|c| c.strip_suffix(';')).unwrap().replace('/', ".");
+                (dotted, name.to_string())
+            })
+            .collect();
+        for (class, name) in &detected {
+            let cm = mapping.classes.iter().find(|c| &c.obfuscated == class);
+            let synthesized = cm.is_some_and(|c| {
+                c.is_synthesized()
+                    || c.members.iter().any(|m| {
+                        matches!(&m.kind, MemberKind::Method(x) if &x.obfuscated == name)
+                            && m.metadata.iter().any(|md| md.parsed == Metadata::Synthesized)
+                    })
+            });
+            assert!(synthesized, "{fixture}: {class}.{name} was inlined as an outline but R8 didn't synthesize it");
+            checked += 1;
+        }
+        for c in &mapping.classes {
+            for m in &c.members {
+                let MemberKind::Method(x) = &m.kind else { continue };
+                if m.metadata.iter().any(|md| md.parsed == Metadata::Outline) {
+                    assert!(
+                        detected.contains(&(c.obfuscated.clone(), x.obfuscated.clone())),
+                        "{fixture}: outline {}.{} ({}) was not detected",
+                        c.obfuscated,
+                        x.obfuscated,
+                        x.signature()
+                    );
+                }
+            }
+        }
+    }
+    assert!(checked >= 8, "only {checked} outline detections checked");
+}

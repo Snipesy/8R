@@ -247,6 +247,15 @@ pub fn field(f: &crate::model::Field, s: &Interner) -> String {
 
 /// Canonical rendering of one method (signature, annotations, body).
 pub fn method(m: &crate::model::Method, s: &Interner) -> String {
+    let mut o = method_header(m, s);
+    if let Some(b) = &m.code {
+        o.push_str(&body_semantic(b, s));
+    }
+    o
+}
+
+/// A method's signature and annotations, without its body.
+pub fn method_header(m: &crate::model::Method, s: &Interner) -> String {
     let mut o = format!("  method {}{} access {:#x}\n", s.get(m.name), s.get(m.proto), m.access);
     annotations(&mut o, "    ", &m.annotations, s);
     if let Some(ps) = &m.parameter_annotations {
@@ -254,9 +263,6 @@ pub fn method(m: &crate::model::Method, s: &Interner) -> String {
             let _ = writeln!(o, "    param {i}:");
             annotations(&mut o, "      ", set, s);
         }
-    }
-    if let Some(b) = &m.code {
-        o.push_str(&body_semantic(b, s));
     }
     o
 }
