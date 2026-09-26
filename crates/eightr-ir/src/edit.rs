@@ -37,8 +37,12 @@ pub fn splice(body: &mut Body, at: u32, remove: u32, insert: Vec<Op>, pc: u32) {
     for insn in &mut body.insns {
         insn.op.map_targets(&mut |t| f(t));
     }
+    // A range *starting* inside the removed region (after its first instruction) covered only
+    // the tail of it, e.g. a try starting at a removed `move-result`: it starts after the
+    // inserted code rather than growing over it.
+    let range_start = |i: u32| -> u32 { if i > at && i < end { at + n } else { f(i) } };
     for t in &mut body.tries {
-        t.start = f(t.start);
+        t.start = range_start(t.start);
         t.end = g(t.end);
         for h in &mut t.handlers {
             h.target = f(h.target);
@@ -64,7 +68,7 @@ pub fn splice(body: &mut Body, at: u32, remove: u32, insert: Vec<Op>, pc: u32) {
     });
     body.positions = positions;
     for l in &mut body.locals {
-        l.start = f(l.start);
+        l.start = range_start(l.start);
         l.end = g(l.end);
     }
     body.locals.retain(|l| l.end > l.start);
@@ -94,6 +98,13 @@ pub fn remove_unreachable(body: &mut Body) -> usize {
     if dead.iter().map(|(s, e)| (e - s) as usize).sum::<usize>() >= body.insns.len() {
         return 0;
     }
+    // A handler in a dead block catches nothing (no covered instruction can reach it): drop it,
+    // and any try left without handlers, before its code goes.
+    let is_dead = |i: u32| dead.iter().any(|&(s, e)| s <= i && i < e);
+    for t in &mut body.tries {
+        t.handlers.retain(|h| !is_dead(h.target));
+    }
+    body.tries.retain(|t| !t.handlers.is_empty());
     dead.sort_by_key(|d| std::cmp::Reverse(d.0));
     let mut removed = 0;
     for (start, end) in dead {
@@ -178,6 +189,25 @@ mod tests {
         b.positions = vec![(0, 1), (1, 2), (2, 3)];
         splice(&mut b, 1, 1, vec![], 0);
         assert_eq!(b.positions, vec![(0, 1), (1, 3)]);
+    }
+
+    #[test]
+    fn try_starting_at_removed_move_result_does_not_grow() {
+        // 0: nop ; 1: nop (replaced) ; 2: nop (removed, like a move-result) ; 3: return-void
+        let mut b = body(vec![Op::Nop, Op::Nop, Op::Nop, Op::ReturnVoid]);
+        b.tries.push(TryRange { start: 2, end: 4, handlers: vec![Handler { ty: None, target: 3 }] });
+        splice(&mut b, 1, 2, vec![Op::Nop, Op::Nop, Op::Nop], 1);
+        assert_eq!((b.tries[0].start, b.tries[0].end), (4, 5));
+    }
+
+    #[test]
+    fn dead_handler_and_its_try_are_dropped() {
+        // No instruction in the try can throw, so the handler block is dead.
+        let mut b = body(vec![Op::Nop, Op::ReturnVoid, Op::MoveException { dst: 0 }, Op::ReturnVoid]);
+        b.tries.push(TryRange { start: 0, end: 1, handlers: vec![Handler { ty: None, target: 2 }] });
+        assert_eq!(remove_unreachable(&mut b), 2);
+        assert!(b.tries.is_empty());
+        assert_eq!(b.insns.len(), 2);
     }
 
     #[test]

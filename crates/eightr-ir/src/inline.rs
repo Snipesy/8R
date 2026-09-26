@@ -89,11 +89,7 @@ fn check_site(body: &Body, call_at: u32, callee: &Body) -> Result<Vec<Reg>, Refu
 fn wide_starts(callee: &Body, params: &[&str]) -> Vec<Reg> {
     let mut v = Vec::new();
     for insn in &callee.insns {
-        if let Some((r, true)) = insn.op.def() {
-            v.push(r);
-        }
-        let uses = insn.op.uses();
-        v.extend(uses.windows(2).filter(|w| w[1] == w[0].wrapping_add(1)).map(|w| w[0]));
+        v.extend(insn.op.wide_starts());
     }
     let mut word = callee.registers - callee.ins;
     for p in params {
@@ -207,10 +203,7 @@ fn with_gap(body: &Body, call_at: u32, callee: &Body, proto: &str) -> Result<Bod
     // Gap positions that would split a wide pair (g - 1, g).
     let mut split = std::collections::BTreeSet::new();
     for insn in &body.insns {
-        if let Some((reg, true)) = insn.op.def() {
-            split.insert(reg + 1);
-        }
-        split.extend(insn.op.uses().windows(2).filter(|w| w[1] == w[0].wrapping_add(1)).map(|w| w[1]));
+        split.extend(insn.op.wide_starts().into_iter().map(|r| r + 1));
     }
     let straddles = |g: Reg| g > 0 && split.contains(&g);
     let mut candidates = vec![base];
@@ -444,5 +437,83 @@ mod tests {
         assert_eq!(args[1], args[0] + 1, "{:?}", caller.insns);
         // Block v0..v3 of the callee needs four contiguous dead registers: v1..v4.
         assert_eq!(caller.registers, 8);
+    }
+
+    #[test]
+    fn keeps_registers_a_handler_reads_and_stays_inside_the_try() {
+        use crate::lift::{Handler, TryRange};
+        let mut s = Interner::default();
+        let m = MethodRef { class: s.intern("LO;"), name: s.intern("m"), proto: s.intern("(I)V") };
+        let hash = MethodRef { class: s.intern("Ljava/lang/Integer;"), name: s.intern("hashCode"), proto: s.intern("(I)I") };
+        // callee: v0 = hashCode(p0) (p0 = v1)
+        let callee = body(2, 1, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: hash, args: vec![1] },
+            Op::MoveResult { width: Width::Single, dst: 0 },
+            Op::ReturnVoid,
+        ]);
+        // v0 is dead on the normal path after the call but read by the handler.
+        let mut caller = body(4, 0, vec![
+            Op::Const { dst: 0, value: Const::Narrow(5) },
+            Op::Const { dst: 1, value: Const::Narrow(7) },
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![1] },
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::Return { width: Width::Single, src: 0 },
+            Op::Return { width: Width::Single, src: 0 },
+        ]);
+        caller.tries.push(TryRange { start: 2, end: 3, handlers: vec![Handler { ty: None, target: 5 }] });
+        inline_static_call(&mut caller, 2, &callee, "(I)V").unwrap();
+        assert_eq!(caller.registers, 4, "runs in place");
+        let region: Vec<&Op> = caller.insns[2..caller.insns.len() - 3].iter().map(|i| &i.op).collect();
+        assert!(region.iter().all(|op| op.def().is_none_or(|(r, _)| r != 0)), "clobbers v0: {region:?}");
+        let t = &caller.tries[0];
+        assert_eq!((t.start, t.end), (2, caller.insns.len() as u32 - 3), "try covers the inlined code");
+        assert_eq!(t.handlers[0].target, caller.insns.len() as u32 - 1);
+    }
+
+    #[test]
+    fn wide_result_moves_as_a_pair() {
+        let mut s = Interner::default();
+        let m = MethodRef { class: s.intern("LO;"), name: s.intern("m"), proto: s.intern("(JJ)J") };
+        // callee: v0/v1 = p0 + p1 (p0 = v2/v3, p1 = v4/v5)
+        let callee = body(6, 4, vec![
+            Op::Binop { op: BinOp::Add, ty: NumType::Long, dst: 0, a: 2, b: Operand::Reg(4) },
+            Op::Return { width: Width::Wide, src: 0 },
+        ]);
+        // caller: v2/v3 stays live; the arguments v0/v1 and v4/v5 die at the call.
+        let mut caller = body(8, 0, vec![
+            Op::Const { dst: 0, value: Const::Wide(1) },
+            Op::Const { dst: 2, value: Const::Wide(2) },
+            Op::Const { dst: 4, value: Const::Wide(3) },
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![0, 1, 4, 5] },
+            Op::MoveResult { width: Width::Wide, dst: 0 },
+            Op::Binop { op: BinOp::Add, ty: NumType::Long, dst: 0, a: 0, b: Operand::Reg(2) },
+            Op::Return { width: Width::Wide, src: 0 },
+        ]);
+        inline_static_call(&mut caller, 3, &callee, "(JJ)J").unwrap();
+        let ops: Vec<&Op> = caller.insns.iter().map(|i| &i.op).collect();
+        // Arguments are aliased; the sum goes to a free pair and moves wide into v0/v1.
+        assert_eq!(ops[3], &Op::Binop { op: BinOp::Add, ty: NumType::Long, dst: 6, a: 0, b: Operand::Reg(4) });
+        assert_eq!(ops[4], &Op::Move { width: Width::Wide, dst: 0, src: 6 });
+        assert_eq!(caller.registers, 8);
+    }
+
+    #[test]
+    fn later_sites_reuse_a_gap_opened_by_an_earlier_one() {
+        let mut s = Interner::default();
+        let m = MethodRef { class: s.intern("LO;"), name: s.intern("m"), proto: s.intern("()V") };
+        let callee = body(1, 0, vec![Op::Const { dst: 0, value: Const::Narrow(9) }, Op::ReturnVoid]);
+        // Both v0 and v1 are live across both calls: the first site spliced opens a gap.
+        let mut caller = body(2, 0, vec![
+            Op::Const { dst: 0, value: Const::Narrow(1) },
+            Op::Const { dst: 1, value: Const::Narrow(2) },
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![] },
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![] },
+            Op::Binop { op: BinOp::Add, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(1) },
+            Op::Return { width: Width::Single, src: 0 },
+        ]);
+        let res = inline_static_calls(&mut caller, &[(2, &callee, "()V"), (3, &callee, "()V")]);
+        assert_eq!(res, vec![Ok(()), Ok(())]);
+        assert_eq!(caller.registers, 3, "one gap, shared");
+        assert!(caller.insns.iter().all(|i| !matches!(i.op, Op::Invoke { .. })));
     }
 }

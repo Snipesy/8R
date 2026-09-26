@@ -295,3 +295,45 @@ fn jadx_applies_mapping() {
     assert!(all.contains("public String db;"), "jadx output doesn't show the recovered field name");
     assert!(all.contains("class Class_"), "jadx output doesn't show structural class names");
 }
+
+/// Every method and field the output references on a program class resolves, through
+/// superclasses and interfaces, to a member that exists (a library class ends the search
+/// successfully). Catches rewrites that delete something still in use.
+#[test]
+fn every_program_reference_resolves() {
+    fn resolves(p: &Model, class: &str, found: &dyn Fn(&eightr_ir::model::Class) -> bool, depth: u32) -> bool {
+        let Some(i) = p.find(class) else { return true }; // library (or an array type)
+        let c = &p.classes[i];
+        if found(c) || depth > 64 {
+            return true;
+        }
+        c.superclass.iter().chain(&c.interfaces).any(|s| resolves(p, p.syms.get(*s), found, depth + 1))
+    }
+    let mut checked = 0usize;
+    for (name, bytes) in fixtures() {
+        let (_, out) = undo(&bytes);
+        let p = load(&out_files(&out));
+        for c in &p.classes {
+            for m in c.methods.iter().filter_map(|m| m.code.as_ref()) {
+                for insn in &m.insns {
+                    use eightr_ir::op::Op;
+                    match &insn.op {
+                        Op::Invoke { method, .. } => {
+                            let ok = resolves(&p, p.syms.get(method.class), &|k| k.methods.iter().any(|x| x.name == method.name && x.proto == method.proto), 0);
+                            assert!(ok, "{name}: {} calls missing {}->{}{}", p.syms.get(c.ty), p.syms.get(method.class), p.syms.get(method.name), p.syms.get(method.proto));
+                            checked += 1;
+                        }
+                        Op::InstanceGet { field, .. } | Op::InstancePut { field, .. } | Op::StaticGet { field, .. } | Op::StaticPut { field, .. } => {
+                            let ok = resolves(&p, p.syms.get(field.class), &|k| k.fields.iter().any(|x| x.name == field.name && x.ty == field.ty), 0);
+                            assert!(ok, "{name}: {} uses missing field {}->{}", p.syms.get(c.ty), p.syms.get(field.class), p.syms.get(field.name));
+                            checked += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked > 1000, "only {checked} references checked");
+}
+

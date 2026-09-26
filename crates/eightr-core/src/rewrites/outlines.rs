@@ -5,13 +5,19 @@
 //! * a method of a class R8 synthesized to hold outlines (see [`is_outline_holder`]);
 //! * a static method with straight-line code, reached only by `invoke-static` from at least
 //!   two sites;
-//! * classic outline: ends in a return; body is invokes / `new-instance` / arithmetic / moves;
-//! * bottom-up (throw) outline (R8 ≥ 9): ends in `throw` of a freshly built exception.
+//! * classic outline: ends in a return, at least 3 operations (R8's minimum outline size), at
+//!   least one a call, and it only calls and instantiates *library* classes (R8 outlines
+//!   sequences of library calls on their "holes"). This keeps out other synthetics of the same
+//!   shape: interface companions (`$-CC`) call app code, and backports are pure arithmetic;
+//! * bottom-up (throw) outline (R8 ≥ 9): ends in `throw` of a freshly built exception (which
+//!   may be an app class, and may use other outlines to build its message).
 //!
-//! Inlining a static method preserves behavior provided its class has no `<clinit>` (the call
-//! would have triggered class initialization) and everything its body references is
-//! accessible from the caller. A hand-written helper can look like an outline, so these rules
-//! are D: the result is the same program, just more readable.
+//! Inlining a static method preserves behavior provided no class initializer would have run
+//! on the call (holder and its superclasses have no `<clinit>`) and everything the body
+//! references is accessible from the caller (checked per call site, resolving inherited
+//! members). Outlines that call outlines are inlined callee-first, so every copy is final. A
+//! hand-written helper can look like an outline, so these rules are D: the result is the same
+//! program, just more readable.
 
 use std::collections::BTreeMap;
 
@@ -38,11 +44,6 @@ type Key = (String, String, String); // (class, name, proto)
 
 fn key(p: &Model, m: &MethodRef) -> Key {
     (p.syms.get(m.class).to_string(), p.syms.get(m.name).to_string(), p.syms.get(m.proto).to_string())
-}
-
-fn package(desc: &str) -> &str {
-    let inner = desc.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(desc);
-    inner.rsplit_once('/').map(|(p, _)| p).unwrap_or("")
 }
 
 /// Method references that aren't plain `invoke-static` calls (method handles, values,
@@ -104,12 +105,35 @@ fn escaping_refs(p: &Model) -> std::collections::BTreeSet<Key> {
 /// which the horizontal class merger may fold into a merged lambda group; either way the
 /// holder is marked synthetic. Hand-written helpers (`throwIllegalArgumentException`,
 /// `copyInto`) share the shape of an outline but never live in a synthetic class; inlining
-/// them would be correct but less readable. No `<clinit>`: the call would have triggered it.
-fn is_outline_holder(p: &Model, c: &eightr_ir::model::Class) -> bool {
-    c.access & access::SYNTHETIC != 0 && c.access & access::INTERFACE == 0 && !c.methods.iter().any(|m| p.syms.get(m.name) == "<clinit>")
+/// them would be correct but less readable.
+///
+/// A static call initializes the holder and its superclasses, so none may have a `<clinit>`.
+/// A holder with program subclasses is skipped: its statics could be referenced through them.
+fn is_outline_holder(p: &Model, ci: usize, subclassed: &std::collections::BTreeSet<&str>) -> bool {
+    let c = &p.classes[ci];
+    if c.access & access::SYNTHETIC == 0 || c.access & access::INTERFACE != 0 || subclassed.contains(p.syms.get(c.ty)) {
+        return false;
+    }
+    let mut cur = Some(ci);
+    let mut depth = 0;
+    while let Some(i) = cur {
+        let k = &p.classes[i];
+        if k.methods.iter().any(|m| p.syms.get(m.name) == "<clinit>") || depth > 64 {
+            return false;
+        }
+        cur = k.superclass.and_then(|s| p.find(p.syms.get(s)));
+        depth += 1;
+    }
+    true
 }
 
-fn classify(body: &Body) -> Option<Kind> {
+/// Not defined in the program (arrays by their element type).
+fn is_library(p: &Model, desc: &str) -> bool {
+    let base = desc.trim_start_matches('[');
+    !base.starts_with('L') || p.find(base).is_none()
+}
+
+fn classify(p: &Model, body: &Body) -> Option<Kind> {
     if !body.tries.is_empty() || body.insns.is_empty() {
         return None;
     }
@@ -119,16 +143,21 @@ fn classify(body: &Body) -> Option<Kind> {
         Op::Throw { .. } => Kind::Throw,
         _ => return None,
     };
-    let mut work = 0;
-    let mut news = 0;
+    let (mut work, mut calls, mut news, mut app) = (0, 0, 0, false);
     for (k, insn) in body.insns.iter().enumerate() {
         let is_last = k + 1 == body.insns.len();
         match &insn.op {
-            Op::Invoke { .. } | Op::Binop { .. } | Op::Unop { .. } => work += 1,
-            Op::NewInstance { .. } => {
+            Op::Invoke { method, .. } => {
+                app |= !is_library(p, p.syms.get(method.class));
+                work += 1;
+                calls += 1;
+            }
+            Op::NewInstance { ty, .. } => {
+                app |= !is_library(p, p.syms.get(*ty));
                 work += 1;
                 news += 1;
             }
+            Op::Binop { .. } | Op::Unop { .. } => work += 1,
             Op::Move { .. } | Op::MoveResult { .. } | Op::Const { .. } => {}
             Op::ConstString { .. } if kind == Kind::Throw => {}
             Op::Return { .. } | Op::ReturnVoid | Op::Throw { .. } if is_last => {}
@@ -136,49 +165,56 @@ fn classify(body: &Body) -> Option<Kind> {
         }
     }
     let ok = match kind {
-        Kind::Classic => work >= 2,
+        Kind::Classic => work >= 3 && calls >= 1 && !app,
         Kind::Throw => news >= 1 && work >= 2,
     };
     ok.then_some(kind)
 }
 
-/// Can code in `caller_class` reference everything `body` references?
-fn accessible_from(p: &Model, caller_class: &str, body: &Body) -> bool {
-    let s = &p.syms;
-    let class_ok = |desc: &str| -> bool {
-        let base = desc.trim_start_matches('[');
-        match p.find(base) {
-            Some(i) => p.classes[i].access & access::PUBLIC != 0 || package(base) == package(caller_class),
-            None => true, // library: outlines only reference accessible library code
-        }
-    };
-    let member_ok = |owner: &str, flags: Option<u32>| -> bool {
-        match flags {
-            None => true,
-            Some(f) if f & access::PUBLIC != 0 => true,
-            Some(f) if f & access::PRIVATE != 0 => owner == caller_class,
-            Some(_) => package(owner) == package(caller_class),
-        }
-    };
-    for insn in &body.insns {
-        match &insn.op {
-            Op::Invoke { method, .. } => {
-                let owner = s.get(method.class);
-                if !class_ok(owner) {
-                    return false;
-                }
-                let flags = p.find(owner).and_then(|i| {
-                    p.classes[i].methods.iter().find(|m| m.name == method.name && m.proto == method.proto).map(|m| m.access)
-                });
-                if !member_ok(owner, flags) {
-                    return false;
-                }
-            }
-            Op::NewInstance { ty, .. } if !class_ok(s.get(*ty)) => return false,
-            _ => {}
-        }
+fn package(desc: &str) -> &str {
+    let inner = desc.strip_prefix('L').and_then(|d| d.strip_suffix(';')).unwrap_or(desc);
+    inner.rsplit_once('/').map_or("", |(p, _)| p)
+}
+
+/// Where a member reference resolves: a program class declaring it (with its flags), or the
+/// library (the search left the program). `None`: not found anywhere in the program.
+fn resolve_method(p: &Model, class: &str, name: eightr_ir::sym::Sym, proto: eightr_ir::sym::Sym, depth: u32) -> Option<Option<(String, u32)>> {
+    let Some(i) = p.find(class) else { return Some(None) };
+    let c = &p.classes[i];
+    if let Some(m) = c.methods.iter().find(|m| m.name == name && m.proto == proto) {
+        return Some(Some((class.to_string(), m.access)));
     }
-    true
+    if depth > 64 {
+        return None;
+    }
+    c.superclass.iter().chain(&c.interfaces).find_map(|s| resolve_method(p, p.syms.get(*s), name, proto, depth + 1))
+}
+
+/// Can code in `caller` (a class descriptor) reference everything `body` references? Library
+/// references are accessible: the outline's holder, an unrelated app class, could make them.
+/// Program classes must be public or in the caller's package; program members are checked
+/// against their declaring class (protected ones conservatively as package-private).
+fn accessible_from(p: &Model, caller: &str, body: &Body) -> bool {
+    let class_ok = |desc: &str| {
+        let base = desc.trim_start_matches('[');
+        p.find(base).is_none_or(|i| p.classes[i].access & access::PUBLIC != 0 || package(base) == package(caller))
+    };
+    body.insns.iter().all(|insn| match &insn.op {
+        Op::NewInstance { ty, .. } => class_ok(p.syms.get(*ty)),
+        Op::Invoke { method, .. } => {
+            let owner = p.syms.get(method.class);
+            class_ok(owner)
+                && match resolve_method(p, owner, method.name, method.proto, 0) {
+                    None => false,
+                    Some(None) => true,
+                    Some(Some((declaring, flags))) => {
+                        flags & access::PUBLIC != 0
+                            || if flags & access::PRIVATE != 0 { declaring == caller } else { package(&declaring) == package(caller) }
+                    }
+                }
+        }
+        _ => true,
+    })
 }
 
 impl Rewrite for OutlineInline {
@@ -203,10 +239,11 @@ impl Rewrite for OutlineInline {
                 }
             }
         }
+        let subclassed: std::collections::BTreeSet<&str> = p.classes.iter().filter_map(|c| c.superclass).map(|t| p.syms.get(t)).collect();
         // Candidate outlines: key → (class, method, kind).
         let mut outlines: BTreeMap<Key, (usize, usize, Kind)> = BTreeMap::new();
         for (ci, c) in p.classes.iter().enumerate() {
-            if !is_outline_holder(p, c) {
+            if !is_outline_holder(p, ci, &subclassed) {
                 continue;
             }
             for (mi, m) in c.methods.iter().enumerate() {
@@ -219,53 +256,90 @@ impl Rewrite for OutlineInline {
                 if calls < 2 || escaping.contains(&k) {
                     continue;
                 }
-                // Not self-referencing, and not calling another candidate-shaped method (R8 never
-                // nests outlines; refusing keeps inlining order-independent).
-                let calls_static = body.insns.iter().any(|i| matches!(&i.op, Op::Invoke { kind: InvokeKind::Static, method, .. } if key(p, method) == k));
-                if calls_static {
-                    continue;
-                }
-                if let Some(kind) = classify(body) {
+                if let Some(kind) = classify(p, body) {
                     outlines.insert(k, (ci, mi, kind));
                 }
             }
         }
+        // Outlines calling outlines (a throw outline building its message with a classic one)
+        // are inlined callee-first, so each body is final before it's copied. Cycles (never
+        // produced by R8) are dropped.
+        let calls_of = |p: &Model, ci: usize, mi: usize| -> Vec<Key> {
+            p.classes[ci].methods[mi].code.iter().flat_map(|b| &b.insns).filter_map(|i| match &i.op {
+                Op::Invoke { kind: InvokeKind::Static, method, .. } => Some(key(p, method)),
+                _ => None,
+            }).collect()
+        };
+        let mut order: Vec<Key> = Vec::new();
+        {
+            let deps: BTreeMap<Key, Vec<Key>> = outlines
+                .iter()
+                .map(|(k, &(ci, mi, _))| (k.clone(), calls_of(p, ci, mi).into_iter().filter(|d| outlines.contains_key(d)).collect()))
+                .collect();
+            let mut placed: std::collections::BTreeSet<Key> = std::collections::BTreeSet::new();
+            loop {
+                let ready: Vec<Key> = deps.iter().filter(|(k, d)| !placed.contains(*k) && d.iter().all(|x| placed.contains(x))).map(|(k, _)| k.clone()).collect();
+                if ready.is_empty() {
+                    break;
+                }
+                for k in ready {
+                    placed.insert(k.clone());
+                    order.push(k);
+                }
+            }
+            outlines.retain(|k, _| placed.contains(k));
+        }
         if outlines.is_empty() {
             return Ok(());
         }
-        // Callee bodies (cloned so callers can be edited freely).
-        let bodies: BTreeMap<Key, (Body, String, Kind)> = outlines
-            .iter()
-            .map(|(k, &(ci, mi, kind))| (k.clone(), (p.classes[ci].methods[mi].code.clone().expect("has code"), k.2.clone(), kind)))
-            .collect();
 
-        // Per caller: every outline site, if accessible from the caller.
+        // Every outline call site, per caller.
         let mut per_caller: BTreeMap<(usize, usize), Vec<(u32, Key)>> = BTreeMap::new();
         for (k, list) in &sites {
-            let Some((_, body_proto_kind)) = bodies.get_key_value(k) else { continue };
-            for &(ci, mi, insn) in list {
-                if accessible_from(p, p.syms.get(p.classes[ci].ty), &body_proto_kind.0) {
+            if outlines.contains_key(k) {
+                for &(ci, mi, insn) in list {
                     per_caller.entry((ci, mi)).or_default().push((insn, k.clone()));
                 }
             }
         }
+        // Callers that are outlines go first, callee-first; then everyone else.
+        let mut callers: Vec<(usize, usize)> = order.iter().map(|k| (outlines[k].0, outlines[k].1)).filter(|c| per_caller.contains_key(c)).collect();
+        let first: std::collections::BTreeSet<(usize, usize)> = callers.iter().copied().collect();
+        callers.extend(per_caller.keys().copied().filter(|c| !first.contains(c)));
+
         let mut inlined: BTreeMap<Key, usize> = BTreeMap::new();
         let mut refused: BTreeMap<Key, BTreeMap<String, usize>> = BTreeMap::new();
-        for ((ci, mi), list) in per_caller {
+        for (ci, mi) in callers {
+            let list = &per_caller[&(ci, mi)];
+            let caller_class = p.syms.get(p.classes[ci].ty).to_string();
+            // Current (final) bodies of the callees.
+            let bodies: BTreeMap<&Key, Body> = list
+                .iter()
+                .map(|(_, k)| (k, p.classes[outlines[k].0].methods[outlines[k].1].code.clone().expect("has code")))
+                .collect();
+            let mut batch: Vec<(u32, &Body, &str)> = Vec::new();
+            let mut keys: Vec<&Key> = Vec::new();
+            for (i, k) in list {
+                if accessible_from(p, &caller_class, &bodies[k]) {
+                    batch.push((*i, &bodies[k], k.2.as_str()));
+                    keys.push(k);
+                } else {
+                    *refused.entry(k.clone()).or_default().entry("Inaccessible".to_string()).or_default() += 1;
+                }
+            }
             let Some(caller) = p.classes[ci].methods[mi].code.as_mut() else { continue };
-            let batch: Vec<(u32, &Body, &str)> = list.iter().map(|(i, k)| (*i, &bodies[k].0, bodies[k].1.as_str())).collect();
-            let mut done: Vec<&Key> = Vec::new();
-            for ((_, k), res) in list.iter().zip(inline_static_calls(caller, &batch)) {
+            let mut throws = false;
+            for (k, res) in keys.into_iter().zip(inline_static_calls(caller, &batch)) {
                 match res {
-                    Ok(()) => done.push(k),
+                    Ok(()) => {
+                        throws |= outlines[k].2 == Kind::Throw;
+                        *inlined.entry(k.clone()).or_default() += 1;
+                    }
                     Err(e) => *refused.entry(k.clone()).or_default().entry(format!("{e:?}")).or_default() += 1,
                 }
             }
-            if done.iter().any(|k| bodies[*k].2 == Kind::Throw) {
+            if throws {
                 eightr_ir::edit::remove_unreachable(caller);
-            }
-            for k in done {
-                *inlined.entry(k.clone()).or_default() += 1;
             }
         }
 
@@ -274,91 +348,339 @@ impl Rewrite for OutlineInline {
         for (k, &(ci, mi, kind)) in &outlines {
             let total = sites[k].len();
             let n = inlined.get(k).copied().unwrap_or(0);
-            if n == 0 && !refused.contains_key(k) {
-                continue; // no call site was accessible: not reported as an outline
-            }
+
             let rule = if kind == Kind::Throw { BU_OUTLINE_INLINE } else { OUTLINE_INLINE };
             let detail = if n == total {
                 delete.push((ci, mi));
                 format!("inlined at all {total} call sites; method removed")
             } else {
                 let why: Vec<String> = refused.get(k).into_iter().flatten().map(|(r, c)| format!("{c} {r}")).collect();
-                let why = if why.is_empty() { "others inaccessible from their caller".to_string() } else { format!("refused: {}", why.join(", ")) };
-                format!("inlined at {n} of {total} call sites; {why}")
+                format!("inlined at {n} of {total} call sites; refused: {}", why.join(", "))
             };
             records.push(RewriteRecord { rule, item: format!("{}->{}{}", k.0, k.1, k.2), detail });
         }
         delete.sort_by(|a, b| b.cmp(a));
+        let mut emptied = Vec::new();
         for (ci, mi) in delete {
             p.classes[ci].methods.remove(mi);
+            emptied.push(p.syms.get(p.classes[ci].ty).to_string());
         }
-        remove_empty_unreferenced_classes(p);
+        remove_emptied_holders(p, &emptied);
         Ok(())
     }
 }
 
-/// Removes classes left with no members, no annotations, and no references to their type.
-fn remove_empty_unreferenced_classes(p: &mut Model) {
-    let empty: Vec<usize> = p
-        .classes
+/// Removes holders this rewrite emptied, if nothing else mentions them: no members,
+/// annotations or interfaces left, no other class mentions their type (structurally, see
+/// [`eightr_ir::refs::class_types`]), and no reflective lookup names them.
+fn remove_emptied_holders(p: &mut Model, emptied: &[String]) {
+    use std::collections::BTreeSet;
+    let empty: BTreeSet<&str> = emptied
         .iter()
-        .enumerate()
-        .filter(|(_, c)| c.fields.is_empty() && c.methods.is_empty() && c.annotations.is_empty() && c.interfaces.is_empty())
-        .map(|(i, _)| i)
+        .map(String::as_str)
+        .filter(|d| {
+            p.find(d).is_some_and(|i| {
+                let c = &p.classes[i];
+                c.fields.is_empty() && c.methods.is_empty() && c.annotations.is_empty() && c.interfaces.is_empty()
+            })
+        })
         .collect();
     if empty.is_empty() {
         return;
     }
-    // Descriptors hide inside protos and generic signatures, so look for them in the text of
-    // every other class.
-    let mut referenced = vec![false; empty.len()];
-    for (ci, c) in p.classes.iter().enumerate() {
-        let text = type_text(p, c);
-        for (k, &e) in empty.iter().enumerate() {
-            referenced[k] |= ci != e && text.contains(p.syms.get(p.classes[e].ty));
+    let mut referenced: BTreeSet<String> = BTreeSet::new();
+    for c in &p.classes {
+        let own = p.syms.get(c.ty);
+        eightr_ir::refs::class_types(p, c, |d| {
+            if d != own && empty.contains(d) {
+                referenced.insert(d.to_string());
+            }
+        });
+    }
+    // Reflective lookups (`Class.forName("a.b.C")`) with a constant name.
+    for site in eightr_ir::reflect::sites(p) {
+        if site.kind == eightr_ir::reflect::Kind::Class {
+            let desc = format!("L{};", site.name.replace('.', "/"));
+            if empty.contains(desc.as_str()) {
+                referenced.insert(desc);
+            }
         }
     }
-    let mut remove: Vec<usize> = empty.into_iter().zip(referenced).filter(|(_, r)| !r).map(|(i, _)| i).collect();
-    remove.sort_by(|a, b| b.cmp(a));
-    for i in remove {
-        p.classes.remove(i);
-    }
+    let remove: BTreeSet<String> = empty.iter().filter(|d| !referenced.contains(**d)).map(|d| d.to_string()).collect();
+    p.classes.retain(|c| !remove.contains(p.syms.get(c.ty)));
 }
 
-/// Everything in `c` that can mention a type, as text: the class header and annotations,
-/// fields, method signatures and annotations, instructions, and catch types.
-fn type_text(p: &Model, c: &eightr_ir::model::Class) -> String {
-    use eightr_ir::print;
-    let s = &p.syms;
-    let header = eightr_ir::model::Class {
-        ty: c.ty,
-        access: c.access,
-        superclass: c.superclass,
-        interfaces: c.interfaces.clone(),
-        source_file: c.source_file,
-        annotations: c.annotations.clone(),
-        fields: Vec::new(),
-        methods: Vec::new(),
-        origin: c.origin,
-    };
-    let mut t = print::class(&header, s);
-    for f in &c.fields {
-        t.push_str(&print::field(f, s));
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eightr_ir::lift::Insn;
+    use eightr_ir::model::{Class, Method};
+    use eightr_ir::op::{BinOp, NumType, Operand, Width};
+
+    fn body(registers: u16, ins: u16, ops: Vec<Op>) -> Body {
+        Body {
+            registers,
+            ins,
+            outs: 0,
+            insns: ops.into_iter().enumerate().map(|(i, op)| Insn { pc: i as u32, op }).collect(),
+            tries: vec![],
+            positions: vec![],
+            locals: vec![],
+            parameter_names: vec![],
+        }
     }
-    for m in &c.methods {
-        t.push_str(&print::method_header(m, s));
-        if let Some(b) = &m.code {
-            for insn in &b.insns {
-                t.push_str(&print::op(&insn.op, s));
-                t.push('\n');
-            }
-            for h in b.tries.iter().flat_map(|x| &x.handlers) {
-                if let Some(ty) = h.ty {
-                    t.push_str(s.get(ty));
-                    t.push('\n');
+
+    fn class(p: &mut Model, ty: &str, access: u32, methods: Vec<Method>) -> Class {
+        Class {
+            ty: p.syms.intern(ty),
+            access,
+            superclass: Some(p.syms.intern("Ljava/lang/Object;")),
+            interfaces: vec![],
+            source_file: None,
+            annotations: vec![],
+            fields: vec![],
+            methods,
+            origin: 0,
+        }
+    }
+
+    fn meth(p: &mut Model, name: &str, proto: &str, access: u32, code: Option<Body>) -> Method {
+        Method { name: p.syms.intern(name), proto: p.syms.intern(proto), access, code, annotations: vec![], parameter_annotations: None }
+    }
+
+    fn mref(p: &mut Model, class: &str, name: &str, proto: &str) -> MethodRef {
+        MethodRef { class: p.syms.intern(class), name: p.syms.intern(name), proto: p.syms.intern(proto) }
+    }
+
+    const ST: u32 = access::STATIC | access::PUBLIC;
+
+    /// `(II)I` caller: `return m(p0, p1)`.
+    fn calls(m: MethodRef) -> Body {
+        body(3, 2, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![1, 2] },
+            Op::MoveResult { width: Width::Single, dst: 0 },
+            Op::Return { width: Width::Single, src: 0 },
+        ])
+    }
+
+    /// `(II)I` outline-shaped body: `Integer.hashCode(p0) + p1) * p1` (library call + arithmetic).
+    fn outline_body(p: &mut Model) -> Body {
+        let hash = mref(p, "Ljava/lang/Integer;", "hashCode", "(I)I");
+        body(3, 2, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: hash, args: vec![1] },
+            Op::MoveResult { width: Width::Single, dst: 0 },
+            Op::Binop { op: BinOp::Add, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(2) },
+            Op::Binop { op: BinOp::Mul, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(2) },
+            Op::Return { width: Width::Single, src: 0 },
+        ])
+    }
+
+    /// Every invoke of a program class names a method that still exists.
+    fn assert_no_dangling_calls(p: &Model) {
+        for c in &p.classes {
+            for m in c.methods.iter().filter_map(|m| m.code.as_ref()) {
+                for i in &m.insns {
+                    if let Op::Invoke { method, .. } = &i.op {
+                        if let Some(k) = p.find(p.syms.get(method.class)) {
+                            assert!(
+                                p.classes[k].methods.iter().any(|x| x.name == method.name && x.proto == method.proto),
+                                "{} calls deleted {}->{}",
+                                p.syms.get(c.ty),
+                                p.syms.get(method.class),
+                                p.syms.get(method.name)
+                            );
+                        }
+                    }
                 }
             }
         }
     }
-    t
+
+    #[test]
+    fn inlines_a_library_only_outline_and_removes_its_holder() {
+        let mut p = Model::default();
+        let o = mref(&mut p, "LH;", "o", "(II)I");
+        let ob = outline_body(&mut p);
+        let mo = meth(&mut p, "o", "(II)I", ST, Some(ob));
+        let h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![mo]);
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(o)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(o)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2]);
+        p.classes = vec![h, u];
+        let mut rec = vec![];
+        OutlineInline.run(&mut p, &mut rec).unwrap();
+        assert_eq!(rec.len(), 1);
+        assert!(p.find("LH;").is_none(), "emptied holder should go");
+        assert_no_dangling_calls(&p);
+    }
+
+    /// A synthetic static calling another synthetic static is app code, not an outline: neither
+    /// is inlined, so no copy can call a deleted method (review finding).
+    #[test]
+    fn candidates_calling_program_code_are_not_outlines() {
+        let mut p = Model::default();
+        let a = mref(&mut p, "LH;", "a", "(II)I");
+        let b = mref(&mut p, "LH;", "b", "(II)I");
+        let bb = outline_body(&mut p);
+        let ab = body(3, 2, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: b, args: vec![1, 2] },
+            Op::MoveResult { width: Width::Single, dst: 0 },
+            Op::Binop { op: BinOp::Add, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(1) },
+            Op::Binop { op: BinOp::Mul, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(2) },
+            Op::Return { width: Width::Single, src: 0 },
+        ]);
+        let ma = meth(&mut p, "a", "(II)I", ST, Some(ab));
+        let mb = meth(&mut p, "b", "(II)I", ST, Some(bb));
+        let h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![ma, mb]);
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(a)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(a)));
+        let c3 = meth(&mut p, "c3", "(II)I", ST, Some(calls(b)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2, c3]);
+        p.classes = vec![h, u];
+        let mut rec = vec![];
+        OutlineInline.run(&mut p, &mut rec).unwrap();
+        assert!(rec.iter().all(|r| !r.item.contains("->a(")), "{rec:?}");
+        assert_no_dangling_calls(&p);
+    }
+
+    /// Only holders this rewrite emptied are removed (review finding).
+    #[test]
+    fn unrelated_empty_class_is_kept() {
+        let mut p = Model::default();
+        let e = class(&mut p, "LEmpty;", access::PUBLIC, vec![]);
+        let o = mref(&mut p, "LH;", "o", "(II)I");
+        let ob = outline_body(&mut p);
+        let mo = meth(&mut p, "o", "(II)I", ST, Some(ob));
+        let h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![mo]);
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(o)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(o)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2]);
+        p.classes = vec![e, h, u];
+        OutlineInline.run(&mut p, &mut vec![]).unwrap();
+        assert!(p.find("LEmpty;").is_some());
+        assert!(p.find("LH;").is_none());
+    }
+
+    /// An emptied holder looked up reflectively stays.
+    #[test]
+    fn holder_looked_up_reflectively_is_kept() {
+        let mut p = Model::default();
+        let o = mref(&mut p, "La/H;", "o", "(II)I");
+        let ob = outline_body(&mut p);
+        let mo = meth(&mut p, "o", "(II)I", ST, Some(ob));
+        let h = class(&mut p, "La/H;", access::PUBLIC | access::SYNTHETIC, vec![mo]);
+        let name = p.syms.intern("a.H");
+        let for_name = mref(&mut p, "Ljava/lang/Class;", "forName", "(Ljava/lang/String;)Ljava/lang/Class;");
+        let r = meth(&mut p, "r", "()V", ST, Some(body(1, 0, vec![
+            Op::ConstString { dst: 0, value: name },
+            Op::Invoke { kind: InvokeKind::Static, method: for_name, args: vec![0] },
+            Op::ReturnVoid,
+        ])));
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(o)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(o)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2, r]);
+        p.classes = vec![h, u];
+        p.sort();
+        OutlineInline.run(&mut p, &mut vec![]).unwrap();
+        assert!(p.find("La/H;").is_some());
+    }
+
+    /// A holder whose superclass has a static initializer isn't an outline holder: the call
+    /// would have run it (review finding).
+    #[test]
+    fn superclass_initializer_blocks_inlining() {
+        let mut p = Model::default();
+        let clinit = meth(&mut p, "<clinit>", "()V", access::STATIC | access::CONSTRUCTOR, Some(body(0, 0, vec![Op::ReturnVoid])));
+        let base = class(&mut p, "LBase;", access::PUBLIC, vec![clinit]);
+        let o = mref(&mut p, "LH;", "o", "(II)I");
+        let ob = outline_body(&mut p);
+        let mo = meth(&mut p, "o", "(II)I", ST, Some(ob));
+        let mut h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![mo]);
+        h.superclass = Some(p.syms.intern("LBase;"));
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(calls(o)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(calls(o)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2]);
+        p.classes = vec![base, h, u];
+        let mut rec = vec![];
+        OutlineInline.run(&mut p, &mut rec).unwrap();
+        assert!(rec.is_empty(), "{rec:?}");
+    }
+
+    /// Backport-shaped (pure arithmetic) and too-small bodies aren't classic outlines.
+    #[test]
+    fn classic_outlines_need_a_library_call_and_three_operations() {
+        let mut p = Model::default();
+        let arith = body(3, 2, vec![
+            Op::Binop { op: BinOp::Xor, ty: NumType::Int, dst: 0, a: 1, b: Operand::Reg(2) },
+            Op::Binop { op: BinOp::Ushr, ty: NumType::Int, dst: 0, a: 0, b: Operand::Lit(16) },
+            Op::Binop { op: BinOp::Xor, ty: NumType::Int, dst: 0, a: 0, b: Operand::Reg(1) },
+            Op::Return { width: Width::Single, src: 0 },
+        ]);
+        assert_eq!(classify(&p, &arith), None);
+        let ctor = mref(&mut p, "Ljava/lang/Object;", "<init>", "()V");
+        let obj = p.syms.intern("Ljava/lang/Object;");
+        let api_outline = body(1, 0, vec![
+            Op::NewInstance { dst: 0, ty: obj },
+            Op::Invoke { kind: InvokeKind::Direct, method: ctor, args: vec![0] },
+            Op::Return { width: Width::Object, src: 0 },
+        ]);
+        assert_eq!(classify(&p, &api_outline), None);
+        let ob = outline_body(&mut p);
+        assert_eq!(classify(&p, &ob), Some(Kind::Classic));
+    }
+
+    /// A throw outline that builds its message with a classic outline: both are inlined,
+    /// callee-first, so no copy calls a deleted method.
+    #[test]
+    fn nested_outlines_inline_callee_first() {
+        let mut p = Model::default();
+        let msg = mref(&mut p, "LH;", "msg", "(II)I");
+        let fail = mref(&mut p, "LH;", "fail", "(II)V");
+        let ctor = mref(&mut p, "Ljava/lang/IllegalStateException;", "<init>", "(I)V");
+        let ise = p.syms.intern("Ljava/lang/IllegalStateException;");
+        let mb = outline_body(&mut p);
+        let fb = body(4, 2, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: msg, args: vec![2, 3] },
+            Op::MoveResult { width: Width::Single, dst: 1 },
+            Op::NewInstance { dst: 0, ty: ise },
+            Op::Invoke { kind: InvokeKind::Direct, method: ctor, args: vec![0, 1] },
+            Op::Throw { src: 0 },
+        ]);
+        let m_msg = meth(&mut p, "msg", "(II)I", ST, Some(mb));
+        let m_fail = meth(&mut p, "fail", "(II)V", ST, Some(fb));
+        let h = class(&mut p, "LH;", access::PUBLIC | access::SYNTHETIC, vec![m_fail, m_msg]);
+        let thrower = |m: MethodRef| body(3, 2, vec![
+            Op::Invoke { kind: InvokeKind::Static, method: m, args: vec![1, 2] },
+            Op::Const { dst: 0, value: eightr_ir::op::Const::Narrow(0) },
+            Op::Return { width: Width::Single, src: 0 },
+        ]);
+        let c1 = meth(&mut p, "c1", "(II)I", ST, Some(thrower(fail)));
+        let c2 = meth(&mut p, "c2", "(II)I", ST, Some(thrower(fail)));
+        let c3 = meth(&mut p, "c3", "(II)I", ST, Some(calls(msg)));
+        let u = class(&mut p, "LU;", access::PUBLIC, vec![c1, c2, c3]);
+        p.classes = vec![h, u];
+        let mut rec = vec![];
+        OutlineInline.run(&mut p, &mut rec).unwrap();
+        assert_eq!(rec.len(), 2, "{rec:?}");
+        assert!(rec.iter().all(|r| r.detail.contains("method removed")), "{rec:?}");
+        assert!(p.find("LH;").is_none());
+        assert_no_dangling_calls(&p);
+    }
+
+    /// A package-private method inherited through a public subclass isn't accessible from
+    /// another package (review finding).
+    #[test]
+    fn inherited_package_private_member_is_not_accessible() {
+        let mut p = Model::default();
+        let base_m = meth(&mut p, "f", "()V", 0, Some(body(1, 1, vec![Op::ReturnVoid])));
+        let base = class(&mut p, "La/Base;", access::PUBLIC, vec![base_m]);
+        let mut sub = class(&mut p, "La/Sub;", access::PUBLIC, vec![]);
+        sub.superclass = Some(p.syms.intern("La/Base;"));
+        p.classes = vec![base, sub];
+        p.sort();
+        let f = mref(&mut p, "La/Sub;", "f", "()V");
+        let callee = body(1, 1, vec![Op::Invoke { kind: InvokeKind::Virtual, method: f, args: vec![0] }, Op::ReturnVoid]);
+        assert!(!accessible_from(&p, "Lb/Caller;", &callee));
+        assert!(accessible_from(&p, "La/Caller;", &callee));
+    }
 }
