@@ -35,6 +35,24 @@
     "Signature": 0,
     "SourceFile": 0
   },
+  "compose_witness": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 634,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
+  "compose_witness_k21": {
+    "Body": 0,
+    "ClassName": 1,
+    "Lines": 0,
+    "MemberName": 665,
+    "Package": 1,
+    "Signature": 0,
+    "SourceFile": 0
+  },
   "dontobfuscate": {
     "Body": 0,
     "ClassName": 5,

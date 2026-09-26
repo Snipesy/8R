@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "inlined_occurrences": 35265,
-    "recall": 0.028,
-    "touched": 1000
+    "inlined_occurrences": 48812,
+    "recall": 0.026,
+    "touched": 1259
   },
   "discarded-getclass": {
-    "hints": 768,
-    "precision": 0.747
+    "hints": 979,
+    "precision": 0.724
   },
   "discarded-getclass@r8-8": {
     "base_rate": 0.518,
@@ -15,16 +15,18 @@
     "precision": 0.83
   },
   "discarded-getclass@r8-9": {
-    "base_rate": 0.525,
-    "hints": 633,
-    "lift": 1.391,
-    "precision": 0.73
+    "base_rate": 0.52,
+    "hints": 844,
+    "lift": 1.361,
+    "precision": 0.707
   },
   "fixtures": [
     "compose_basic",
     "compose_basic_r94",
     "compose_shapes",
     "compose_shapes_k21",
+    "compose_witness",
+    "compose_witness_k21",
     "dontobfuscate",
     "hello",
     "kotlin_basic",
@@ -43,10 +45,10 @@
     "shapes"
   ],
   "idiom:areEqual": {
-    "hints": 160,
-    "occurrences": 163,
-    "precision": 0.863,
-    "recall": 0.847
+    "hints": 212,
+    "occurrences": 221,
+    "precision": 0.868,
+    "recall": 0.833
   },
   "idiom:areEqual@r8-8": {
     "base_rate": 0.518,
@@ -55,16 +57,16 @@
     "precision": 0.843
   },
   "idiom:areEqual@r8-9": {
-    "base_rate": 0.525,
-    "hints": 109,
-    "lift": 1.661,
-    "precision": 0.872
+    "base_rate": 0.52,
+    "hints": 161,
+    "lift": 1.686,
+    "precision": 0.876
   },
   "idiom:collectionSizeOrDefault": {
-    "hints": 9,
-    "occurrences": 14,
-    "precision": 0.444,
-    "recall": 0.429
+    "hints": 13,
+    "occurrences": 18,
+    "precision": 0.462,
+    "recall": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-8": {
     "base_rate": 0.518,
@@ -73,14 +75,14 @@
     "precision": 0.5
   },
   "idiom:collectionSizeOrDefault@r8-9": {
-    "base_rate": 0.525,
-    "hints": 7,
-    "lift": 0.817,
-    "precision": 0.429
+    "base_rate": 0.52,
+    "hints": 11,
+    "lift": 0.875,
+    "precision": 0.455
   },
   "inlined-instance-call": {
-    "hints": 254,
-    "precision": 0.831
+    "hints": 330,
+    "precision": 0.812
   },
   "inlined-instance-call@r8-8": {
     "base_rate": 0.518,
@@ -89,14 +91,14 @@
     "precision": 0.903
   },
   "inlined-instance-call@r8-9": {
-    "base_rate": 0.525,
-    "hints": 192,
-    "lift": 1.538,
-    "precision": 0.807
+    "base_rate": 0.52,
+    "hints": 268,
+    "lift": 1.523,
+    "precision": 0.791
   },
   "param-null-check": {
-    "hints": 207,
-    "precision": 0.266
+    "hints": 301,
+    "precision": 0.256
   },
   "param-null-check@r8-8": {
     "base_rate": 0.518,
@@ -105,9 +107,9 @@
     "precision": 0.0
   },
   "param-null-check@r8-9": {
-    "base_rate": 0.525,
-    "hints": 206,
-    "lift": 0.509,
-    "precision": 0.267
+    "base_rate": 0.52,
+    "hints": 300,
+    "lift": 0.494,
+    "precision": 0.257
   }
 }

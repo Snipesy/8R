@@ -6,12 +6,15 @@
 //! composer parameter, taking an int constant (the durable group key) and returning the composer
 //! type. The class whose such method opens the most methods, by a wide margin, is the composer.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use eightr_ir::lift::Body;
 use eightr_ir::model::Program as Model;
 use eightr_ir::op::{Const, InvokeKind, Op};
 use eightr_ir::types::parse_proto;
+
+/// Role candidates with their votes, best first.
+type Ranked = Vec<((String, String), usize)>;
 
 /// Restartable composables opened by one method: (class index, method index, entry key).
 type Opened = Vec<(usize, usize, i32)>;
@@ -30,8 +33,8 @@ pub struct Composer {
 /// The first call in `body` if it is `recv.m(k)` on a parameter (or a copy of one) with an int
 /// constant `k`. Straight-line code before it is allowed (R8 hoists constants, field loads,
 /// arithmetic, null checks and library calls above it); a branch or an app call first is not.
-/// Returns (method, key).
-fn entry_call<'a>(p: &Model, body: &'a Body) -> Option<(&'a eightr_ir::op::MethodRef, i32)> {
+/// Returns (method, key, the parameter register the receiver copies).
+pub(crate) fn entry_call<'a>(p: &Model, body: &'a Body) -> Option<(&'a eightr_ir::op::MethodRef, i32, u16)> {
     let first_param = body.registers - body.ins;
     let mut consts: BTreeMap<u16, i32> = BTreeMap::new();
     // Register → the parameter it copies.
@@ -54,7 +57,8 @@ fn entry_call<'a>(p: &Model, body: &'a Body) -> Option<(&'a eightr_ir::op::Metho
         }
         match op {
             Op::Invoke { kind: InvokeKind::Virtual | InvokeKind::Interface, method, args } if args.len() == 2 => {
-                return params.contains_key(&args[0]).then_some(()).and(consts.get(&args[1]).map(|&k| (method, k)));
+                let recv = *params.get(&args[0])?;
+                return consts.get(&args[1]).map(|&k| (method, k, recv));
             }
             Op::Invoke { .. } | Op::InvokeCustom { .. } | Op::InvokePolymorphic { .. } => return None,
             _ if op.is_branch() || matches!(op, Op::Return { .. } | Op::ReturnVoid | Op::Throw { .. } | Op::Switch { .. }) => return None,
@@ -97,7 +101,7 @@ pub fn find(p: &Model) -> Option<Composer> {
     for (ci, c) in p.classes.iter().enumerate() {
         for (mi, m) in c.methods.iter().enumerate() {
             let Some(b) = &m.code else { continue };
-            let Some((call, key)) = entry_call(p, b) else { continue };
+            let Some((call, key, _)) = entry_call(p, b) else { continue };
             let proto = s.get(call.proto);
             let Some((params, ret)) = parse_proto(proto) else { continue };
             // (I) returning the receiver's own class: startRestartGroup(I)Composer.
@@ -190,6 +194,9 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
     for &(ci, mi, _) in &c.restartable {
         let Some(b) = &p.classes[ci].methods[mi].code else { continue };
         let insns = &b.insns;
+        // Only the first skip-decision-shaped call is the composable's skip check: a later `()Z`
+        // is the defaults block's getDefaultsInvalid (whose else arm also skips to group end).
+        let mut skip_seen = false;
         for (i, insn) in insns.iter().enumerate() {
             let Op::Invoke { method, .. } = &insn.op else { continue };
             if !on_c(method) {
@@ -211,6 +218,9 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
                 // ...) isn't voted for.
                 "(ZI)Z" | "()Z" => {
                     let Some((cond, target)) = result.and_then(branch_on) else { continue };
+                    if std::mem::replace(&mut skip_seen, true) {
+                        continue;
+                    }
                     let skips_when_true = proto == "()Z";
                     // `if-eqz r` jumps when false; `if-nez r` when true.
                     let jump_when_true = match cond {
@@ -272,19 +282,24 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
             (s.get(p.classes[ci].ty).to_string(), s.get(m.name).to_string(), s.get(m.proto).to_string())
         })
         .collect();
+    // Its body is the runtime's bit shuffle: masks 0x12492492 and 0x24924924 (the "same" and
+    // "different" bits of every slot), which R8 keeps verbatim.
+    let shuffles = |(class, name, proto): &(String, String, String)| -> bool {
+        let Some(k) = p.find(class) else { return false };
+        let Some(body) = p.classes[k].methods.iter().find(|x| s.get(x.name) == name && s.get(x.proto) == proto).and_then(|x| x.code.as_ref()) else { return false };
+        let has = |v: i32| body.insns.iter().any(|x| matches!(x.op, Op::Const { value: eightr_ir::op::Const::Narrow(k), .. } if k == v));
+        has(0x1249_2492) && has(0x2492_4924)
+    };
     let mut flags: BTreeMap<(String, String, String), usize> = BTreeMap::new();
     for m in p.classes.iter().flat_map(|c| &c.methods) {
         let Some(b) = &m.code else { continue };
-        // Register → the static (I)I call defining it.
+        // Register → the static (I)I call defining it (straight-line; cleared by any other def).
         let mut defined: BTreeMap<u16, &eightr_ir::op::MethodRef> = BTreeMap::new();
-        for (i, insn) in b.insns.iter().enumerate() {
+        let mut pending: Option<&eightr_ir::op::MethodRef> = None;
+        for insn in &b.insns {
+            let last = pending.take();
             match &insn.op {
-                Op::Invoke { kind: InvokeKind::Static, method, .. } if s.get(method.proto) == "(I)I" => {
-                    if let Some(Op::MoveResult { dst, .. }) = b.insns.get(i + 1).map(|x| &x.op) {
-                        defined.insert(*dst, method);
-                    }
-                    continue;
-                }
+                Op::Invoke { kind: InvokeKind::Static, method, .. } if s.get(method.proto) == "(I)I" => pending = Some(method),
                 Op::Invoke { method, args, .. } if restartable.contains(&(s.get(method.class).to_string(), s.get(method.name).to_string(), s.get(method.proto).to_string())) => {
                     for a in args {
                         if let Some(f) = defined.get(a) {
@@ -294,16 +309,22 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
                 }
                 _ => {}
             }
+            if insn.op.is_branch() || insn.op.ends_flow() {
+                defined.clear();
+            }
             if let Some((dst, wide)) = insn.op.def() {
-                if !matches!(insn.op, Op::MoveResult { .. }) || !defined.contains_key(&dst) {
-                    defined.remove(&dst);
-                }
+                defined.remove(&dst);
                 if wide {
                     defined.remove(&(dst + 1));
+                }
+                if let (Op::MoveResult { .. }, Some(f)) = (&insn.op, last) {
+                    defined.insert(dst, f);
                 }
             }
         }
     }
+    // A library reference (runtime not in the program) can't be checked, and isn't renamed.
+    flags.retain(|m, _| p.find(&m.0).is_none() || shuffles(m));
     let mut ranked: Vec<_> = flags.into_iter().collect();
     ranked.sort_by_key(|(m, n)| (std::cmp::Reverse(*n), m.clone()));
     let update_changed_flags = match ranked.as_slice() {
@@ -312,39 +333,50 @@ pub fn roles(p: &Model, c: &Composer) -> Roles {
     };
     // A role holds when one method plays it in most composables that show it at all.
     let mut out = vec![Role { method: c.start_restart_group.clone(), name: "startRestartGroup" }];
+    // The skip checks of the two compiler eras never meet in one program's composables compiled
+    // by one compiler; if both have votes, the (ZI)Z shape (never a composer getter) decides.
+    if votes.get("shouldExecute").is_some_and(|v| !v.is_empty()) {
+        votes.remove("getSkipping");
+    }
+    let mut winners: Vec<Role> = Vec::new();
+    let mut deferred: Vec<(&'static str, Ranked)> = Vec::new();
     for (role, cands) in votes {
         let mut ranked: Vec<_> = cands.into_iter().collect();
         ranked.sort_by_key(|(m, n)| (std::cmp::Reverse(*n), m.clone()));
-        let (m, n) = &ranked[0];
-        // Primitive `changed` overloads all share the name: each candidate is one.
-        if role == "changed" {
-            for (m, _) in &ranked {
-                out.push(Role { method: m.clone(), name: "changed" });
-            }
+        if role == "changed" || role == "changed(Object)" {
+            deferred.push((role, ranked));
             continue;
         }
-        // changed(Object) and changedInstance(Object) share the call shape; their bodies differ:
-        // `nextSlot() != value` (equals) vs `nextSlot() !== value` (identity).
-        if role == "changed(Object)" && ranked.len() == 2 && *n < 4 * ranked[1].1 {
-            let kinds: Vec<Option<&'static str>> = ranked.iter().map(|(m, _)| object_compare(p, c, m)).collect();
-            if let [Some(a), Some(b)] = kinds[..] {
-                if a != b {
-                    for ((m, _), name) in ranked.iter().zip([a, b]) {
-                        out.push(Role { method: m.clone(), name });
-                    }
+        let (m, n) = &ranked[0];
+        if ranked.len() > 1 && *n < 4 * ranked[1].1 {
+            continue; // not a clear winner
+        }
+        winners.push(Role { method: m.clone(), name: role });
+    }
+    let taken: BTreeSet<(String, String)> = winners.iter().map(|r| r.method.clone()).collect();
+    for (role, ranked) in deferred {
+        if role == "changed" {
+            // Primitive `changed` overloads all share the name: each candidate is one (other roles'
+            // winners excluded, e.g. a shouldExecute R8 narrowed to `(Z)Z`).
+            for (m, _) in &ranked {
+                if !taken.contains(m) {
+                    out.push(Role { method: m.clone(), name: "changed" });
                 }
             }
             continue;
         }
-        if ranked.len() > 1 && *n < 4 * ranked[1].1 {
-            continue; // not a clear winner
+        // changed(Object) and changedInstance(Object) share the call shape; their bodies differ:
+        // `nextSlot() != value` (equals) vs `nextSlot() !== value` (identity). Each candidate is
+        // named by its body, when no other candidate has the same verdict.
+        let kinds: Vec<Option<&'static str>> = ranked.iter().map(|(m, _)| object_compare(p, c, m)).collect();
+        for ((m, _), kind) in ranked.iter().zip(&kinds) {
+            let Some(kind) = kind else { continue };
+            if kinds.iter().filter(|k| **k == Some(*kind)).count() == 1 && !taken.contains(m) {
+                out.push(Role { method: m.clone(), name: kind });
+            }
         }
-        let name = match role {
-            "changed(Object)" => "changed",
-            r => r,
-        };
-        out.push(Role { method: m.clone(), name });
     }
+    out.extend(winners);
     out.sort_by(|a, b| a.method.cmp(&b.method));
     out.dedup();
     Roles { composer: out, update_changed_flags }
