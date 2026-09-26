@@ -24,6 +24,9 @@ pub struct Config {
     pub no_rewrites: bool,
     /// Don't annotate methods with their inlining hints in the output (`@eightr.Inlined`).
     pub no_hint_annotations: bool,
+    /// Small text resources of the package (`META-INF/*.version`, root `*.properties`): library
+    /// version evidence (`input::resources`).
+    pub resources: Vec<(String, String)>,
 }
 
 /// Read-only facts gathered before any pass runs.
@@ -158,6 +161,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     if config.verbose_labels {
         report.inline_hints = inline_hints;
     }
+    report.libraries.extend(crate::libraries::from_resources(&config.resources));
+    report.libraries.extend(crate::libraries::from_code(&program.model));
     if let Some(c) = crate::compose::find(&program.model) {
         let all = crate::composables::composables(&program.model, &c, &crate::compose::roles(&program.model, &c));
         let mut summary = crate::composables::summary(&all);
@@ -178,6 +183,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
             report.composables = all;
         }
     }
+    report.libraries.sort();
+    report.libraries.dedup();
     Ok(Outcome { program, labels, report, renaming, annotate_hints: !config.no_hint_annotations })
 }
 
