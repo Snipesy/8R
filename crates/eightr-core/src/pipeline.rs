@@ -263,7 +263,7 @@ fn name_stats(dexes: &[(String, Dex)], program: &Program) -> NameStats {
     NameStats { type_descriptors: types.len() as u64, member_names: generated as u64, packages: packages.len() as u64 }
 }
 
-fn collect_markers(dexes: &[(String, Dex)]) -> Vec<Marker> {
+pub(crate) fn collect_markers(dexes: &[(String, Dex)]) -> Vec<Marker> {
     let mut markers: Vec<Marker> = Vec::new();
     for (_, dex) in dexes {
         for s in dex.strings().flatten() {

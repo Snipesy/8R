@@ -18,6 +18,9 @@ enum Command {
     Info {
         /// A .dex, .apk/.aab/.zip, or a directory of classes*.dex.
         input: PathBuf,
+        /// Print only the build profile (JSON) that `8r-forge build` forges a LibDB pack for.
+        #[arg(long)]
+        profile: bool,
     },
     /// Run the pipeline. With -o, writes classes*.dex (recovered names applied),
     /// 8r-mapping.txt (loadable by jadx), and report.json into that directory.
@@ -52,7 +55,13 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
-        Command::Info { input } => {
+        Command::Info { input, profile: true } => {
+            let inputs = input::load(&input)?;
+            let resources = if input.is_dir() { input::dir_resources(&input) } else { input::resources(&input) };
+            let p = eightr_core::libdb::Profile::from_inputs(&inputs, &resources)?.ok_or("no R8 marker, so no build profile")?;
+            println!("{}", serde_json::to_string_pretty(&p)?);
+        }
+        Command::Info { input, profile: false } => {
             let inputs = input::load(&input)?;
             let outcome = eightr_core::run(&inputs, &Config::default())?;
             let r = &outcome.report;

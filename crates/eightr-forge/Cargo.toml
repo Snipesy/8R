@@ -1,0 +1,25 @@
+[package]
+name = "eightr-forge"
+description = "Forges LibDB packs: library fingerprints from scenario builds of an app's build profile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "8r-forge"
+path = "src/main.rs"
+
+[dependencies]
+eightr-core.workspace = true
+eightr-dex.workspace = true
+eightr-ir.workspace = true
+eightr-mapping.workspace = true
+eightr-rules.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+zip.workspace = true
+clap = { version = "4", features = ["derive"] }
+
+[lints]
+workspace = true

@@ -14,6 +14,7 @@ eightr-core.workspace = true
 eightr-dex.workspace = true
 eightr-rules.workspace = true
 clap = { version = "4", features = ["derive"] }
+serde_json.workspace = true
 
 [lints]
 workspace = true

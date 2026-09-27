@@ -1,0 +1,275 @@
+//! A LibDB pack: fingerprints of library code as R8 emitted it in the forge's scenario builds of
+//! one build profile (docs/research/libdb.md). Built by `8r-forge` (the only place a mapping is
+//! read: to key the records); 8R only reads it.
+//!
+//! Records are keyed by the original (class, name, proto) the scenario's mapping gives; one record
+//! per distinct body, with the set of scenarios that produced it. `unique` marks a body hash that
+//! belongs to exactly one original method across every scenario of the pack.
+//!
+//! File format (`*.8rpack`): `8RPACK01`, then a raw-deflate stream of little-endian fields
+//! (strings as u32 length + UTF-8, lists as u32 count + items).
+
+use std::io::{Read, Write};
+
+use super::profile::Profile;
+use crate::sigdb::print::SKETCH;
+
+const MAGIC: &[u8; 8] = b"8RPACK01";
+/// No artifact (a class the closure doesn't own, e.g. R8's own).
+pub const NO_ARTIFACT: u32 = u32::MAX;
+/// A callee or frame method outside the key table.
+pub const NO_METHOD: u32 = u32::MAX;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pack {
+    pub profile: Profile,
+    /// The resolved closure: `group:artifact:version sha256 url`, sorted.
+    pub lock: Vec<String>,
+    /// The scenario catalog the pack was forged from (verbatim).
+    pub catalog: String,
+    /// Tool identities: (`r8`, version + sha256), (`javac`, version), (`android.jar`, sha256), ...
+    pub tools: Vec<(String, String)>,
+    /// Scenario names; bit `i` of a `scenarios` mask is `scenarios[i]` (at most 64).
+    pub scenarios: Vec<String>,
+    /// `group:artifact:version` of the closure.
+    pub artifacts: Vec<String>,
+    /// (original class descriptor, owning artifact or [`NO_ARTIFACT`]).
+    pub classes: Vec<(String, u32)>,
+    /// (class index, original name, original proto descriptor).
+    pub methods: Vec<(u32, String, String)>,
+    pub records: Vec<Record>,
+    pub class_records: Vec<ClassRecord>,
+    /// Inline stacks, innermost frame first: (method index, original line or -1).
+    pub stacks: Vec<Vec<(u32, i32)>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Record {
+    pub method: u32,
+    pub scenarios: u64,
+    pub informative: bool,
+    /// The body hash maps to this method only, across the whole pack.
+    pub unique: bool,
+    pub all: u64,
+    pub strings: u64,
+    pub proto: u64,
+    pub sketch: [u32; SKETCH],
+    /// Program callees: (erased call token, callee method index or [`NO_METHOD`]).
+    pub callees: Vec<(u64, u32)>,
+    /// Inlined code: (first instruction, end instruction exclusive, stack index), over the body
+    /// as fingerprinted (after 8R's rewrites).
+    pub frames: Vec<(u32, u32, u32)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ClassRecord {
+    pub class: u32,
+    pub scenarios: u64,
+    pub c2: u64,
+    pub c3: u64,
+}
+
+#[derive(Default)]
+struct W(Vec<u8>);
+
+impl W {
+    fn u8(&mut self, v: u8) {
+        self.0.push(v);
+    }
+    fn u32(&mut self, v: u32) {
+        self.0.extend(v.to_le_bytes());
+    }
+    fn i32(&mut self, v: i32) {
+        self.0.extend(v.to_le_bytes());
+    }
+    fn u64(&mut self, v: u64) {
+        self.0.extend(v.to_le_bytes());
+    }
+    fn str(&mut self, s: &str) {
+        self.u32(s.len() as u32);
+        self.0.extend(s.as_bytes());
+    }
+    fn len(&mut self, n: usize) {
+        self.u32(n as u32);
+    }
+}
+
+struct R<'a> {
+    b: &'a [u8],
+    at: usize,
+}
+
+impl R<'_> {
+    fn take(&mut self, n: usize) -> Result<&[u8], String> {
+        let end = self.at.checked_add(n).filter(|&e| e <= self.b.len()).ok_or("truncated pack")?;
+        let s = &self.b[self.at..end];
+        self.at = end;
+        Ok(s)
+    }
+    fn u8(&mut self) -> Result<u8, String> {
+        Ok(self.take(1)?[0])
+    }
+    fn u32(&mut self) -> Result<u32, String> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into().expect("4 bytes")))
+    }
+    fn i32(&mut self) -> Result<i32, String> {
+        Ok(i32::from_le_bytes(self.take(4)?.try_into().expect("4 bytes")))
+    }
+    fn u64(&mut self) -> Result<u64, String> {
+        Ok(u64::from_le_bytes(self.take(8)?.try_into().expect("8 bytes")))
+    }
+    fn str(&mut self) -> Result<String, String> {
+        let n = self.u32()? as usize;
+        String::from_utf8(self.take(n)?.to_vec()).map_err(|e| e.to_string())
+    }
+    /// A list count, bounded by the bytes left (each item takes at least one byte).
+    fn len(&mut self) -> Result<usize, String> {
+        let n = self.u32()? as usize;
+        if n > self.b.len() - self.at {
+            return Err("corrupt pack: list longer than the file".into());
+        }
+        Ok(n)
+    }
+}
+
+impl Pack {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut w = W::default();
+        w.str(&self.profile.canonical());
+        w.len(self.lock.len());
+        for l in &self.lock {
+            w.str(l);
+        }
+        w.str(&self.catalog);
+        w.len(self.tools.len());
+        for (k, v) in &self.tools {
+            w.str(k);
+            w.str(v);
+        }
+        for list in [&self.scenarios, &self.artifacts] {
+            w.len(list.len());
+            for s in list {
+                w.str(s);
+            }
+        }
+        w.len(self.classes.len());
+        for (c, a) in &self.classes {
+            w.str(c);
+            w.u32(*a);
+        }
+        w.len(self.methods.len());
+        for (c, n, p) in &self.methods {
+            w.u32(*c);
+            w.str(n);
+            w.str(p);
+        }
+        w.len(self.records.len());
+        for r in &self.records {
+            w.u32(r.method);
+            w.u64(r.scenarios);
+            w.u8(u8::from(r.informative) | (u8::from(r.unique) << 1));
+            w.u64(r.all);
+            w.u64(r.strings);
+            w.u64(r.proto);
+            for x in r.sketch {
+                w.u32(x);
+            }
+            w.len(r.callees.len());
+            for (t, k) in &r.callees {
+                w.u64(*t);
+                w.u32(*k);
+            }
+            w.len(r.frames.len());
+            for (a, b, s) in &r.frames {
+                w.u32(*a);
+                w.u32(*b);
+                w.u32(*s);
+            }
+        }
+        w.len(self.class_records.len());
+        for r in &self.class_records {
+            w.u32(r.class);
+            w.u64(r.scenarios);
+            w.u64(r.c2);
+            w.u64(r.c3);
+        }
+        w.len(self.stacks.len());
+        for st in &self.stacks {
+            w.len(st.len());
+            for (m, l) in st {
+                w.u32(*m);
+                w.i32(*l);
+            }
+        }
+        let mut out = MAGIC.to_vec();
+        let mut z = flate2::write::DeflateEncoder::new(&mut out, flate2::Compression::best());
+        z.write_all(&w.0).expect("in-memory write");
+        z.finish().expect("in-memory write");
+        out
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Pack, String> {
+        let body = bytes.strip_prefix(MAGIC.as_slice()).ok_or("not a LibDB pack")?;
+        let mut raw = Vec::new();
+        flate2::read::DeflateDecoder::new(body).read_to_end(&mut raw).map_err(|e| e.to_string())?;
+        let mut r = R { b: &raw, at: 0 };
+        let profile = Profile::parse(&r.str()?)?;
+        let lock = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
+        let catalog = r.str()?;
+        let tools = (0..r.len()?).map(|_| Ok((r.str()?, r.str()?))).collect::<Result<_, String>>()?;
+        let scenarios: Vec<String> = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
+        let artifacts = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
+        let classes = (0..r.len()?).map(|_| Ok((r.str()?, r.u32()?))).collect::<Result<_, String>>()?;
+        let methods = (0..r.len()?).map(|_| Ok((r.u32()?, r.str()?, r.str()?))).collect::<Result<_, String>>()?;
+        let n = r.len()?;
+        let mut records = Vec::with_capacity(n);
+        for _ in 0..n {
+            let method = r.u32()?;
+            let scenarios = r.u64()?;
+            let flags = r.u8()?;
+            let (all, strings, proto) = (r.u64()?, r.u64()?, r.u64()?);
+            let mut sketch = [0u32; SKETCH];
+            for x in &mut sketch {
+                *x = r.u32()?;
+            }
+            let callees = (0..r.len()?).map(|_| Ok((r.u64()?, r.u32()?))).collect::<Result<_, String>>()?;
+            let frames = (0..r.len()?).map(|_| Ok((r.u32()?, r.u32()?, r.u32()?))).collect::<Result<_, String>>()?;
+            records.push(Record { method, scenarios, informative: flags & 1 != 0, unique: flags & 2 != 0, all, strings, proto, sketch, callees, frames });
+        }
+        let class_records = (0..r.len()?).map(|_| Ok(ClassRecord { class: r.u32()?, scenarios: r.u64()?, c2: r.u64()?, c3: r.u64()? })).collect::<Result<_, String>>()?;
+        let stacks = (0..r.len()?).map(|_| (0..r.len()?).map(|_| Ok((r.u32()?, r.i32()?))).collect::<Result<Vec<_>, String>>()).collect::<Result<_, _>>()?;
+        if r.at != raw.len() {
+            return Err("trailing bytes in pack".into());
+        }
+        if scenarios.len() > 64 {
+            return Err("pack has more than 64 scenarios".into());
+        }
+        Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::libdb::profile::Coord;
+
+    #[test]
+    fn round_trip() {
+        let p = Pack {
+            profile: Profile { r8: "9.4.24".into(), min_api: 26, mode: "full".into(), libraries: vec![Coord::parse("a.b:c:1.0").unwrap()] },
+            lock: vec!["a.b:c:1.0 00ff https://x/c.jar".into()],
+            catalog: "lib-alone all\n".into(),
+            tools: vec![("r8".into(), "9.4.24".into())],
+            scenarios: vec!["all".into()],
+            artifacts: vec!["a.b:c:1.0".into()],
+            classes: vec![("La/b/C;".into(), 0), ("LR8$$;".into(), NO_ARTIFACT)],
+            methods: vec![(0, "f".into(), "()V".into())],
+            records: vec![Record { method: 0, scenarios: 1, informative: true, unique: true, all: 7, strings: 0, proto: 3, sketch: [9; SKETCH], callees: vec![(5, NO_METHOD)], frames: vec![(0, 3, 0)] }],
+            class_records: vec![ClassRecord { class: 0, scenarios: 1, c2: 1, c3: 2 }],
+            stacks: vec![vec![(0, 12), (0, -1)]],
+        };
+        let bytes = p.encode();
+        assert_eq!(Pack::decode(&bytes).unwrap(), p);
+        assert!(Pack::decode(&bytes[..bytes.len() - 3]).is_err());
+    }
+}
