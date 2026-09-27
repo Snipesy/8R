@@ -208,6 +208,7 @@ dependencies = [
  "eightr-core",
  "eightr-dex",
  "eightr-rules",
+ "serde_json",
 ]
 
 [[package]]
@@ -240,6 +241,22 @@ dependencies = [
  "eightr-dex",
  "eightr-ir",
  "sha1",
+]
+
+[[package]]
+name = "eightr-forge"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "eightr-core",
+ "eightr-dex",
+ "eightr-ir",
+ "eightr-mapping",
+ "eightr-rules",
+ "serde",
+ "serde_json",
+ "sha2",
+ "zip",
 ]
 
 [[package]]
@@ -541,6 +558,7 @@ version = "0.1.0"
 dependencies = [
  "eightr-core",
  "eightr-dex",
+ "eightr-forge",
  "eightr-ir",
  "eightr-mapping",
  "eightr-rules",

@@ -1,0 +1,205 @@
+//! One scenario build → fingerprint records keyed by original names. The residual program is
+//! normalized by 8R's own rewrites first (outlines inlined back, merged classes split), exactly as
+//! an app is before matching; classes 8R split, R8's synthesized code and classes the closure
+//! doesn't own (the generated callers) get no records.
+//!
+//! Inline frames come from the mapping: each instruction's residual line (its debug position, or
+//! its pc when the method has none: R8's pc encoding) → the stack of frames R8 recorded there. They
+//! are computed before the rewrites and carried to the normalized body by pc, only where the
+//! instruction is unchanged.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+
+use eightr_core::sigdb::print::{class_print, method_print, platform_stable, reflective_strings, SKETCH};
+use eightr_ir::model::Program as Model;
+use eightr_mapping::{ClassMapping, Mapping, MethodMapping};
+
+use crate::names::{descriptor, Names};
+use crate::tools::{read, read_string, Result};
+
+/// An original method: (class descriptor, name, proto).
+pub type Key = (String, String, String);
+/// Inlined code: (first insn, end insn, stack innermost first: (method, line)).
+pub type Frames = Vec<(u32, u32, Vec<(Key, i32)>)>;
+/// A residual method's pc → (op hash, inline stack).
+pub type FrameTable = BTreeMap<u32, (u64, Vec<(Key, i32)>)>;
+type Runs<'a> = BTreeMap<&'a str, Vec<(u32, u32, Vec<&'a MethodMapping>)>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MethodOut {
+    pub key: Key,
+    pub informative: bool,
+    pub all: u64,
+    pub strings: u64,
+    pub proto: u64,
+    pub sketch: [u32; SKETCH],
+    pub callees: Vec<(u64, Option<Key>)>,
+    pub frames: Frames,
+}
+
+#[derive(Debug, Default)]
+pub struct ScenarioOut {
+    pub methods: Vec<MethodOut>,
+    /// (original class, C2, C3).
+    pub classes: Vec<(String, u64, u64)>,
+}
+
+pub fn load_dex_dir(dir: &Path) -> Result<Model> {
+    let mut bytes = Vec::new();
+    for i in 1.. {
+        let f = dir.join(if i == 1 { "classes.dex".to_string() } else { format!("classes{i}.dex") });
+        if !f.exists() {
+            break;
+        }
+        bytes.push(read(&f)?);
+    }
+    if bytes.is_empty() {
+        return Err(format!("{}: no classes.dex", dir.display()));
+    }
+    let dexes: Vec<eightr_dex::Dex> = bytes.iter().map(|b| eightr_dex::Dex::parse(b).map_err(|e| format!("{e:?}"))).collect::<Result<_>>()?;
+    let refs: Vec<&eightr_dex::Dex> = dexes.iter().collect();
+    Model::load(&refs).map_err(|e| format!("{e:?}"))
+}
+
+/// `void f(int,java.lang.String)` + owner → an original key.
+fn frame_key(owner_dotted: &str, m: &MethodMapping) -> Key {
+    let ps: String = m.params.iter().map(|t| descriptor(t)).collect();
+    (descriptor(owner_dotted), m.original_name.clone(), format!("({ps}){}", descriptor(&m.return_type)))
+}
+
+/// A class's inline runs: residual method name → [(first line, last line, frames innermost first)].
+fn runs(cm: &ClassMapping) -> Runs<'_> {
+    let all: Vec<&MethodMapping> = cm.methods().map(|x| x.0).collect();
+    let mut out = Runs::new();
+    let mut i = 0;
+    while i < all.len() {
+        let m = all[i];
+        let Some((a, b)) = m.minified_range else {
+            i += 1;
+            continue;
+        };
+        let mut j = i;
+        while j + 1 < all.len() && all[j + 1].obfuscated == m.obfuscated && all[j + 1].minified_range == m.minified_range {
+            j += 1;
+        }
+        out.entry(m.obfuscated.as_str()).or_default().push((a, b, all[i..=j].to_vec()));
+        i = j + 1;
+    }
+    out
+}
+
+fn op_hash(op: &eightr_ir::op::Op) -> u64 {
+    eightr_core::sigdb::print::fnv(format!("{op:?}").as_bytes())
+}
+
+/// Per residual method: pc → (op hash, inline stack), for instructions with inlined frames.
+pub type PreFrames = BTreeMap<(String, String, String), FrameTable>;
+
+pub fn pre_frames(model: &Model, mapping: &Mapping) -> PreFrames {
+    let by_obf = mapping.by_obfuscated();
+    let s = &model.syms;
+    let mut out = PreFrames::new();
+    for c in &model.classes {
+        let rc = s.get(c.ty);
+        let dotted = rc.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
+        let Some(&k) = by_obf.get(dotted.as_str()) else { continue };
+        let cm = &mapping.classes[k];
+        let rs = runs(cm);
+        for m in &c.methods {
+            let Some(b) = &m.code else { continue };
+            let Some(list) = rs.get(s.get(m.name)) else { continue };
+            let mut table = BTreeMap::new();
+            let mut pos = b.positions.iter().peekable();
+            let mut line: Option<i64> = None;
+            for (idx, x) in b.insns.iter().enumerate() {
+                while let Some(&&(pi, l)) = pos.peek() {
+                    if pi as usize > idx {
+                        break;
+                    }
+                    line = Some(l);
+                    pos.next();
+                }
+                let l = if b.positions.is_empty() { i64::from(x.pc) } else { line.unwrap_or(0) };
+                let Ok(l) = u32::try_from(l) else { continue };
+                // Overloads share a residual name; their ranges are disjoint.
+                let Some((_, _, frames)) = list.iter().find(|(a, e, _)| *a <= l && l <= *e) else { continue };
+                if frames.len() < 2 {
+                    continue;
+                }
+                let stack: Vec<(Key, i32)> = frames[..frames.len() - 1]
+                    .iter()
+                    .map(|f| {
+                        let owner = f.original_owner.clone().unwrap_or_else(|| cm.original.clone());
+                        (frame_key(&owner, f), f.original_line(l).and_then(|x| i32::try_from(x).ok()).unwrap_or(-1))
+                    })
+                    .collect();
+                table.insert(x.pc, (op_hash(&x.op), stack));
+            }
+            if !table.is_empty() {
+                out.insert((rc.to_string(), s.get(m.name).to_string(), s.get(m.proto).to_string()), table);
+            }
+        }
+    }
+    out
+}
+
+/// The inline frames of a normalized body: runs of instructions carried over by pc (and unchanged)
+/// from the residual method's table.
+pub fn body_frames(table: &FrameTable, b: &eightr_ir::lift::Body) -> Frames {
+    let mut fr = Frames::new();
+    for (idx, x) in b.insns.iter().enumerate() {
+        let Some((_, stack)) = table.get(&x.pc).filter(|(h, _)| *h == op_hash(&x.op)) else { continue };
+        let idx = idx as u32;
+        match fr.last_mut() {
+            Some(last) if last.1 == idx && &last.2 == stack => last.1 = idx + 1,
+            _ => fr.push((idx, idx + 1, stack.clone())),
+        }
+    }
+    fr
+}
+
+/// Fingerprints one scenario's output directory (dex files + `mapping.txt`). `owned` says whether
+/// an original class belongs to the closure.
+pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut> {
+    let mut model = load_dex_dir(dir)?;
+    let mapping = Mapping::parse_normalized(&read_string(&dir.join("mapping.txt"))?).map_err(|e| format!("{e:?}"))?;
+    let names = Names::new(&mapping);
+    let frames = pre_frames(&model, &mapping);
+    let program: BTreeSet<String> = model.classes.iter().map(|c| model.syms.get(c.ty).to_string()).collect();
+    let rewrites = eightr_core::rewrites::run_all(&mut model).map_err(|e| e.to_string())?;
+    let split: BTreeSet<String> = rewrites.iter().filter(|r| r.rule == eightr_rules::SPLIT_MERGED_CLASS).map(|r| r.item.clone()).collect();
+    let model = &model;
+    let s = &model.syms;
+    let stable = |d: &str| platform_stable(d);
+    let reflective = reflective_strings(model);
+    let mut out = ScenarioOut::default();
+    for (ci, c) in model.classes.iter().enumerate() {
+        let rc = s.get(c.ty);
+        if !program.contains(rc) || split.contains(rc) || names.synthesized_classes.contains(rc) {
+            continue;
+        }
+        let oc = names.class(rc);
+        if owned(&oc) {
+            let cp = class_print(model, ci, &stable);
+            out.classes.push((oc, cp.c2, cp.c3));
+        }
+        for (mi, m) in c.methods.iter().enumerate() {
+            let Some(mp) = method_print(model, ci, mi, &stable, &reflective) else { continue };
+            let (rn, rp) = (s.get(m.name), s.get(m.proto));
+            let Some(key) = names.method(rc, rn, rp) else { continue };
+            if !owned(&key.0) {
+                continue;
+            }
+            let callees = mp.callees.iter().map(|(tok, (cc, cn, cpr))| (*tok, if program.contains(cc.as_str()) { names.method(cc, cn, cpr) } else { None })).collect();
+            let fr = match (frames.get(&(rc.to_string(), rn.to_string(), rp.to_string())), &m.code) {
+                (Some(table), Some(b)) => body_frames(table, b),
+                _ => Vec::new(),
+            };
+            out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });
+        }
+    }
+    out.methods.sort();
+    out.classes.sort();
+    Ok(out)
+}
