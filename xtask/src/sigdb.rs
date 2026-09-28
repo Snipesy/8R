@@ -93,7 +93,7 @@ pub fn sigdb(only: &[String]) -> Result<(), String> {
         }
         eprintln!("sigdb {} {} ({})", e.library, e.version, e.coord);
         let profile = Profile { r8: R8.into(), min_api: MIN_API, mode: "full".into(), libraries: vec![e.coord.clone()] };
-        let opts = eightr_forge::build::Options { catalog: eightr_forge::catalog::DEFAULT.to_string(), pins: Vec::new(), jobs: 4, log: false };
+        let opts = eightr_forge::build::Options { catalog: eightr_forge::catalog::DEFAULT.to_string(), pins: Vec::new(), jobs: 4, log: false, app: None };
         let (_, pack) = eightr_forge::build::build(&profile, &opts)?;
         let r8 = pack.tools.iter().find(|t| t.0 == "r8").map(|t| t.1.clone()).unwrap_or_default();
         let db = dbs.entry(e.library.clone()).or_insert_with(|| SigDb::new(&e.library, &r8));
