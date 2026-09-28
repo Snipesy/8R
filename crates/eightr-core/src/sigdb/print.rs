@@ -136,6 +136,18 @@ fn op_token(op: &Op) -> Option<&'static str> {
     })
 }
 
+/// Whether an int constant is an app resource id (`0x7fTTEEEE`: package 0x7f, a small type id,
+/// entry). The numbers are assigned per app build (library code's `R.id.x` folds into them), so
+/// fingerprints keep only that it is one. (aapt's type ids are small: `Integer.MAX_VALUE`,
+/// `0x7fffffff`, isn't one.)
+pub fn is_app_resource_id(v: i32) -> bool {
+    let v = v as u32;
+    v >> 24 == 0x7f && (1..=0x40).contains(&((v >> 16) & 0xff))
+}
+
+/// The fingerprint token of every app resource id.
+const APP_RESOURCE_ID: i64 = 0x7f00_0000;
+
 struct Tokens {
     ops: Vec<&'static str>,
     refs: Vec<String>,
@@ -162,6 +174,7 @@ fn tokens(p: &Model, body: &Body, stable: &dyn Fn(&str) -> bool, reflective: &dy
         match &x.op {
             Op::Const { value, .. } => {
                 let v = match value {
+                    Const::Narrow(k) if is_app_resource_id(*k) => APP_RESOURCE_ID,
                     Const::Narrow(k) => i64::from(*k),
                     Const::Wide(k) => *k,
                 };
@@ -319,4 +332,15 @@ pub fn class_print(p: &Model, ci: usize, stable: &dyn Fn(&str) -> bool) -> Class
     let sup = sup.unwrap_or_default();
     let base = [sup.as_str(), &ifaces.join(","), &inst.join(",")];
     ClassPrint { class: ci, c2: hash_parts(&[base[0], base[1], base[2], &stat.join(",")]), c3: hash_parts(&base) }
+}
+
+#[cfg(test)]
+mod resource_id_tests {
+    #[test]
+    fn app_resource_ids() {
+        assert!(super::is_app_resource_id(0x7f0a01e1));
+        assert!(!super::is_app_resource_id(0x7fffffff));
+        assert!(!super::is_app_resource_id(0x7f000000));
+        assert!(!super::is_app_resource_id(0x0101_0000));
+    }
 }

@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 pub struct ClassWriter {
     cp: Vec<Vec<u8>>,
     index: BTreeMap<Vec<u8>, u16>,
+    fields: Vec<Vec<u8>>,
     methods: Vec<Vec<u8>>,
 }
 
@@ -61,6 +62,39 @@ impl ClassWriter {
         self.entry(e)
     }
 
+    pub fn field_ref(&mut self, owner: &str, name: &str, desc: &str) -> u16 {
+        let c = self.class(owner);
+        let (n, d) = (self.utf8(name), self.utf8(desc));
+        let mut nat = vec![12];
+        nat.extend(n.to_be_bytes());
+        nat.extend(d.to_be_bytes());
+        let nat = self.entry(nat);
+        let mut e = vec![9];
+        e.extend(c.to_be_bytes());
+        e.extend(nat.to_be_bytes());
+        self.entry(e)
+    }
+
+    /// Adds a field, with an int `ConstantValue` when given.
+    pub fn field(&mut self, access: u16, name: &str, desc: &str, constant: Option<i32>) {
+        let (n, d) = (self.utf8(name), self.utf8(desc));
+        let mut f = Vec::new();
+        f.extend(access.to_be_bytes());
+        f.extend(n.to_be_bytes());
+        f.extend(d.to_be_bytes());
+        match constant {
+            None => f.extend(0u16.to_be_bytes()),
+            Some(v) => {
+                let (attr, val) = (self.utf8("ConstantValue"), self.integer(v));
+                f.extend(1u16.to_be_bytes());
+                f.extend(attr.to_be_bytes());
+                f.extend(2u32.to_be_bytes());
+                f.extend(val.to_be_bytes());
+            }
+        }
+        self.fields.push(f);
+    }
+
     /// Adds a method; `code` is (max stack, max locals, bytecode).
     pub fn method(&mut self, access: u16, name: &str, desc: &str, code: Option<(u16, u16, Vec<u8>)>) {
         let (n, d) = (self.utf8(name), self.utf8(desc));
@@ -86,7 +120,7 @@ impl ClassWriter {
         self.methods.push(m);
     }
 
-    /// The class file (Java 8, no interfaces or fields).
+    /// The class file (Java 8, no interfaces).
     pub fn finish(mut self, this: &str, superclass: &str, access: u16) -> Vec<u8> {
         let (t, s) = (self.class(this), self.class(superclass));
         let mut out = vec![0xCA, 0xFE, 0xBA, 0xBE, 0, 0, 0, 52];
@@ -98,7 +132,10 @@ impl ClassWriter {
         out.extend(t.to_be_bytes());
         out.extend(s.to_be_bytes());
         out.extend(0u16.to_be_bytes()); // interfaces
-        out.extend(0u16.to_be_bytes()); // fields
+        out.extend((self.fields.len() as u16).to_be_bytes());
+        for f in &self.fields {
+            out.extend(f);
+        }
         out.extend((self.methods.len() as u16).to_be_bytes());
         for m in &self.methods {
             out.extend(m);

@@ -25,6 +25,8 @@ pub struct Scenario {
     pub frac: f64,
     pub seed: u64,
     pub scope: Scope,
+    /// `part=I/K`: the entries in hash bucket I of K (disjoint scenarios), instead of `frac`/`seed`.
+    pub part: Option<(u32, u32)>,
 }
 
 pub fn parse(text: &str) -> Result<Vec<Scenario>> {
@@ -47,12 +49,16 @@ pub fn parse(text: &str) -> Result<Vec<Scenario>> {
         if !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') || out.iter().any(|s| s.name == name) {
             return Err(err("names are unique [A-Za-z0-9_-]+"));
         }
-        let mut s = Scenario { kind, name, frac: 0.05, seed: 1, scope: Scope::Declared };
+        let mut s = Scenario { kind, name, frac: 0.05, seed: 1, scope: Scope::Declared, part: None };
         for kv in &w[2..] {
             let (k, v) = kv.split_once('=').ok_or_else(|| err(&format!("expected key=value, got {kv}")))?;
             match k {
                 "frac" => s.frac = v.parse().ok().filter(|f: &f64| *f > 0.0 && *f <= 1.0).ok_or_else(|| err("frac in (0, 1]"))?,
                 "seed" => s.seed = v.parse().map_err(|_| err("seed is an integer"))?,
+                "part" => {
+                    let (i, k) = v.split_once('/').and_then(|(i, k)| Some((i.parse::<u32>().ok()?, k.parse::<u32>().ok()?))).filter(|(i, k)| i < k).ok_or_else(|| err("part is I/K with I < K"))?;
+                    s.part = Some((i, k));
+                }
                 "scope" => {
                     s.scope = match v {
                         "declared" => Scope::Declared,
@@ -81,6 +87,6 @@ mod tests {
         assert!(s.len() >= 3 && s[0].kind == Kind::LibAlone);
         assert!(parse("roots a frac=2").is_err());
         assert!(parse("roots a\nroots a").is_err());
-        assert_eq!(parse("callers c frac=0.1 seed=7 scope=closure").unwrap()[0], Scenario { kind: Kind::Callers, name: "c".into(), frac: 0.1, seed: 7, scope: Scope::Closure });
+        assert_eq!(parse("callers c frac=0.1 seed=7 scope=closure").unwrap()[0], Scenario { kind: Kind::Callers, name: "c".into(), frac: 0.1, seed: 7, scope: Scope::Closure, part: None });
     }
 }

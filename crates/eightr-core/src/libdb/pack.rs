@@ -6,7 +6,7 @@
 //! per distinct body, with the set of scenarios that produced it. `unique` marks a body hash that
 //! belongs to exactly one original method across every scenario of the pack.
 //!
-//! File format (`*.8rpack`): `8RPACK02`, then a raw-deflate stream of little-endian fields
+//! File format (`*.8rpack`): `8RPACK03`, then a raw-deflate stream of little-endian fields
 //! (strings as u32 length + UTF-8, lists as u32 count + items).
 
 use std::io::{Read, Write};
@@ -14,7 +14,7 @@ use std::io::{Read, Write};
 use super::profile::Profile;
 use crate::sigdb::print::SKETCH;
 
-const MAGIC: &[u8; 8] = b"8RPACK02";
+const MAGIC: &[u8; 8] = b"8RPACK03";
 /// Largest inflated pack accepted (a corrupt or hostile file can't exhaust memory).
 const MAX_RAW: u64 = 2 << 30;
 /// No artifact (a class the closure doesn't own, e.g. R8's own).
@@ -44,6 +44,9 @@ pub struct Pack {
     pub class_records: Vec<ClassRecord>,
     /// Inline stacks, innermost frame first: (method index, original line or -1).
     pub stacks: Vec<Vec<(u32, i32)>>,
+    /// The app this pack was forged for (its scenarios keep what that app's build kept), as
+    /// `libdb::app_id` of its dex files; empty for a pack of the profile alone.
+    pub app: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -154,6 +157,7 @@ impl Pack {
     pub fn encode(&self) -> Vec<u8> {
         let mut w = W::default();
         w.str(&self.profile.canonical());
+        w.str(&self.app);
         w.len(self.lock.len());
         for l in &self.lock {
             w.str(l);
@@ -238,6 +242,7 @@ impl Pack {
         }
         let mut r = R { b: &raw, at: 0 };
         let profile = Profile::parse(&r.str()?)?;
+        let app = r.str()?;
         let lock = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
         let catalog = r.str()?;
         let tools = (0..r.len()?).map(|_| Ok((r.str()?, r.str()?))).collect::<Result<_, String>>()?;
@@ -289,7 +294,7 @@ impl Pack {
         if bad_name {
             return Err("corrupt pack: invalid class or member name".into());
         }
-        Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks })
+        Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks, app })
     }
 }
 
@@ -312,6 +317,7 @@ mod tests {
             records: vec![Record { method: 0, scenarios: 1, informative: true, unique: true, all: 7, strings: 0, proto: 3, sketch: [9; SKETCH], callees: vec![(5, NO_METHOD)], frames: vec![(0, 3, 0)] }],
             class_records: vec![ClassRecord { class: 0, scenarios: 1, c2: 1, c3: 2 }],
             stacks: vec![vec![(0, 12), (0, -1)]],
+            app: "ab12".into(),
         };
         let bytes = p.encode();
         assert_eq!(Pack::decode(&bytes).unwrap(), p);

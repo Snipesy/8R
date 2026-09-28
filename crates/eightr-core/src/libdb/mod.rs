@@ -92,7 +92,19 @@ pub struct LibDbs {
 /// reported and ignored). The result doesn't depend on the order packs are given in: they're
 /// ordered by (profile, catalog, tools, lock), and of packs for the same profile the first in that
 /// order is used, with a warning.
-pub fn select(packs: &[Pack], app: Option<&Profile>, findings: &mut Vec<Finding>) -> LibDbs {
+/// The identity of an app's code: sha256 over its dex files' sha256s (hex, input order). A pack
+/// forged for one app (`Pack::app`) is used for that app only.
+pub fn app_id(dex_sha256s: &[String]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    for s in dex_sha256s {
+        h.update(s.as_bytes());
+        h.update(b"\n");
+    }
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+pub fn select(packs: &[Pack], app: Option<&Profile>, app_code: &str, findings: &mut Vec<Finding>) -> LibDbs {
     let code = code_id();
     let mut notes: Vec<Finding> = Vec::new();
     let mut ok: Vec<&Pack> = Vec::new();
@@ -103,6 +115,10 @@ pub fn select(packs: &[Pack], app: Option<&Profile>, findings: &mut Vec<Finding>
                 severity: Severity::Warning,
                 message: format!("libdb: pack {} was forged by other fingerprint code ({}, this 8R: {code}); ignored, forge it again", p.profile.key(), theirs.unwrap_or("unknown")),
             });
+            continue;
+        }
+        if !p.app.is_empty() && p.app != app_code {
+            notes.push(Finding { severity: Severity::Warning, message: format!("libdb: pack {} was forged for another app; ignored", p.profile.key()) });
             continue;
         }
         match app {
@@ -117,7 +133,8 @@ pub fn select(packs: &[Pack], app: Option<&Profile>, findings: &mut Vec<Finding>
             }),
         }
     }
-    let order = |p: &Pack| (p.profile.key(), p.catalog.clone(), p.tools.clone(), p.lock.clone(), p.records.len());
+    // An app's own pack before a profile pack.
+    let order = |p: &Pack| (p.profile.key(), p.app.is_empty(), p.catalog.clone(), p.tools.clone(), p.lock.clone(), p.records.len());
     ok.sort_by_key(|p| order(p));
     let mut out = LibDbs::default();
     let mut used: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();

@@ -347,3 +347,54 @@ and 8R output is byte-identical with and without a pack.
 - **After the fixes:** `sigdb_app` holds at 98.4% / 76.6%, and Gretio has 4927 sigdb names, down
   from 4981 before the fixes (exact `$default` keying; no displacement by guessed versions). It
   ART-verifies and runs.
+
+## 9. Matching the app's build context: `setContent`
+
+In Gretio, `setContent { … }` (activity-compose) was the method that stayed unnamed. Three generic
+gaps between the scenarios and a real app build caused it. Each is fixed below, and the method now
+fingerprints identically (`12fecb805b8c39ff`) in 16 of the 17 scenarios and in the app.
+
+1. **App-derived pins** (`pins.rs`).
+   - **Problem:** the app's build kept library code for reasons the forge can't see: AGP's
+     manifest and layout rules, the app's own rules, reflection. Gretio keeps `ComposeView`'s name
+     and constructors, and R8 compiles `setContent` around those pins.
+   - **What counts as a pin:** a closure class whose exact descriptor is in the app dex kept its
+     name. A member counts when it has the library's name (at least 3 characters) and descriptor,
+     or a unique library name of at least 4 characters with compatible parameter kinds; the app may
+     have renamed the types.
+   - **Use:** the pins become `-keep` rules in every scenario (Gretio: 409 classes).
+   - **Per-app packs:** `8r-forge build APP` records `Pack::app`, the sha256 of the app's dex
+     files (`libdb::app_id`). 8R uses such a pack for that app only. Its own pack goes before a
+     profile pack.
+2. **Library `R` classes** (`rclass.rs`).
+   - **Problem:** an app build generates every library's `R` classes with final ids, and R8 folds
+     `R.id.x` into constants. That is what makes `ViewTreeLifecycleOwner.set` a
+     `setTag(0x7f…, owner)` small enough to inline into `setContent`. AARs ship only `R.txt`.
+   - **Fix:** the forge writes the `…/R$<type>` classes the closure's bytecode reads, with ids by
+     sorted (type, name) and styleable indices and array lengths from the AARs' `R.txt`, and adds
+     them to every scenario.
+   - **Fingerprints on both sides** normalize app resource ids (`0x7f` package, type 1..0x40) to
+     one token, because the numbers are per app (`sigdb::print::is_app_resource_id`).
+3. **Default-argument calls in disjoint parts.**
+   - **Problem:** calling every bridge in one scenario adds call edges an app doesn't have, which
+     changes single-caller inlining.
+   - **Fix:** `defaults` is split by hash bucket (`part=I/K`, 4 parts).
+   - **Keying:** a bridge whose function is inlined into it is keyed as the function only when R8
+     removed its mask and marker (every caller passed the same defaults), because then the body is
+     the function specialized with them. A bridge that kept its mask stays a bridge.
+   - **Ambiguity:** the specialized body is also what an app has when R8 inlined the function into
+     the surviving bridge. The name `f` vs `f$default` is R8's context-dependent choice, and the
+     pack uses the API name `f`. `grade` counts these separately.
+
+**Results:**
+
+- **Gretio:** `setContent(ComponentActivity, ComposableLambdaImpl)` is named; 5003 sigdb names;
+  ART-verifies and runs.
+- **`enableEdgeToEdge`** is still unmatched. In the app, R8 inlines `SystemBarStyle.auto` into it
+  twice, and no scenario reproduces that call-graph context yet.
+- **`compose_lib` fixture:** 40.3% recall, 98.47% precision (99.44% when the 35 cases that name
+  the same code `f` rather than `f$default` count as right).
+  - Recall is down from 42.5% because the fixture build is unrealistic: xtask builds it without
+    AGP, so its 149 library `R` field reads stay unresolved field reads instead of constants.
+  - Follow-up: have the fixture pipeline generate library `R` classes as AGP does.
+- **`sigdb_app`:** 98.4% precision, 76.3% recall.

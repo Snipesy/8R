@@ -80,7 +80,14 @@ fn run(cli: Cli) -> Result<(), String> {
                 Some(p) => std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?,
                 None => eightr_forge::catalog::DEFAULT.to_string(),
             };
-            let opts = eightr_forge::build::Options { catalog, pins: pins(&pin)?, jobs, log: true };
+            // Forged from an app (not a profile file): its own pins, a pack for that app.
+            let app = if profile.extension().is_some_and(|x| x == "json") {
+                None
+            } else {
+                let inputs = eightr_core::input::load(&profile).map_err(|e| e.to_string())?;
+                Some(eightr_forge::pins::app_shape(&inputs)?)
+            };
+            let opts = eightr_forge::build::Options { catalog, pins: pins(&pin)?, jobs, log: true, app };
             let (path, pack) = eightr_forge::build::build(&load_profile(&profile)?, &opts)?;
             eprintln!("pack: {} records, {} methods, {} scenarios", pack.records.len(), pack.methods.len(), pack.scenarios.len());
             if let Some(o) = out {
@@ -94,6 +101,7 @@ fn run(cli: Cli) -> Result<(), String> {
             let pct = |a: usize, b: usize| if b == 0 { 0.0 } else { 100.0 * a as f64 / b as f64 };
             println!("library methods {}; matched {} ({:.1}% recall), correct {} ({:.2}% precision)", g.library_methods, g.matched, pct(g.correct, g.library_methods), g.correct, pct(g.correct, g.matched));
             println!("universe-unique matches {}, correct {} ({:.2}%)", g.unique_matched, g.unique_correct, pct(g.unique_correct, g.unique_matched));
+            println!("of the wrong: {} name the function where the app kept its `$default` bridge (same code); precision counting those as right {:.2}%", g.bridge_equivalent, pct(g.correct + g.bridge_equivalent, g.matched));
             println!("inline frames: {} correct matches have inlined code; the pack's frame table equals the app's own for {} ({:.1}%)", g.with_frames, g.frames_equal, pct(g.frames_equal, g.with_frames));
             for w in &g.wrong {
                 println!("  wrong: {w}");
