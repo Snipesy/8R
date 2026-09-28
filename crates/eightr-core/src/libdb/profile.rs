@@ -77,6 +77,11 @@ impl Profile {
         Ok(Profile::from_parts(&markers, &crate::libraries::from_resources(resources)))
     }
 
+    /// The profile from already collected markers and the package resources.
+    pub fn from_markers(markers: &[Marker], resources: &[(String, String)]) -> Option<Profile> {
+        Profile::from_parts(markers, &crate::libraries::from_resources(resources))
+    }
+
     fn from_parts(markers: &[Marker], libs: &[LibraryVersion]) -> Option<Profile> {
         let m = markers.iter().find(|m| m.tool == "R8")?;
         let mut libraries: Vec<Coord> = libs.iter().filter(|l| l.versions.len() == 1).filter_map(|l| coord_of(&l.library, &l.evidence, &l.versions[0])).collect();

@@ -2,8 +2,9 @@
 # Real-app smoke test: replace an APK's dex with 8R's output, verify every class with ART,
 # install on the attached device/emulator, launch, and show crashes.
 #
-#   scripts/smoke-apk.sh APK COMPONENT [TAP_X TAP_Y]
+#   [LIBDB=pack.8rpack|dir] scripts/smoke-apk.sh APK COMPONENT [TAP_X TAP_Y]
 #   e.g. scripts/smoke-apk.sh ~/Downloads/app.apk com.example/.MainActivity 160 266
+# LIBDB: LibDB packs (`8r-forge build APK`) for 8R to use.
 #
 # Needs: target/release/8r (cargo build --release), Android SDK build-tools, adb with a device.
 set -euo pipefail
@@ -15,7 +16,7 @@ KS=$WORK/debug.jks
 [ -f "$KS" ] || keytool -genkeypair -keystore "$KS" -storepass android -keypass android -alias debug \
     -keyalg RSA -validity 10000 -dname CN=8r >/dev/null 2>&1
 
-rm -rf "$WORK/out" && "$ROOT/target/release/8r" undo -o "$WORK/out" "$APK" >/dev/null
+rm -rf "$WORK/out" && "$ROOT/target/release/8r" undo -o "$WORK/out" ${LIBDB:+--libdb "$LIBDB"} "$APK" >/dev/null
 cp "$APK" "$WORK/unsigned.apk" && (cd "$WORK/out" && zip -q -0 ../unsigned.apk classes*.dex)
 "$BT/zipalign" -f -p 4 "$WORK/unsigned.apk" "$WORK/aligned.apk"
 "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --ks-key-alias debug --out "$WORK/8r.apk" "$WORK/aligned.apk" 2>/dev/null

@@ -9,6 +9,7 @@ pub enum Kind {
     LibAlone,
     Roots,
     Callers,
+    Defaults,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +40,7 @@ pub fn parse(text: &str) -> Result<Vec<Scenario>> {
             "lib-alone" => Kind::LibAlone,
             "roots" => Kind::Roots,
             "callers" => Kind::Callers,
+            "defaults" => Kind::Defaults,
             k => return Err(err(&format!("unknown kind {k}"))),
         };
         let name = w.get(1).ok_or_else(|| err("missing name"))?.to_string();

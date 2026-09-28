@@ -7,6 +7,7 @@ pub mod api;
 pub mod artifacts;
 pub mod build;
 pub mod catalog;
+pub mod classfile;
 pub mod fingerprint;
 pub mod gen;
 pub mod grade;

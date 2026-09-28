@@ -89,6 +89,10 @@ fn const_before(body: &Body, cfg: &Cfg, at: u32, reg: Reg) -> Option<i32> {
 /// result register holds it), with each success instruction and the result register (as
 /// `compares`), and the message its failure path throws.
 pub(crate) fn value_of_chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
+    // Cheap syntactic filter: no `equals` test, no chain (skips the dataflow).
+    if !body.insns.iter().any(|x| matches!(&x.op, Op::Invoke { method, args, .. } if args.len() == 2 && p.str(method.name) == "equals" && p.str(method.proto) == "(Ljava/lang/Object;)Z")) {
+        return Vec::new();
+    }
     let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
     let rd = ReachingDefs::compute(body, &cfg);
     // Equals tests: (input value, literal, success instruction).
@@ -325,6 +329,10 @@ fn name_tables(p: &impl Strs, body: &Body) -> Vec<BTreeMap<i32, String>> {
 }
 
 pub(crate) fn chains(p: &impl Strs, body: &Body) -> Vec<Chain> {
+    // A table needs two `if-eq`/`if-ne` tests.
+    if body.insns.iter().filter(|x| matches!(&x.op, Op::If { cond: Cond::Eq | Cond::Ne, .. })).take(2).count() < 2 {
+        return Vec::new();
+    }
     let Ok(cfg) = Cfg::build(body) else { return Vec::new() };
     let rd = ReachingDefs::compute(body, &cfg);
     // Keyed by the value compared (register and its reaching definitions): R8 reuses registers.

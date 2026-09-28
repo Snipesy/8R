@@ -284,7 +284,31 @@ pub fn class(c: &crate::model::Class, s: &Interner) -> String {
     let mut fields: Vec<String> = c.fields.iter().map(|f| field(f, s)).collect();
     fields.sort();
     out.extend(fields);
-    let mut methods: Vec<String> = c.methods.iter().map(|m| method(m, s)).collect();
+    let methods: Vec<String> = c.methods.iter().map(|m| method(m, s)).collect();
+    class_rest(out, methods)
+}
+
+/// `class` with its methods already rendered (`method`, in member order).
+pub fn class_with_methods(c: &crate::model::Class, s: &Interner, methods: Vec<String>) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "class {} access {:#x}", s.get(c.ty), c.access);
+    if let Some(sup) = c.superclass {
+        let _ = writeln!(out, "  extends {}", s.get(sup));
+    }
+    for i in &c.interfaces {
+        let _ = writeln!(out, "  implements {}", s.get(*i));
+    }
+    if let Some(f) = c.source_file {
+        let _ = writeln!(out, "  source {:?}", s.get(f));
+    }
+    annotations(&mut out, "  ", &c.annotations, s);
+    let mut fields: Vec<String> = c.fields.iter().map(|f| field(f, s)).collect();
+    fields.sort();
+    out.extend(fields);
+    class_rest(out, methods)
+}
+
+fn class_rest(mut out: String, mut methods: Vec<String>) -> String {
     methods.sort();
     out.extend(methods);
     out

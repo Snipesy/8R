@@ -33,6 +33,27 @@ pub fn embedded() -> &'static [SigDb] {
     DBS.get_or_init(|| EMBEDDED.iter().filter_map(|b| SigDb::decode(b).ok()).collect())
 }
 
+/// The DBs to match against: LibDB packs forged for this app first, then the embedded DBs
+/// without the classes a pack covers (a pack, built from the app's exact library versions and
+/// R8, is the better witness; the same method in two DBs would make every exact match ambiguous).
+pub fn with_packs(packs: &[SigDb]) -> std::borrow::Cow<'static, [SigDb]> {
+    if packs.is_empty() {
+        return std::borrow::Cow::Borrowed(embedded());
+    }
+    let covered: BTreeSet<&str> = packs.iter().flat_map(|db| db.records.iter().map(move |r| db.classes[db.methods[r.method as usize].0 as usize].as_str())).collect();
+    let mut out: Vec<SigDb> = packs.to_vec();
+    for db in embedded() {
+        let mut db = db.clone();
+        let keep = |c: u32| !covered.contains(db.classes[c as usize].as_str());
+        let records = db.records.iter().filter(|r| keep(db.methods[r.method as usize].0)).cloned().collect();
+        let class_records = db.class_records.iter().filter(|r| keep(r.class)).cloned().collect();
+        db.records = records;
+        db.class_records = class_records;
+        out.push(db);
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// A DB method: (library index, method index).
 pub type Key = (u16, u32);
 /// A DB class: (library index, class index).

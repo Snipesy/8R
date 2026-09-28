@@ -34,7 +34,7 @@ enum Command {
         #[arg(long)]
         pin: Vec<String>,
         /// Parallel scenario builds.
-        #[arg(long, default_value_t = 2)]
+        #[arg(long, default_value_t = 4)]
         jobs: usize,
         /// Also copy the pack here.
         #[arg(short, long)]
@@ -42,6 +42,10 @@ enum Command {
     },
     /// Summarize a pack.
     Show { pack: PathBuf },
+    /// Developer check: fingerprints of an app's methods in one (residual) class, after 8R's rewrites.
+    Hash { app: PathBuf, class: String },
+    /// List a pack's records for methods whose `class->name` contains a string.
+    Lookup { pack: PathBuf, pattern: String },
     /// Developer check: exact matching of a mapped app (dex directory + mapping) against a pack.
     Grade { pack: PathBuf, app: PathBuf, mapping: PathBuf },
 }
@@ -93,6 +97,33 @@ fn run(cli: Cli) -> Result<(), String> {
             println!("inline frames: {} correct matches have inlined code; the pack's frame table equals the app's own for {} ({:.1}%)", g.with_frames, g.frames_equal, pct(g.frames_equal, g.with_frames));
             for w in &g.wrong {
                 println!("  wrong: {w}");
+            }
+        }
+        Command::Hash { app, class } => {
+            let inputs = eightr_core::input::load(&app).map_err(|e| e.to_string())?;
+            let dexes: Vec<eightr_dex::Dex> = inputs.iter().map(|i| eightr_dex::Dex::parse(&i.bytes).map_err(|e| format!("{e:?}"))).collect::<Result<_, _>>()?;
+            let refs: Vec<&eightr_dex::Dex> = dexes.iter().collect();
+            let mut model = eightr_ir::model::Program::load(&refs).map_err(|e| format!("{e:?}"))?;
+            eightr_core::rewrites::run_all(&mut model).map_err(|e| e.to_string())?;
+            let stable = |d: &str| eightr_core::sigdb::print::platform_stable(d);
+            let refl = eightr_core::sigdb::print::reflective_strings(&model);
+            let ci = model.find(&class).ok_or_else(|| format!("no class {class}"))?;
+            for mi in 0..model.classes[ci].methods.len() {
+                if let Some(p) = eightr_core::sigdb::print::method_print(&model, ci, mi, &stable, &refl) {
+                    let m = &model.classes[ci].methods[mi];
+                    println!("{}{}  all={:016x} informative={}", model.syms.get(m.name), model.syms.get(m.proto), p.all, p.informative);
+                }
+            }
+        }
+        Command::Lookup { pack, pattern } => {
+            let p = eightr_core::libdb::Pack::decode(&std::fs::read(&pack).map_err(|e| format!("{}: {e}", pack.display()))?)?;
+            for r in &p.records {
+                let (c, n, pr) = &p.methods[r.method as usize];
+                let key = format!("{}->{n}{pr}", p.classes[*c as usize].0);
+                if key.contains(&pattern) {
+                    let sc: Vec<&str> = p.scenarios.iter().enumerate().filter(|(i, _)| r.scenarios >> i & 1 == 1).map(|x| x.1.as_str()).collect();
+                    println!("{key}  all={:016x} informative={} unique={} scenarios={}", r.all, r.informative, r.unique, sc.join(","));
+                }
             }
         }
         Command::Show { pack } => {

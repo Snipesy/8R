@@ -258,6 +258,21 @@ fn class_labels(cx: &Ctx) -> Vec<String> {
             }
         }
     }
+    // Round-invariant: (referring class, method, instruction, referred class).
+    let mut sites: Vec<(usize, usize, usize, usize)> = Vec::new();
+    for id in p.class_ids() {
+        let ci = id.0 as usize;
+        for (mi, m) in p.class(id).methods.iter().enumerate() {
+            let Some(body) = &m.code else { continue };
+            for (k, insn) in body.insns.iter().enumerate() {
+                for d in op_types(p, &insn.op) {
+                    if let Some(x) = p.find(d.trim_start_matches('[')) {
+                        sites.push((ci, mi, k, x.0 as usize));
+                    }
+                }
+            }
+        }
+    }
     for _ in 0..WL_ROUNDS {
         let mut classes = BTreeMap::new();
         for id in p.class_ids() {
@@ -287,20 +302,15 @@ fn class_labels(cx: &Ctx) -> Vec<String> {
         // Where each class is referenced: (referring method's normalized hash, instruction).
         // Members and instructions keep their order through renaming.
         let mut uses: Vec<Vec<String>> = vec![Vec::new(); n];
-        for id in p.class_ids() {
-            let ci = id.0 as usize;
-            for (mi, m) in p.class(id).methods.iter().enumerate() {
-                let Some(body) = &m.code else { continue };
-                let mh = hash_hex(&eightr_ir::print::method(&model.classes[norm_of[ci]].methods[mi], &model.syms));
-                for (k, insn) in body.insns.iter().enumerate() {
-                    for d in op_types(p, &insn.op) {
-                        if let Some(x) = p.find(d.trim_start_matches('[')) {
-                            uses[x.0 as usize].push(format!("{mh}@{k}"));
-                        }
-                    }
-                }
-            }
+        let prints: Vec<Vec<String>> = (0..n).map(|ci| model.classes[norm_of[ci]].methods.iter().map(|m| eightr_ir::print::method(m, &model.syms)).collect()).collect();
+        let mhash: Vec<Vec<Option<String>>> = (0..n)
+            .map(|ci| p.class(ClassId(ci as u32)).methods.iter().zip(&prints[ci]).map(|(m, t)| m.code.as_ref().map(|_| hash_hex(t))).collect())
+            .collect();
+        for &(ci, mi, k, x) in &sites {
+            let mh = mhash[ci][mi].as_deref().unwrap_or_default();
+            uses[x].push(format!("{mh}@{k}"));
         }
+        let mut prints = prints;
         let mut debug_texts: Vec<String> = Vec::new();
         for orig_idx in 0..n {
             let mut users: Vec<&str> = incoming[orig_idx].iter().map(|&u| labels[u].as_str()).collect();
@@ -308,7 +318,7 @@ fn class_labels(cx: &Ctx) -> Vec<String> {
             uses[orig_idx].sort_unstable();
             let text = format!(
                 "{}\nused-by {}\nused-at {}",
-                eightr_ir::print::class(&model.classes[norm_of[orig_idx]], &model.syms),
+                eightr_ir::print::class_with_methods(&model.classes[norm_of[orig_idx]], &model.syms, std::mem::take(&mut prints[orig_idx])),
                 users.join(","),
                 uses[orig_idx].join(",")
             );
