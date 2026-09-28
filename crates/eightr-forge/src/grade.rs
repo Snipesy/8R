@@ -29,6 +29,9 @@ pub struct Grade {
     /// the pack's frame table reproduces exactly.
     pub with_frames: usize,
     pub frames_equal: usize,
+    /// Wrong only in that the app kept the name of the default-argument bridge `f$default` whose
+    /// body is `f` specialized with its defaults (the pack names such bodies `f`).
+    pub bridge_equivalent: usize,
 }
 
 pub fn grade(pack: &Pack, app_dir: &Path, mapping: &Path) -> Result<Grade> {
@@ -116,7 +119,11 @@ pub fn grade(pack: &Pack, app_dir: &Path, mapping: &Path) -> Result<Grade> {
                 }
             }
         }
-        if !ok && g.wrong.len() < 15 {
+        let bridge = !ok && truth.as_ref().is_some_and(|t| t.0 == got.0 && t.1 == format!("{}$default", got.1));
+        if bridge {
+            g.bridge_equivalent += 1;
+        }
+        if !ok && !bridge && g.wrong.len() < 15 {
             g.wrong.push(format!("{}->{}{}  (truth {:?})", got.0, got.1, got.2, truth));
         }
     }

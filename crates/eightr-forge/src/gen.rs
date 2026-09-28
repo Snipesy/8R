@@ -17,6 +17,17 @@ use crate::api::{Entry, ACC_ABSTRACT, ACC_INTERFACE, ACC_PUBLIC, ACC_STATIC};
 use crate::tools::{mkdirs, read, write, Result, Tools};
 
 /// Whether the sample `seed` at fraction `frac` takes `e`.
+/// Whether scenario `s` takes `e`: its hash bucket (`part=I/K`), or the `frac`/`seed` sample.
+pub fn takes(e: &Entry, s: &crate::catalog::Scenario) -> bool {
+    match s.part {
+        Some((i, k)) => {
+            let h = Sha256::digest(format!("part|{}|{}|{}", e.class, e.name, e.desc).as_bytes());
+            u64::from_le_bytes(h[..8].try_into().expect("8 bytes")) % u64::from(k) == u64::from(i)
+        }
+        None => sampled(e, s.frac, s.seed),
+    }
+}
+
 pub fn sampled(e: &Entry, frac: f64, seed: u64) -> bool {
     let h = Sha256::digest(format!("{seed}|{}|{}|{}", e.class, e.name, e.desc).as_bytes());
     let v = u64::from_le_bytes(h[..8].try_into().expect("8 bytes"));
@@ -405,15 +416,22 @@ pub fn default_callers(entries: &[&crate::api::DefaultEntry], dir: &Path) -> Res
         classes.push((format!("gen/{prefix}{k}.class"), w.finish(&format!("gen/{prefix}{k}"), "java/lang/Object", PUB | ACC_FINAL | ACC_SUPER)));
     }
     let jar = dir.join("gen.jar");
-    let file = std::fs::File::create(&jar).map_err(|e| e.to_string())?;
+    write_jar(&jar, &classes)?;
+    Ok((jar, usable.len()))
+}
+
+/// Writes `(entry, bytes)` pairs as a jar (in the given order, fixed timestamps).
+pub fn write_jar(jar: &Path, classes: &[(String, Vec<u8>)]) -> Result<()> {
+    let tmp = jar.with_extension("jar.tmp");
+    let file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
     let mut z = zip::ZipWriter::new(file);
     let opts = zip::write::SimpleFileOptions::default();
-    for (name, bytes) in &classes {
+    for (name, bytes) in classes {
         z.start_file(name.as_str(), opts).map_err(|e| e.to_string())?;
         z.write_all(bytes).map_err(|e| e.to_string())?;
     }
     z.finish().map_err(|e| e.to_string())?;
-    Ok((jar, usable.len()))
+    std::fs::rename(&tmp, jar).map_err(|e| e.to_string())
 }
 
 /// Keep rules making the program classes a generated caller passes opaque values as instantiable,

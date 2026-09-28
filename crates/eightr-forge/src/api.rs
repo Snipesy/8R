@@ -1,7 +1,7 @@
 //! The public API of the closure, read straight from the class files (no D8 needed): what the
 //! generated scenarios call or keep, and which artifact owns each class.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::Path;
 
@@ -23,6 +23,10 @@ pub struct ClassInfo {
     pub access: u16,
     /// (name, descriptor, access).
     pub methods: Vec<(String, String, u16)>,
+    /// (name, type descriptor).
+    pub fields: Vec<(String, String)>,
+    /// Fields read from Android resource classes (`…/R$<type>`): (class, name, type).
+    pub r_refs: Vec<(String, String, String)>,
     /// Kotlin default-argument bridges (`f$default(…, int mask, Object)` and constructors ending in
     /// `(…, int, DefaultConstructorMarker)`): (name, descriptor) → (mask of the bits the bridge
     /// tests, indices of the parameters those bits default).
@@ -183,6 +187,8 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
     // Constant pool: UTF-8 entries by index, class entries → name index.
     let mut utf8: BTreeMap<u16, String> = BTreeMap::new();
     let mut ints: BTreeMap<u16, i32> = BTreeMap::new();
+    let mut field_refs: BTreeMap<u16, (u16, u16)> = BTreeMap::new();
+    let mut nats: BTreeMap<u16, (u16, u16)> = BTreeMap::new();
     let mut class_name: BTreeMap<u16, u16> = BTreeMap::new();
     let mut i = 1;
     while i < n {
@@ -205,7 +211,13 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
             3 => {
                 ints.insert(idx, c.u32()? as i32);
             }
-            4 | 9 | 10 | 11 | 12 | 17 | 18 => {
+            9 => {
+                field_refs.insert(idx, (c.u16()?, c.u16()?));
+            }
+            12 => {
+                nats.insert(idx, (c.u16()?, c.u16()?));
+            }
+            4 | 10 | 11 | 17 | 18 => {
                 c.u32()?;
             }
             5 | 6 => {
@@ -222,8 +234,10 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
     c.u16()?;
     let k = c.u16()? as usize;
     c.take(2 * k)?;
+    let mut fields = Vec::new();
     for _ in 0..c.u16()? {
-        c.take(6)?;
+        let (_, ni, di) = (c.u16()?, c.u16()?, c.u16()?);
+        fields.push((utf8.get(&ni)?.clone(), utf8.get(&di)?.clone()));
         c.skip_attributes()?;
     }
     let mut methods = Vec::new();
@@ -261,9 +275,19 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
         }
         methods.push((mn, md, acc));
     }
+    let mut r_refs = Vec::new();
+    for (ci, ni) in field_refs.values() {
+        let (Some(cn), Some((n, t))) = (class_name.get(ci).and_then(|u| utf8.get(u)), nats.get(ni)) else { continue };
+        let is_r = cn.rsplit('/').next().is_some_and(|x| x.strip_prefix("R$").is_some_and(|t| !t.is_empty() && t.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')));
+        if let (true, Some(n), Some(t)) = (is_r, utf8.get(n), utf8.get(t)) {
+            r_refs.push((format!("L{cn};"), n.clone(), t.clone()));
+        }
+    }
+    r_refs.sort();
+    r_refs.dedup();
     // Bridges with more than one mask int aren't modelled: drop them.
     defaults.retain(|(n, d), _| mask_count(n, d, &methods) == Some(1));
-    Some(ClassInfo { descriptor: format!("L{name};"), access, methods, defaults })
+    Some(ClassInfo { descriptor: format!("L{name};"), access, methods, fields, r_refs, defaults })
 }
 
 /// The classes of a jar, sorted by descriptor (multi-release and module-info entries skipped).
@@ -298,6 +322,9 @@ pub struct Entry {
     pub access: u16,
 }
 
+/// A class's (methods (name, descriptor), fields (name, type)).
+pub type Members = (Vec<(String, String)>, Vec<(String, String)>);
+
 /// A public Kotlin default-argument bridge: the entry, the mask of all its defaults, and which
 /// parameters (indices into the bridge's descriptor) take them.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -314,6 +341,10 @@ pub struct Api {
     pub owner: BTreeMap<String, u32>,
     /// Class descriptor → access flags.
     pub access: BTreeMap<String, u16>,
+    /// Class descriptor → its members.
+    pub members: BTreeMap<String, Members>,
+    /// Resource-class fields the closure reads: (class, name, type).
+    pub r_refs: BTreeSet<(String, String, String)>,
     pub entries: Vec<Entry>,
     pub defaults: Vec<DefaultEntry>,
 }
@@ -329,6 +360,8 @@ impl Api {
                     }
                     api.owner.insert(c.descriptor.clone(), ai as u32);
                     api.access.insert(c.descriptor.clone(), c.access);
+                    api.members.insert(c.descriptor.clone(), (c.methods.iter().map(|m| (m.0.clone(), m.1.clone())).collect(), c.fields.clone()));
+                    api.r_refs.extend(c.r_refs.iter().cloned());
                     if c.access & ACC_PUBLIC == 0 {
                         continue;
                     }

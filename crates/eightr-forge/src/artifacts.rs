@@ -14,6 +14,9 @@ pub struct Lib {
     pub coord: String,
     pub jars: Vec<PathBuf>,
     pub rules: Vec<PathBuf>,
+    /// An AAR's `R.txt` (the resources it declares, `int <type> <name> <value>` and
+    /// `int[] styleable <name> { … }` lines).
+    pub r_txt: Option<String>,
 }
 
 fn entries(zip: &Path) -> Result<Vec<(String, Vec<u8>)>> {
@@ -26,7 +29,7 @@ fn entries(zip: &Path) -> Result<Vec<(String, Vec<u8>)>> {
             continue;
         }
         let name = f.name().to_string();
-        let wanted = name == "classes.jar" || name == "proguard.txt" || (name.starts_with("libs/") && name.ends_with(".jar")) || (name.starts_with("META-INF/") && name.ends_with(".pro"));
+        let wanted = name == "classes.jar" || name == "proguard.txt" || name == "R.txt" || (name.starts_with("libs/") && name.ends_with(".jar")) || (name.starts_with("META-INF/") && name.ends_with(".pro"));
         if wanted {
             let mut b = Vec::new();
             f.read_to_end(&mut b).map_err(|e| e.to_string())?;
@@ -61,6 +64,7 @@ pub fn prepare(r: &Resolved, r8_version: &str) -> Result<Lib> {
     let ents = entries(&r.file)?;
     let mut jars = Vec::new();
     let mut rules = Vec::new();
+    let mut r_txt = None;
     let is_aar = r.url.ends_with(".aar");
     let put = |name: &str, bytes: &[u8]| -> Result<PathBuf> {
         let p = dir.join(name.replace('/', "_"));
@@ -75,6 +79,8 @@ pub fn prepare(r: &Resolved, r8_version: &str) -> Result<Lib> {
                 jars.push(put(n, b)?);
             } else if n == "proguard.txt" {
                 rules.push(put(n, b)?);
+            } else if n == "R.txt" {
+                r_txt = Some(String::from_utf8_lossy(b).into_owned());
             }
         }
     } else {
@@ -88,7 +94,7 @@ pub fn prepare(r: &Resolved, r8_version: &str) -> Result<Lib> {
             rules.push(put(n, b)?);
         }
     }
-    Ok(Lib { coord: r.coord.to_string(), jars, rules })
+    Ok(Lib { coord: r.coord.to_string(), jars, rules, r_txt })
 }
 
 #[cfg(test)]

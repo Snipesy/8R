@@ -19,7 +19,7 @@ use crate::fingerprint::{Key, ScenarioOut};
 use crate::tools::{cache_root, mkdirs, r8_jar, read, run, sha256_hex, write, Result, Tools};
 
 /// Bumped whenever the forge's output for the same inputs changes.
-pub const FORGE_VERSION: &str = "3";
+pub const FORGE_VERSION: &str = "4";
 
 /// Per scenario kind, bumped whenever that generator's output changes: part of the kind's
 /// scenario cache key and of the pack key, so only its scenarios run again.
@@ -41,6 +41,9 @@ pub struct Options {
     /// Parallel scenario builds.
     pub jobs: usize,
     pub log: bool,
+    /// The app the pack is forged for: its pins (`crate::pins`) apply to every scenario and the
+    /// pack is that app's alone. `None`: a pack for the profile.
+    pub app: Option<crate::pins::AppShape>,
 }
 
 macro_rules! log {
@@ -125,13 +128,25 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
     Ok(Inputs { profile: profile.clone(), closure, lock, catalog: opts.catalog.clone(), scenarios, tools, r8, tool_ids, hash, build_hash, cpus_per_jvm })
 }
 
-/// Where the pack for these inputs lives.
-fn pack_path(inp: &Inputs) -> PathBuf {
-    cache_root().join("packs").join(format!("{}-{}.8rpack", inp.profile.key(), inp.hash))
+/// Where the pack for these inputs (and app pins) lives.
+fn pack_path(inp: &Inputs, pins_hash: &str) -> PathBuf {
+    let tag = if pins_hash.is_empty() { inp.hash.clone() } else { sha256_hex(format!("{}|{pins_hash}", inp.hash).as_bytes())[..16].to_string() };
+    cache_root().join("packs").join(format!("{}-{tag}.8rpack", inp.profile.key()))
 }
 
 /// Runs R8 for one scenario into `dir` (skipped when `dir/done` exists).
-fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>, s: &Scenario, dir: &Path) -> Result<String> {
+/// What every scenario of a build shares: the closure, its API, the declared artifacts, the app's
+/// pins (keep rules) and generated program parts (R classes).
+struct Shared<'a> {
+    libs: &'a [Lib],
+    api: &'a Api,
+    declared: &'a BTreeSet<u32>,
+    pins: &'a str,
+    extra: &'a [PathBuf],
+}
+
+fn run_scenario(inp: &Inputs, sh: &Shared, s: &Scenario, dir: &Path) -> Result<String> {
+    let (libs, api, declared, pins, extra) = (sh.libs, sh.api, sh.declared, sh.pins, sh.extra);
     let done = dir.join("done");
     if done.exists() {
         return Ok(String::from_utf8_lossy(&read(&done)?).into_owned());
@@ -140,9 +155,11 @@ fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>,
     mkdirs(dir)?;
     let all_jars: Vec<PathBuf> = libs.iter().flat_map(|l| l.jars.iter().cloned()).collect();
     let in_scope = |e: &Entry| s.scope == Scope::Closure || declared.contains(&e.artifact);
-    let sample: Vec<&Entry> = api.entries.iter().filter(|e| in_scope(e) && crate::gen::sampled(e, s.frac, s.seed)).collect();
+    let sample: Vec<&Entry> = api.entries.iter().filter(|e| in_scope(e) && crate::gen::takes(e, s)).collect();
     let mut rules = String::from("-dontwarn **\n-ignorewarnings\n");
     let mut program = all_jars.clone();
+    // Generated program parts every app has (the libraries' R classes).
+    program.extend(extra.iter().cloned());
     let note = match s.kind {
         Kind::LibAlone => {
             rules.push_str("-keep public class * { public protected *; }\n");
@@ -153,7 +170,7 @@ fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>,
             format!("{} roots", sample.len())
         }
         Kind::Defaults => {
-            let sample: Vec<&crate::api::DefaultEntry> = api.defaults.iter().filter(|d| in_scope(&d.entry) && crate::gen::sampled(&d.entry, s.frac, s.seed)).collect();
+            let sample: Vec<&crate::api::DefaultEntry> = api.defaults.iter().filter(|d| in_scope(&d.entry) && crate::gen::takes(&d.entry, s)).collect();
             let (jar, n) = crate::gen::default_callers(&sample, &dir.join("gen"))?;
             rules.push_str("-keep class gen.** { *; }\n");
             // Bridges are static: receivers are parameters.
@@ -173,6 +190,8 @@ fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>,
             format!("{kept} of {} calls compile", sample.len())
         }
     };
+    // What the app's build kept of its libraries, kept here too.
+    rules.push_str(pins);
     let conf = dir.join("scenario.pro");
     write(&conf, &rules)?;
     let out = dir.join("out");
@@ -222,6 +241,7 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
         records: Vec::new(),
         class_records: Vec::new(),
         stacks: Vec::new(),
+        app: String::new(),
     };
     // Keys first, in sorted order, so indices don't depend on scenario order.
     let mut classes: BTreeSet<String> = BTreeSet::new();
@@ -318,20 +338,36 @@ pub fn lock(profile: &Profile, pins: &[Coord]) -> Result<Vec<String>> {
 /// Builds (or reuses) the pack of `profile`: (path, pack).
 pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
     let inp = inputs(profile, opts)?;
-    let path = pack_path(&inp);
+    let libs: Vec<Lib> = inp.closure.iter().map(|r| prepare(r, &inp.profile.r8)).collect::<Result<_>>()?;
+    let api = Api::build(&libs)?;
+    let pins = opts.app.as_ref().map(|a| crate::pins::rules(&api, a)).unwrap_or_default();
+    let pins_hash = if pins.is_empty() { String::new() } else { sha256_hex(pins.as_bytes())[..16].to_string() };
+    let path = pack_path(&inp, &pins_hash);
     if path.exists() {
         log!(opts, "cached: {}", path.display());
         let pack = Pack::decode(&read(&path)?)?;
         return Ok((path, pack));
     }
     log!(opts, "closure: {} artifacts; {} scenarios; R8 {}; min-api {}", inp.closure.len(), inp.scenarios.len(), inp.profile.r8, inp.profile.min_api);
-    let libs: Vec<Lib> = inp.closure.iter().map(|r| prepare(r, &inp.profile.r8)).collect::<Result<_>>()?;
-    let api = Api::build(&libs)?;
     let declared: BTreeSet<u32> = inp.closure.iter().enumerate().filter(|(_, r)| r.declared).map(|(i, _)| i as u32).collect();
     log!(opts, "API: {} classes, {} public entry points ({} declared artifacts)", api.owner.len(), api.entries.len(), declared.len());
+    if !pins.is_empty() {
+        log!(opts, "app pins: {} library classes kept by the app", pins.matches("-keep class").count());
+    }
     let work = cache_root().join("work").join(format!("{}-{}", inp.profile.key(), inp.build_hash));
+    let pins_tag = if pins_hash.is_empty() { String::new() } else { format!("-app{}", &pins_hash[..8]) };
+    // The libraries' resource classes, as the app build generates them.
+    let r_jar = work.join("r.jar");
+    if !r_jar.exists() {
+        let classes = crate::rclass::r_classes(&api, &libs);
+        mkdirs(&work)?;
+        crate::gen::write_jar(&r_jar, &classes)?;
+        log!(opts, "R classes: {}", classes.len());
+    }
+    let extra = vec![r_jar];
+    let shared = Shared { libs: &libs, api: &api, declared: &declared, pins: &pins, extra: &extra };
     // A scenario's directory: its name and definition, so catalog edits reuse unchanged ones.
-    let scenario_dir = |s: &Scenario| work.join(format!("{}-{}", s.name, &sha256_hex(format!("{:?}|{}|{}|{:?}|{}", s.kind, s.frac, s.seed, s.scope, generator_version(s.kind)).as_bytes())[..8]));
+    let scenario_dir = |s: &Scenario| work.join(format!("{}-{}{pins_tag}", s.name, &sha256_hex(format!("{:?}|{}|{}|{:?}|{}{}", s.kind, s.frac, s.seed, s.scope, generator_version(s.kind), s.part.map_or(String::new(), |(i, k)| format!("|part {i}/{k}"))).as_bytes())[..8]));
     // Scenario builds, `jobs` at a time; results by index.
     let jobs = opts.jobs.max(1);
     let next = std::sync::atomic::AtomicUsize::new(0);
@@ -344,7 +380,7 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
             sc.spawn(|| loop {
                 let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let Some(s) = inp.scenarios.get(i) else { break };
-                let r = run_scenario(&inp, &libs, &api, &declared, s, &scenario_dir(s)).and_then(|note| {
+                let r = run_scenario(&inp, &shared, s, &scenario_dir(s)).and_then(|note| {
                     let o = crate::fingerprint::scenario(&scenario_dir(s).join("out"), &|c| owner_of(c).is_some())?;
                     log!(opts, "  scenario {}: {note}; {} methods fingerprinted", s.name, o.methods.len());
                     Ok((note, o))
@@ -358,7 +394,10 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
     for (i, r) in results {
         outs.push(r.map_err(|e| format!("{}: {e}", inp.scenarios[i].name))?.1);
     }
-    let pack = merge(&inp, &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
+    let mut pack = merge(&inp, &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
+    if !pins.is_empty() {
+        pack.app = opts.app.as_ref().map(|a| a.id.clone()).unwrap_or_default();
+    }
     write(&path, pack.encode())?;
     Ok((path, pack))
 }

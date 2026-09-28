@@ -13,4 +13,6 @@ pub mod gen;
 pub mod grade;
 pub mod maven;
 pub mod names;
+pub mod pins;
+pub mod rclass;
 pub mod tools;

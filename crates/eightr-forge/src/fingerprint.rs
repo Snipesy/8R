@@ -20,7 +20,7 @@ use crate::tools::{read, read_string, Result};
 
 /// Bumped whenever this module's output for the same scenario output changes (part of the pack
 /// key, not of the scenario cache: R8 doesn't run again).
-pub const REVISION: u32 = 3;
+pub const REVISION: u32 = 4;
 
 /// An original method: (class descriptor, name, proto).
 pub type Key = (String, String, String);
@@ -175,9 +175,16 @@ pub fn body_frames(table: &FrameTable, b: &eightr_ir::lift::Body) -> Frames {
 
 /// The function a Kotlin default-argument bridge `f$default(…, int mask…, Object)` stands for,
 /// when that function (same class, name `f`, the bridge's parameters without the masks and marker,
-/// with or without the leading receiver) is inlined into the bridge as the outermost inlined frame.
-fn default_target(key: &Key, frames: &Frames) -> Option<Key> {
+/// with or without the leading receiver) is inlined into the bridge as the outermost inlined frame
+/// and R8 removed the mask and marker (`residual` is shorter by at least two parameters): every
+/// caller passed the same defaults, so the body is `f` specialized with them. A bridge that kept
+/// its mask is still a bridge.
+fn default_target(key: &Key, residual: &str, frames: &Frames) -> Option<Key> {
     let name = key.1.strip_suffix("$default")?;
+    let arity = |d: &str| eightr_ir::types::parse_proto(d).map(|x| x.0.len());
+    if arity(residual)? + 2 > arity(&key.2)? {
+        return None;
+    }
     let (ps, ret) = eightr_ir::types::parse_proto(&key.2)?;
     let n = ps.len().checked_sub(1)?;
     if !ps[n].starts_with('L') {
@@ -237,7 +244,7 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
             // A Kotlin default-argument bridge with its own function inlined into it is that
             // function specialized with its defaults: the body an app has where the bridge was
             // inlined into the call site and the function survives (`setContent { … }`).
-            if let Some(target) = default_target(&key, &fr) {
+            if let Some(target) = default_target(&key, rp, &fr) {
                 key = target;
             }
             out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });
@@ -262,13 +269,15 @@ mod tests {
     fn default_bridge_target_is_the_outermost_matching_frame() {
         let bridge = k("La/K;", "f$default", "(IILjava/lang/Object;)V");
         let frames: Frames = vec![(0, 3, vec![(k("La/K;", "f", "(II)V"), 5), (k("La/K;", "f", "(I)V"), 2)])];
-        assert_eq!(default_target(&bridge, &frames), Some(k("La/K;", "f", "(I)V")));
+        assert_eq!(default_target(&bridge, "()V", &frames), Some(k("La/K;", "f", "(I)V")));
+        // A bridge that kept its mask (callers pass different defaults) stays a bridge.
+        assert_eq!(default_target(&bridge, "(IILjava/lang/Object;)V", &frames), None);
         // Only the inner overload inlined: no key change.
         let frames: Frames = vec![(0, 3, vec![(k("La/K;", "f", "(II)V"), 5)])];
-        assert_eq!(default_target(&bridge, &frames), None);
+        assert_eq!(default_target(&bridge, "()V", &frames), None);
         // A member function: the bridge's receiver isn't a parameter of the target.
         let member = k("La/K;", "g$default", "(La/K;Ljava/lang/String;ILjava/lang/Object;)I");
         let frames: Frames = vec![(0, 3, vec![(k("La/K;", "g", "(Ljava/lang/String;)I"), 7)])];
-        assert_eq!(default_target(&member, &frames), Some(k("La/K;", "g", "(Ljava/lang/String;)I")));
+        assert_eq!(default_target(&member, "(Lx;Ljava/lang/String;)I", &frames), Some(k("La/K;", "g", "(Ljava/lang/String;)I")));
     }
 }

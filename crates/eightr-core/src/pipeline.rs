@@ -120,7 +120,8 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let mut program = Program { model, class_hints: Default::default() };
     let name_stats = name_stats(&dexes, &program);
     let app_profile = crate::libdb::Profile::from_markers(&markers, &config.resources);
-    let libdb = std::sync::Arc::new(crate::libdb::select(&config.packs, app_profile.as_ref(), &mut findings));
+    let app_code = crate::libdb::app_id(&summaries.iter().map(|x| x.sha256.clone()).collect::<Vec<_>>());
+    let libdb = std::sync::Arc::new(crate::libdb::select(&config.packs, app_profile.as_ref(), &app_code, &mut findings));
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats, resources: config.resources.clone(), libdb };
 
     let mut labels = Labels::default();
