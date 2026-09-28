@@ -16,7 +16,6 @@ use sha2::{Digest, Sha256};
 use crate::api::{Entry, ACC_ABSTRACT, ACC_INTERFACE, ACC_PUBLIC, ACC_STATIC};
 use crate::tools::{mkdirs, read, write, Result, Tools};
 
-/// Whether the sample `seed` at fraction `frac` takes `e`.
 /// Whether scenario `s` takes `e`: its hash bucket (`part=I/K`), or the `frac`/`seed` sample.
 pub fn takes(e: &Entry, s: &crate::catalog::Scenario) -> bool {
     match s.part {
@@ -28,6 +27,7 @@ pub fn takes(e: &Entry, s: &crate::catalog::Scenario) -> bool {
     }
 }
 
+/// Whether the sample `seed` at fraction `frac` takes `e`.
 pub fn sampled(e: &Entry, frac: f64, seed: u64) -> bool {
     let h = Sha256::digest(format!("{seed}|{}|{}|{}", e.class, e.name, e.desc).as_bytes());
     let v = u64::from_le_bytes(h[..8].try_into().expect("8 bytes"));

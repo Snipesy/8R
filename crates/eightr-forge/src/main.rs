@@ -101,7 +101,7 @@ fn run(cli: Cli) -> Result<(), String> {
             let pct = |a: usize, b: usize| if b == 0 { 0.0 } else { 100.0 * a as f64 / b as f64 };
             println!("library methods {}; matched {} ({:.1}% recall), correct {} ({:.2}% precision)", g.library_methods, g.matched, pct(g.correct, g.library_methods), g.correct, pct(g.correct, g.matched));
             println!("universe-unique matches {}, correct {} ({:.2}%)", g.unique_matched, g.unique_correct, pct(g.unique_correct, g.unique_matched));
-            println!("of the wrong: {} name the function where the app kept its `$default` bridge (same code); precision counting those as right {:.2}%", g.bridge_equivalent, pct(g.correct + g.bridge_equivalent, g.matched));
+            println!("of the wrong: {} name the function `f` where the app kept the name `f$default` for its specialized body (no mask test left)", g.bridge_equivalent);
             println!("inline frames: {} correct matches have inlined code; the pack's frame table equals the app's own for {} ({:.1}%)", g.with_frames, g.frames_equal, pct(g.frames_equal, g.with_frames));
             for w in &g.wrong {
                 println!("  wrong: {w}");

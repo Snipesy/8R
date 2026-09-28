@@ -93,18 +93,31 @@ pub fn rules(api: &Api, app: &AppShape) -> String {
     for (desc, (app_methods, app_fields)) in &app.classes {
         let Some((lib_methods, lib_fields)) = api.members.get(desc) else { continue };
         let mut specs: BTreeSet<String> = BTreeSet::new();
+        let mut ctors: BTreeSet<String> = BTreeSet::new();
         for (n, d) in app_methods {
-            if n == "<clinit>" {
+            // Names every build keeps anyway aren't evidence of a keep: constructors, and
+            // overrides of Object's methods.
+            let object_override = matches!((n.as_str(), d.as_str()), ("equals", "(Ljava/lang/Object;)Z") | ("hashCode", "()I") | ("toString", "()Ljava/lang/String;"));
+            if n == "<clinit>" || object_override {
                 continue;
             }
             if let Some(m) = pinned(n, d, lib_methods, true).and_then(|m| member_spec(&m.0, &m.1, true)) {
-                specs.insert(m);
+                if n == "<init>" {
+                    ctors.insert(m);
+                } else {
+                    specs.insert(m);
+                }
             }
         }
         for (n, t) in app_fields {
             if let Some(f) = pinned(n, t, lib_fields, false).and_then(|f| member_spec(&f.0, &f.1, false)) {
                 specs.insert(f);
             }
+        }
+        // Constructors count only for a class the app kept members of (e.g. a view kept for its
+        // layout: its constructors are what the layout inflates).
+        if !specs.is_empty() {
+            specs.extend(ctors);
         }
         let body: String = specs.iter().map(|x| format!("\n    {x}")).collect();
         out.push_str(&format!("-keep class {} {{{body}\n}}\n", java_name(desc)));

@@ -20,7 +20,7 @@ use crate::tools::{read, read_string, Result};
 
 /// Bumped whenever this module's output for the same scenario output changes (part of the pack
 /// key, not of the scenario cache: R8 doesn't run again).
-pub const REVISION: u32 = 4;
+pub const REVISION: u32 = 6;
 
 /// An original method: (class descriptor, name, proto).
 pub type Key = (String, String, String);
@@ -173,6 +173,38 @@ pub fn body_frames(table: &FrameTable, b: &eightr_ir::lift::Body) -> Frames {
     fr
 }
 
+/// Whether a body bit-tests one of its int parameters (an `and` reading a parameter register
+/// before any instruction writes it; R8 reuses registers afterwards): a default-argument bridge
+/// that still reads its mask.
+fn tests_int_param(b: &eightr_ir::lift::Body, proto: &str, is_static: bool) -> bool {
+    use eightr_ir::op::{BinOp, Op, Operand};
+    let Some((ps, _)) = eightr_ir::types::parse_proto(proto) else { return false };
+    let mut reg = b.registers - b.ins + u16::from(!is_static);
+    let mut ints = std::collections::BTreeSet::new();
+    for t in &ps {
+        if *t == "I" {
+            ints.insert(reg);
+        }
+        reg += if *t == "J" || *t == "D" { 2 } else { 1 };
+    }
+    let mut written = std::collections::BTreeSet::new();
+    for x in &b.insns {
+        if let Op::Binop { op: BinOp::And, a, b: rhs, .. } = &x.op {
+            let param = |r: u16| ints.contains(&r) && !written.contains(&r);
+            if param(*a) || matches!(rhs, Operand::Reg(r) if param(*r)) {
+                return true;
+            }
+        }
+        if let Some((d, wide)) = x.op.def() {
+            written.insert(d);
+            if wide {
+                written.insert(d + 1);
+            }
+        }
+    }
+    false
+}
+
 /// The function a Kotlin default-argument bridge `f$default(…, int mask…, Object)` stands for,
 /// when that function (same class, name `f`, the bridge's parameters without the masks and marker,
 /// with or without the leading receiver) is inlined into the bridge as the outermost inlined frame
@@ -244,7 +276,8 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
             // A Kotlin default-argument bridge with its own function inlined into it is that
             // function specialized with its defaults: the body an app has where the bridge was
             // inlined into the call site and the function survives (`setContent { … }`).
-            if let Some(target) = default_target(&key, rp, &fr) {
+            let tests_a_mask = m.code.as_ref().is_some_and(|b| tests_int_param(b, rp, m.access & eightr_dex::class::access::STATIC != 0));
+            if let Some(target) = default_target(&key, rp, &fr).filter(|_| !tests_a_mask) {
                 key = target;
             }
             out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });

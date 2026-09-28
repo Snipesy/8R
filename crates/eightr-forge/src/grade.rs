@@ -29,8 +29,8 @@ pub struct Grade {
     /// the pack's frame table reproduces exactly.
     pub with_frames: usize,
     pub frames_equal: usize,
-    /// Wrong only in that the app kept the name of the default-argument bridge `f$default` whose
-    /// body is `f` specialized with its defaults (the pack names such bodies `f`).
+    /// Named `f` where the app's method is `f$default` (the pack names bodies of a bridge that
+    /// no longer tests its mask, `f` specialized with its defaults, `f`).
     pub bridge_equivalent: usize,
 }
 
@@ -122,6 +122,9 @@ pub fn grade(pack: &Pack, app_dir: &Path, mapping: &Path) -> Result<Grade> {
         let bridge = !ok && truth.as_ref().is_some_and(|t| t.0 == got.0 && t.1 == format!("{}$default", got.1));
         if bridge {
             g.bridge_equivalent += 1;
+            if std::env::var_os("DEBUG_BRIDGES").is_some() {
+                eprintln!("bridge: {}->{} residual {}{}", got.0, got.1, s.get(m.name), s.get(m.proto));
+            }
         }
         if !ok && !bridge && g.wrong.len() < 15 {
             g.wrong.push(format!("{}->{}{}  (truth {:?})", got.0, got.1, got.2, truth));
