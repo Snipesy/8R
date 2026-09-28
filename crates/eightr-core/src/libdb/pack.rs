@@ -6,7 +6,7 @@
 //! per distinct body, with the set of scenarios that produced it. `unique` marks a body hash that
 //! belongs to exactly one original method across every scenario of the pack.
 //!
-//! File format (`*.8rpack`): `8RPACK01`, then a raw-deflate stream of little-endian fields
+//! File format (`*.8rpack`): `8RPACK02`, then a raw-deflate stream of little-endian fields
 //! (strings as u32 length + UTF-8, lists as u32 count + items).
 
 use std::io::{Read, Write};
@@ -14,7 +14,9 @@ use std::io::{Read, Write};
 use super::profile::Profile;
 use crate::sigdb::print::SKETCH;
 
-const MAGIC: &[u8; 8] = b"8RPACK01";
+const MAGIC: &[u8; 8] = b"8RPACK02";
+/// Largest inflated pack accepted (a corrupt or hostile file can't exhaust memory).
+const MAX_RAW: u64 = 2 << 30;
 /// No artifact (a class the closure doesn't own, e.g. R8's own).
 pub const NO_ARTIFACT: u32 = u32::MAX;
 /// A callee or frame method outside the key table.
@@ -31,8 +33,9 @@ pub struct Pack {
     pub tools: Vec<(String, String)>,
     /// Scenario names; bit `i` of a `scenarios` mask is `scenarios[i]` (at most 64).
     pub scenarios: Vec<String>,
-    /// `group:artifact:version` of the closure.
-    pub artifacts: Vec<String>,
+    /// `group:artifact:version` of the closure, and whether the app declared it (directly or
+    /// through a multiplatform redirect).
+    pub artifacts: Vec<(String, bool)>,
     /// (original class descriptor, owning artifact or [`NO_ARTIFACT`]).
     pub classes: Vec<(String, u32)>,
     /// (class index, original name, original proto descriptor).
@@ -146,11 +149,14 @@ impl Pack {
             w.str(k);
             w.str(v);
         }
-        for list in [&self.scenarios, &self.artifacts] {
-            w.len(list.len());
-            for s in list {
-                w.str(s);
-            }
+        w.len(self.scenarios.len());
+        for s in &self.scenarios {
+            w.str(s);
+        }
+        w.len(self.artifacts.len());
+        for (a, d) in &self.artifacts {
+            w.str(a);
+            w.u8(u8::from(*d));
         }
         w.len(self.classes.len());
         for (c, a) in &self.classes {
@@ -211,16 +217,19 @@ impl Pack {
     pub fn decode(bytes: &[u8]) -> Result<Pack, String> {
         let body = bytes.strip_prefix(MAGIC.as_slice()).ok_or("not a LibDB pack")?;
         let mut raw = Vec::new();
-        flate2::read::DeflateDecoder::new(body).read_to_end(&mut raw).map_err(|e| e.to_string())?;
+        flate2::read::DeflateDecoder::new(body).take(MAX_RAW + 1).read_to_end(&mut raw).map_err(|e| e.to_string())?;
+        if raw.len() as u64 > MAX_RAW {
+            return Err("pack too large".into());
+        }
         let mut r = R { b: &raw, at: 0 };
         let profile = Profile::parse(&r.str()?)?;
         let lock = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
         let catalog = r.str()?;
         let tools = (0..r.len()?).map(|_| Ok((r.str()?, r.str()?))).collect::<Result<_, String>>()?;
         let scenarios: Vec<String> = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
-        let artifacts = (0..r.len()?).map(|_| r.str()).collect::<Result<_, _>>()?;
-        let classes = (0..r.len()?).map(|_| Ok((r.str()?, r.u32()?))).collect::<Result<_, String>>()?;
-        let methods = (0..r.len()?).map(|_| Ok((r.u32()?, r.str()?, r.str()?))).collect::<Result<_, String>>()?;
+        let artifacts: Vec<(String, bool)> = (0..r.len()?).map(|_| Ok((r.str()?, r.u8()? != 0))).collect::<Result<_, String>>()?;
+        let classes: Vec<(String, u32)> = (0..r.len()?).map(|_| Ok((r.str()?, r.u32()?))).collect::<Result<_, String>>()?;
+        let methods: Vec<(u32, String, String)> = (0..r.len()?).map(|_| Ok((r.u32()?, r.str()?, r.str()?))).collect::<Result<_, String>>()?;
         let n = r.len()?;
         let mut records = Vec::with_capacity(n);
         for _ in 0..n {
@@ -236,13 +245,29 @@ impl Pack {
             let frames = (0..r.len()?).map(|_| Ok((r.u32()?, r.u32()?, r.u32()?))).collect::<Result<_, String>>()?;
             records.push(Record { method, scenarios, informative: flags & 1 != 0, unique: flags & 2 != 0, all, strings, proto, sketch, callees, frames });
         }
-        let class_records = (0..r.len()?).map(|_| Ok(ClassRecord { class: r.u32()?, scenarios: r.u64()?, c2: r.u64()?, c3: r.u64()? })).collect::<Result<_, String>>()?;
-        let stacks = (0..r.len()?).map(|_| (0..r.len()?).map(|_| Ok((r.u32()?, r.i32()?))).collect::<Result<Vec<_>, String>>()).collect::<Result<_, _>>()?;
+        let class_records: Vec<ClassRecord> = (0..r.len()?).map(|_| Ok(ClassRecord { class: r.u32()?, scenarios: r.u64()?, c2: r.u64()?, c3: r.u64()? })).collect::<Result<_, String>>()?;
+        let stacks: Vec<Vec<(u32, i32)>> = (0..r.len()?).map(|_| (0..r.len()?).map(|_| Ok((r.u32()?, r.i32()?))).collect::<Result<Vec<_>, String>>()).collect::<Result<_, _>>()?;
         if r.at != raw.len() {
             return Err("trailing bytes in pack".into());
         }
         if scenarios.len() > 64 {
             return Err("pack has more than 64 scenarios".into());
+        }
+        // Cross-references in range, scenario bits within the scenarios.
+        let bits = if scenarios.len() == 64 { u64::MAX } else { (1u64 << scenarios.len()) - 1 };
+        let (nc, nm, ns, na) = (classes.len(), methods.len(), stacks.len(), artifacts.len());
+        let bad = classes.iter().any(|(_, a): &(String, u32)| *a != NO_ARTIFACT && *a as usize >= na)
+            || methods.iter().any(|(c, _, _): &(u32, String, String)| *c as usize >= nc)
+            || records.iter().any(|r| {
+                r.method as usize >= nm
+                    || r.scenarios & !bits != 0
+                    || r.callees.iter().any(|(_, k)| *k != NO_METHOD && *k as usize >= nm)
+                    || r.frames.iter().any(|(a, b, st)| a > b || *st as usize >= ns)
+            })
+            || class_records.iter().any(|r: &ClassRecord| r.class as usize >= nc || r.scenarios & !bits != 0)
+            || stacks.iter().any(|st: &Vec<(u32, i32)>| st.iter().any(|(m, _)| *m as usize >= nm));
+        if bad {
+            return Err("corrupt pack: index out of range".into());
         }
         Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks })
     }
@@ -261,7 +286,7 @@ mod tests {
             catalog: "lib-alone all\n".into(),
             tools: vec![("r8".into(), "9.4.24".into())],
             scenarios: vec!["all".into()],
-            artifacts: vec!["a.b:c:1.0".into()],
+            artifacts: vec![("a.b:c:1.0".into(), true)],
             classes: vec![("La/b/C;".into(), 0), ("LR8$$;".into(), NO_ARTIFACT)],
             methods: vec![(0, "f".into(), "()V".into())],
             records: vec![Record { method: 0, scenarios: 1, informative: true, unique: true, all: 7, strings: 0, proto: 3, sketch: [9; SKETCH], callees: vec![(5, NO_METHOD)], frames: vec![(0, 3, 0)] }],

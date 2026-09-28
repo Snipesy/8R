@@ -85,10 +85,7 @@ pub fn resources(path: &Path) -> Vec<(String, String)> {
     for i in 0..zip.len() {
         let Ok(mut f) = zip.by_index(i) else { continue };
         let name = f.name().strip_prefix("base/root/").unwrap_or(f.name()).to_string();
-        let small = (name.starts_with("META-INF/") && name.ends_with(".version") && name.matches('/').count() == 1)
-            || (name.ends_with(".properties") && !name.contains('/'));
-        let proto = name.ends_with(".proto");
-        if !(small && f.size() <= 4096 || proto && f.size() <= 512 * 1024) {
+        if !is_resource(&name, f.size()) {
             continue;
         }
         let mut text = String::new();
@@ -100,8 +97,17 @@ pub fn resources(path: &Path) -> Vec<(String, String)> {
     out
 }
 
-/// Every file under `dir` (recursively) as (path relative to `dir`, text): a fixture's package
-/// resources (`fixtures/out/<name>/resources/`). Empty when the directory doesn't exist.
+/// Whether a package file (path from the package root, size) is a resource 8R reads: small
+/// `META-INF/*.version` and root `*.properties` files, and `*.proto` sources. Nothing else, in
+/// particular never an R8 mapping lying next to the dex files.
+fn is_resource(name: &str, size: u64) -> bool {
+    let small = (name.starts_with("META-INF/") && name.ends_with(".version") && name.matches('/').count() == 1) || (name.ends_with(".properties") && !name.contains('/'));
+    small && size <= 4096 || name.ends_with(".proto") && size <= 512 * 1024
+}
+
+/// The resources (as [`resources`] selects them) under `dir`, recursively, as (path relative to
+/// `dir`, text): a fixture's package resources (`fixtures/out/<name>/resources/`) or an unpacked
+/// package. Empty when the directory doesn't exist.
 pub fn dir_resources(dir: &Path) -> Vec<(String, String)> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -111,8 +117,12 @@ pub fn dir_resources(dir: &Path) -> Vec<(String, String)> {
             let p = e.path();
             if p.is_dir() {
                 stack.push(p);
-            } else if let (Ok(rel), Ok(text)) = (p.strip_prefix(dir), fs::read_to_string(&p)) {
-                out.push((rel.to_string_lossy().replace('\\', "/"), text));
+            } else if let Ok(rel) = p.strip_prefix(dir) {
+                let name = rel.to_string_lossy().replace('\\', "/");
+                let size = e.metadata().map_or(u64::MAX, |m| m.len());
+                if let (true, Ok(text)) = (is_resource(&name, size), fs::read_to_string(&p)) {
+                    out.push((name, text));
+                }
             }
         }
     }

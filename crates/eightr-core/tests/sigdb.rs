@@ -158,6 +158,6 @@ fn matcher_precision_recall_on_sigdb_app() {
     }
     let (ok, all): (usize, usize) = per.values().fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
     eprintln!("sigdb matcher: {per:?}; precision {ok}/{all}, recall {matched_truth}/{total}; {} class pairs", matches.classes.len());
-    assert!(all > 0 && ok * 100 >= all * 93, "precision {ok}/{all}");
-    assert!(matched_truth * 100 >= total * 57, "recall {matched_truth}/{total}");
+    assert!(all > 0 && ok * 100 >= all * 97, "precision {ok}/{all}");
+    assert!(matched_truth * 100 >= total * 75, "recall {matched_truth}/{total}");
 }

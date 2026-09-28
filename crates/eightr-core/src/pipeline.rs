@@ -27,6 +27,8 @@ pub struct Config {
     /// Small text resources of the package (`META-INF/*.version`, root `*.properties`, `*.proto`):
     /// library versions and protobuf sources (`input::resources`).
     pub resources: Vec<(String, String)>,
+    /// LibDB packs (`8r-forge`); only those forged for this app's build profile are used.
+    pub packs: Vec<crate::libdb::Pack>,
 }
 
 /// Read-only facts gathered before any pass runs.
@@ -37,6 +39,8 @@ pub struct Evidence {
     pub name_stats: NameStats,
     /// Small text resources of the package (`Config::resources`).
     pub resources: Vec<(String, String)>,
+    /// The packs forged for this app's build profile, as matcher DBs.
+    pub libdb: std::sync::Arc<Vec<crate::sigdb::db::SigDb>>,
 }
 
 pub struct Outcome {
@@ -115,7 +119,9 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let rewrites = if config.no_rewrites { Vec::new() } else { crate::rewrites::run_all(&mut model)? };
     let mut program = Program { model, class_hints: Default::default() };
     let name_stats = name_stats(&dexes, &program);
-    let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats, resources: config.resources.clone() };
+    let app_profile = crate::libdb::Profile::from_markers(&markers, &config.resources);
+    let libdb = std::sync::Arc::new(crate::libdb::select(&config.packs, app_profile.as_ref(), &mut findings));
+    let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats, resources: config.resources.clone(), libdb };
 
     let mut labels = Labels::default();
     for pass in passes::all() {

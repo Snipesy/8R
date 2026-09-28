@@ -18,6 +18,10 @@ use eightr_mapping::{ClassMapping, Mapping, MethodMapping};
 use crate::names::{descriptor, Names};
 use crate::tools::{read, read_string, Result};
 
+/// Bumped whenever this module's output for the same scenario output changes (part of the pack
+/// key, not of the scenario cache: R8 doesn't run again).
+pub const REVISION: u32 = 2;
+
 /// An original method: (class descriptor, name, proto).
 pub type Key = (String, String, String);
 /// Inlined code: (first insn, end insn, stack innermost first: (method, line)).
@@ -68,22 +72,32 @@ fn frame_key(owner_dotted: &str, m: &MethodMapping) -> Key {
     (descriptor(owner_dotted), m.original_name.clone(), format!("({ps}){}", descriptor(&m.return_type)))
 }
 
-/// A class's inline runs: residual method name → [(first line, last line, frames innermost first)].
+/// A class's inline runs: residual method name → [(first line, last line, inlined frames innermost
+/// first)]. A run's last line is the method itself; R8 ≥ 9 wraps a method it moved or bridged in a
+/// synthesized same-name frame, and then the method is the frame inside it (as
+/// `ClassMapping::outermost_methods` reads it). R8's own synthesized frames aren't original code
+/// and are left out of the stacks.
 fn runs(cm: &ClassMapping) -> Runs<'_> {
-    let all: Vec<&MethodMapping> = cm.methods().map(|x| x.0).collect();
+    use eightr_mapping::Metadata;
+    let all: Vec<(&MethodMapping, bool)> = cm.methods().map(|(m, md)| (m, md.iter().any(|x| x.parsed == Metadata::Synthesized))).collect();
     let mut out = Runs::new();
     let mut i = 0;
     while i < all.len() {
-        let m = all[i];
+        let m = all[i].0;
         let Some((a, b)) = m.minified_range else {
             i += 1;
             continue;
         };
         let mut j = i;
-        while j + 1 < all.len() && all[j + 1].obfuscated == m.obfuscated && all[j + 1].minified_range == m.minified_range {
+        while j + 1 < all.len() && all[j + 1].0.obfuscated == m.obfuscated && all[j + 1].0.minified_range == m.minified_range {
             j += 1;
         }
-        out.entry(m.obfuscated.as_str()).or_default().push((a, b, all[i..=j].to_vec()));
+        let mut outer = j;
+        if all[j].1 && j > i && all[j - 1].0.original_name == all[j].0.original_name {
+            outer = j - 1;
+        }
+        let inlined: Vec<&MethodMapping> = all[i..outer].iter().filter(|x| !x.1).map(|x| x.0).collect();
+        out.entry(m.obfuscated.as_str()).or_default().push((a, b, inlined));
         i = j + 1;
     }
     out
@@ -124,10 +138,10 @@ pub fn pre_frames(model: &Model, mapping: &Mapping) -> PreFrames {
                 let Ok(l) = u32::try_from(l) else { continue };
                 // Overloads share a residual name; their ranges are disjoint.
                 let Some((_, _, frames)) = list.iter().find(|(a, e, _)| *a <= l && l <= *e) else { continue };
-                if frames.len() < 2 {
+                if frames.is_empty() {
                     continue;
                 }
-                let stack: Vec<(Key, i32)> = frames[..frames.len() - 1]
+                let stack: Vec<(Key, i32)> = frames
                     .iter()
                     .map(|f| {
                         let owner = f.original_owner.clone().unwrap_or_else(|| cm.original.clone());
@@ -187,7 +201,7 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
         for (mi, m) in c.methods.iter().enumerate() {
             let Some(mp) = method_print(model, ci, mi, &stable, &reflective) else { continue };
             let (rn, rp) = (s.get(m.name), s.get(m.proto));
-            let Some(key) = names.method(rc, rn, rp) else { continue };
+            let Some(mut key) = names.method(rc, rn, rp) else { continue };
             if !owned(&key.0) {
                 continue;
             }
@@ -196,6 +210,15 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
                 (Some(table), Some(b)) => body_frames(table, b),
                 _ => Vec::new(),
             };
+            // A Kotlin default-argument bridge with its own function inlined into it is that
+            // function specialized with its defaults: the body an app has where the bridge was
+            // inlined into the call site and the function survives (`setContent { … }`).
+            if let Some(target) = key.1.strip_suffix("$default").map(str::to_string) {
+                let inlined = fr.iter().flat_map(|x| x.2.iter()).map(|x| &x.0).find(|k| k.0 == key.0 && k.1 == target).cloned();
+                if let Some(k) = inlined {
+                    key = k;
+                }
+            }
             out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });
         }
     }

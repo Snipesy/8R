@@ -38,9 +38,29 @@ enum Command {
         /// Don't annotate methods with their inlining hints (`@eightr.Inlined(...)`).
         #[arg(long)]
         no_hint_annotations: bool,
+        /// LibDB packs (`8r-forge build`): a .8rpack file or a directory of them. Only packs forged
+        /// for this app's build profile are used.
+        #[arg(long)]
+        libdb: Vec<PathBuf>,
     },
     /// List every registered rule.
     Rules,
+}
+
+/// Packs from files and directories (`*.8rpack`, sorted by path).
+fn load_packs(paths: &[PathBuf]) -> Result<Vec<eightr_core::libdb::Pack>, String> {
+    let mut files = Vec::new();
+    for p in paths {
+        if p.is_dir() {
+            let rd = std::fs::read_dir(p).map_err(|e| format!("{}: {e}", p.display()))?;
+            let mut v: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|f| f.extension().is_some_and(|x| x == "8rpack")).collect();
+            v.sort();
+            files.extend(v);
+        } else {
+            files.push(p.clone());
+        }
+    }
+    files.iter().map(|f| std::fs::read(f).map_err(|e| format!("{}: {e}", f.display())).and_then(|b| eightr_core::libdb::Pack::decode(&b).map_err(|e| format!("{}: {e}", f.display())))).collect()
 }
 
 fn main() -> ExitCode {
@@ -99,10 +119,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
-        Command::Undo { input, out, report, verbose, no_hint_annotations } => {
+        Command::Undo { input, out, report, verbose, no_hint_annotations, libdb } => {
             let inputs = input::load(&input)?;
-            let resources = input::resources(&input);
-            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, no_hint_annotations, resources, ..Default::default() })?;
+            let resources = if input.is_dir() { input::dir_resources(&input) } else { input::resources(&input) };
+            let packs = load_packs(&libdb)?;
+            let outcome = eightr_core::run(&inputs, &Config { verbose_labels: verbose, no_hint_annotations, resources, packs, ..Default::default() })?;
             let json = outcome.report.to_json();
             let write = |p: &PathBuf, bytes: &[u8]| std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()));
             if let Some(dir) = &out {

@@ -124,6 +124,17 @@ struct Ctx<'a> {
     program: std::collections::BTreeSet<String>,
     hierarchy: Option<Hierarchy>,
     syms: &'a mut Interner,
+    /// Memos of the pure per-symbol rewrites (keys are pre-rename symbols). Lookup-only, never
+    /// iterated, so their order can't reach the output; `Sym` has no meaningful order to key a
+    /// BTreeMap by.
+    #[allow(clippy::disallowed_types)]
+    memo_ty: std::collections::HashMap<Sym, Sym>,
+    #[allow(clippy::disallowed_types)]
+    memo_proto: std::collections::HashMap<Sym, Sym>,
+    #[allow(clippy::disallowed_types)]
+    memo_field: std::collections::HashMap<(Sym, Sym, Sym), Sym>,
+    #[allow(clippy::disallowed_types)]
+    memo_method: std::collections::HashMap<(Sym, Sym, Sym), Sym>,
 }
 
 impl Ctx<'_> {
@@ -135,10 +146,23 @@ impl Ctx<'_> {
         }
     }
     fn ty(&mut self, t: Sym) -> Sym {
+        if let Some(&x) = self.memo_ty.get(&t) {
+            return x;
+        }
         let new = self.desc(self.syms.get(t));
-        self.syms.intern(&new)
+        let x = self.syms.intern(&new);
+        self.memo_ty.insert(t, x);
+        x
     }
     fn proto(&mut self, p: Sym) -> Sym {
+        if let Some(&x) = self.memo_proto.get(&p) {
+            return x;
+        }
+        let x = self.proto_uncached(p);
+        self.memo_proto.insert(p, x);
+        x
+    }
+    fn proto_uncached(&mut self, p: Sym) -> Sym {
         let old = self.syms.get(p).to_string();
         let Some((params, ret)) = parse_proto(&old) else { return p };
         let new = format!("({}){}", params.iter().map(|x| self.desc(x)).collect::<String>(), self.desc(ret));
@@ -192,6 +216,14 @@ impl Ctx<'_> {
     }
     /// New name for a field declared or referenced as (owner, name, type), pre-rename.
     fn field_name(&mut self, owner: Sym, name: Sym, ty: Sym) -> Sym {
+        if let Some(&x) = self.memo_field.get(&(owner, name, ty)) {
+            return x;
+        }
+        let x = self.field_name_uncached(owner, name, ty);
+        self.memo_field.insert((owner, name, ty), x);
+        x
+    }
+    fn field_name_uncached(&mut self, owner: Sym, name: Sym, ty: Sym) -> Sym {
         if let Some(n) = self.global_name(owner, name) {
             return n;
         }
@@ -207,6 +239,14 @@ impl Ctx<'_> {
     }
     /// New name for a method declared or referenced as (owner, name, proto), pre-rename.
     fn method_name(&mut self, owner: Sym, name: Sym, proto: Sym) -> Sym {
+        if let Some(&x) = self.memo_method.get(&(owner, name, proto)) {
+            return x;
+        }
+        let x = self.method_name_uncached(owner, name, proto);
+        self.memo_method.insert((owner, name, proto), x);
+        x
+    }
+    fn method_name_uncached(&mut self, owner: Sym, name: Sym, proto: Sym) -> Sym {
         if let Some(n) = self.global_name(owner, name) {
             return n;
         }
@@ -383,7 +423,7 @@ impl Renaming {
                 }
             }
         }
-        let mut cx = Ctx { r: self, program, hierarchy, syms: &mut syms };
+        let mut cx = Ctx { r: self, program, hierarchy, syms: &mut syms, memo_ty: Default::default(), memo_proto: Default::default(), memo_field: Default::default(), memo_method: Default::default() };
         for c in &mut p.classes {
             let owner = cx.syms.get(c.ty).to_string();
             c.annotations = cx.annotations(&c.annotations, Some(&owner));
@@ -426,7 +466,7 @@ mod tests {
             ..Default::default()
         };
         let mut syms = Interner::default();
-        let cx = Ctx { r: &r, program: Default::default(), hierarchy: None, syms: &mut syms };
+        let cx = Ctx { r: &r, program: Default::default(), hierarchy: None, syms: &mut syms, memo_ty: Default::default(), memo_proto: Default::default(), memo_field: Default::default(), memo_method: Default::default() };
         assert_eq!(cx.signature("Ljava/util/List<La/b;>;"), "Ljava/util/List<La/z;>;");
         assert_eq!(cx.signature("(La/b;[Lq;)La/b;"), "(La/z;[Lr;)La/z;");
         assert_eq!(cx.signature("<T:La/b;>Ljava/lang/Object;"), "<T:La/z;>Ljava/lang/Object;");

@@ -19,7 +19,19 @@ use crate::fingerprint::{Key, ScenarioOut};
 use crate::tools::{cache_root, mkdirs, r8_jar, read, run, sha256_hex, write, Result, Tools};
 
 /// Bumped whenever the forge's output for the same inputs changes.
-pub const FORGE_VERSION: &str = "1";
+pub const FORGE_VERSION: &str = "3";
+
+/// Per scenario kind, bumped whenever that generator's output changes: part of the kind's
+/// scenario cache key and of the pack key, so only its scenarios run again.
+fn generator_version(k: Kind) -> u32 {
+    match k {
+        Kind::LibAlone | Kind::Roots => 1,
+        // 2: opaque argument types instantiable; 3: Java keywords filtered.
+        Kind::Callers => 3,
+        // 2: every call from two call sites; 3: one call per method; 4: argument types instantiable.
+        Kind::Defaults => 4,
+    }
+}
 
 pub struct Options {
     pub catalog: String,
@@ -45,6 +57,10 @@ struct Inputs {
     r8: PathBuf,
     tool_ids: Vec<(String, String)>,
     hash: String,
+    /// The inputs of the R8 runs alone (scenario outputs are cached by this and the scenario).
+    build_hash: String,
+    /// Cores each R8 JVM may use (machine cores / parallel jobs).
+    cpus_per_jvm: usize,
 }
 
 fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
@@ -54,13 +70,20 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
     }
     let pins: Vec<Coord> = pins.into_values().collect();
     log!(opts, "resolving {} declared libraries", pins.len());
-    let closure = crate::maven::resolve(&pins)?;
-    let lock: Vec<String> = closure.iter().map(|r| r.lock_line()).collect();
+    let res = crate::maven::resolve(&pins)?;
+    for c in &res.missing {
+        log!(opts, "warning: {c} is on neither Google Maven nor Maven Central; left out");
+    }
+    let closure = res.artifacts;
+    let mut lock: Vec<String> = closure.iter().map(|r| r.lock_line()).collect();
+    lock.extend(res.missing.iter().map(|c| format!("{c} missing -")));
+    lock.sort();
     let scenarios = crate::catalog::parse(&opts.catalog)?;
     let tools = Tools::find()?;
     let (r8, r8_sha) = r8_jar(&profile.r8)?;
     let tool_ids = vec![
         ("forge".to_string(), FORGE_VERSION.to_string()),
+        ("fingerprint".to_string(), eightr_core::libdb::code_id()),
         ("r8".to_string(), format!("{} {r8_sha}", profile.r8)),
         ("javac".to_string(), tools.javac_version.clone()),
         ("android.jar".to_string(), tools.android_jar_sha256.clone()),
@@ -75,12 +98,23 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
         h.push_str(l);
         h.push('\n');
     }
+    // What the R8 runs depend on (not the fingerprint code, which only reads their output).
+    for (k, v) in tool_ids.iter().filter(|t| t.0 != "fingerprint") {
+        h.push_str(&format!("\n{k}={v}"));
+    }
+    let build_hash = sha256_hex(h.as_bytes())[..16].to_string();
     h.push_str(&opts.catalog);
-    for (k, v) in &tool_ids {
+    for s in &scenarios {
+        h.push_str(&format!("\ngenerator {} {}", s.name, generator_version(s.kind)));
+    }
+    h.push_str(&format!("\nforge-fingerprint {}", crate::fingerprint::REVISION));
+    for (k, v) in tool_ids.iter().filter(|t| t.0 == "fingerprint") {
         h.push_str(&format!("\n{k}={v}"));
     }
     let hash = sha256_hex(h.as_bytes())[..16].to_string();
-    Ok(Inputs { profile: profile.clone(), closure, lock, catalog: opts.catalog.clone(), scenarios, tools, r8, tool_ids, hash })
+    let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let cpus_per_jvm = (cores / opts.jobs.max(1)).max(1);
+    Ok(Inputs { profile: profile.clone(), closure, lock, catalog: opts.catalog.clone(), scenarios, tools, r8, tool_ids, hash, build_hash, cpus_per_jvm })
 }
 
 /// Where the pack for these inputs lives.
@@ -110,9 +144,23 @@ fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>,
             rules.push_str(&crate::gen::roots(&sample));
             format!("{} roots", sample.len())
         }
+        Kind::Defaults => {
+            let sample: Vec<&crate::api::DefaultEntry> = api.defaults.iter().filter(|d| in_scope(&d.entry) && crate::gen::sampled(&d.entry, s.frac, s.seed)).collect();
+            let (jar, n) = crate::gen::default_callers(&sample, &dir.join("gen"))?;
+            rules.push_str("-keep class gen.** { *; }\n");
+            // Bridges are static: receivers are parameters.
+            let descs: Vec<&str> = sample.iter().map(|d| d.entry.desc.as_str()).collect();
+            rules.push_str(&crate::gen::instantiable(&descs, &api.access));
+            program.push(jar);
+            format!("{n} default-argument calls")
+        }
         Kind::Callers => {
             let (jar, kept) = crate::gen::callers(&inp.tools, &all_jars, &sample, &dir.join("gen"))?;
             rules.push_str("-keep class gen.** { *; }\n");
+            // Receivers of instance calls are opaque values of their class too.
+            let receivers: Vec<String> = sample.iter().filter(|e| e.access & crate::api::ACC_STATIC == 0 && e.name != "<init>").map(|e| format!("({})V", e.class)).collect();
+            let descs: Vec<&str> = sample.iter().map(|e| e.desc.as_str()).chain(receivers.iter().map(String::as_str)).collect();
+            rules.push_str(&crate::gen::instantiable(&descs, &api.access));
             program.push(jar);
             format!("{kept} of {} calls compile", sample.len())
         }
@@ -123,6 +171,9 @@ fn run_scenario(inp: &Inputs, libs: &[Lib], api: &Api, declared: &BTreeSet<u32>,
     mkdirs(&out)?;
     let mut cmd = Command::new(&inp.tools.java);
     cmd.arg(format!("-Xmx{}", std::env::var("EIGHTR_FORGE_XMX").unwrap_or_else(|_| "8g".into())));
+    // Each JVM sized to its share of the cores: R8's, the GC's and the JIT's threads otherwise
+    // all assume the whole machine and `jobs` JVMs oversubscribe it (about 28% more CPU).
+    cmd.arg(format!("-XX:ActiveProcessorCount={}", inp.cpus_per_jvm));
     cmd.arg("-cp").arg(&inp.r8).args(["com.android.tools.r8.R8", "--release", "--min-api"]).arg(inp.profile.min_api.to_string());
     if inp.profile.mode == "compatibility" {
         cmd.arg("--pg-compat");
@@ -157,7 +208,7 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
         catalog: inp.catalog.clone(),
         tools: inp.tool_ids.clone(),
         scenarios: inp.scenarios.iter().map(|s| s.name.clone()).collect(),
-        artifacts: inp.closure.iter().map(|r| r.coord.to_string()).collect(),
+        artifacts: inp.closure.iter().map(|r| (r.coord.to_string(), r.declared)).collect(),
         classes: Vec::new(),
         methods: Vec::new(),
         records: Vec::new(),
@@ -249,7 +300,11 @@ pub fn lock(profile: &Profile, pins: &[Coord]) -> Result<Vec<String>> {
     let mut all = profile.libraries.clone();
     all.retain(|c| !pins.iter().any(|p| p.group == c.group && p.artifact == c.artifact));
     all.extend(pins.iter().cloned());
-    Ok(crate::maven::resolve(&all)?.iter().map(|r| r.lock_line()).collect())
+    let res = crate::maven::resolve(&all)?;
+    let mut out: Vec<String> = res.artifacts.iter().map(|r| r.lock_line()).collect();
+    out.extend(res.missing.iter().map(|c| format!("{c} missing -")));
+    out.sort();
+    Ok(out)
 }
 
 /// Builds (or reuses) the pack of `profile`: (path, pack).
@@ -266,36 +321,34 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
     let api = Api::build(&libs)?;
     let declared: BTreeSet<u32> = inp.closure.iter().enumerate().filter(|(_, r)| r.declared).map(|(i, _)| i as u32).collect();
     log!(opts, "API: {} classes, {} public entry points ({} declared artifacts)", api.owner.len(), api.entries.len(), declared.len());
-    let work = cache_root().join("work").join(format!("{}-{}", inp.profile.key(), inp.hash));
+    let work = cache_root().join("work").join(format!("{}-{}", inp.profile.key(), inp.build_hash));
+    // A scenario's directory: its name and definition, so catalog edits reuse unchanged ones.
+    let scenario_dir = |s: &Scenario| work.join(format!("{}-{}", s.name, &sha256_hex(format!("{:?}|{}|{}|{:?}|{}", s.kind, s.frac, s.seed, s.scope, generator_version(s.kind)).as_bytes())[..8]));
     // Scenario builds, `jobs` at a time; results by index.
     let jobs = opts.jobs.max(1);
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let results: std::sync::Mutex<BTreeMap<usize, Result<String>>> = std::sync::Mutex::new(BTreeMap::new());
+    let owner_of = |c: &str| api.owner.get(c).copied();
+    // Each worker runs a scenario's R8 and then fingerprints it; results by index, so the merge
+    // order is the catalog's whatever finishes first.
+    let results: std::sync::Mutex<BTreeMap<usize, Result<(String, ScenarioOut)>>> = std::sync::Mutex::new(BTreeMap::new());
     std::thread::scope(|sc| {
         for _ in 0..jobs {
             sc.spawn(|| loop {
                 let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let Some(s) = inp.scenarios.get(i) else { break };
-                let r = run_scenario(&inp, &libs, &api, &declared, s, &work.join(&s.name));
-                if let Ok(note) = &r {
-                    log!(opts, "  scenario {}: {note}", s.name);
-                }
+                let r = run_scenario(&inp, &libs, &api, &declared, s, &scenario_dir(s)).and_then(|note| {
+                    let o = crate::fingerprint::scenario(&scenario_dir(s).join("out"), &|c| owner_of(c).is_some())?;
+                    log!(opts, "  scenario {}: {note}; {} methods fingerprinted", s.name, o.methods.len());
+                    Ok((note, o))
+                });
                 results.lock().expect("no poisoned lock").insert(i, r);
             });
         }
     });
     let results = results.into_inner().expect("no poisoned lock");
-    for (i, r) in &results {
-        if let Err(e) = r {
-            return Err(format!("{}: {e}", inp.scenarios[*i].name));
-        }
-    }
-    let owner_of = |c: &str| api.owner.get(c).copied();
     let mut outs = Vec::new();
-    for s in &inp.scenarios {
-        let o = crate::fingerprint::scenario(&work.join(&s.name).join("out"), &|c| owner_of(c).is_some())?;
-        log!(opts, "  fingerprinted {}: {} methods", s.name, o.methods.len());
-        outs.push(o);
+    for (i, r) in results {
+        outs.push(r.map_err(|e| format!("{}: {e}", inp.scenarios[i].name))?.1);
     }
     let pack = merge(&inp, &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
     write(&path, pack.encode())?;

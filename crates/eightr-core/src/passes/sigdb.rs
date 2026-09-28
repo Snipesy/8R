@@ -24,9 +24,9 @@ impl Pass for Sigdb {
     }
 
     fn run(&self, cx: &mut Context) -> Result<()> {
-        let dbs = crate::sigdb::matcher::embedded();
+        let dbs = crate::sigdb::matcher::with_packs(&cx.evidence.libdb);
         let pins = eightr_ir::reflect::pins(&cx.program.model);
-        let matches = crate::sigdb::matcher::match_program(&cx.program.model, dbs);
+        let matches = crate::sigdb::matcher::match_program(&cx.program.model, &dbs);
         let p = &cx.program.model;
         let s = &p.syms;
         let subclassed: std::collections::BTreeSet<&str> = p.classes.iter().filter_map(|c| c.superclass).map(|t| s.get(t)).collect();
@@ -165,21 +165,26 @@ impl Pass for Sigdb {
                 _ => None,
             })
             .collect();
+        // Direct program subclasses of each class (by superclass descriptor).
+        let mut children: Vec<Vec<usize>> = vec![Vec::new(); p.classes.len()];
+        for (k, c) in p.classes.iter().enumerate() {
+            if let Some(sup) = c.superclass.and_then(|t| p.find(s.get(t))) {
+                if sup != k {
+                    children[sup].push(k);
+                }
+            }
+        }
         let subclasses_or_self = |ci: usize| -> Vec<String> {
-            let root = p.classes[ci].ty;
-            let mut out = vec![s.get(root).to_string()];
-            let mut grew = true;
-            while grew {
-                grew = false;
-                for c in &p.classes {
-                    let d = s.get(c.ty).to_string();
-                    if !out.contains(&d) && c.superclass.is_some_and(|t| out.iter().any(|o| o == s.get(t))) {
-                        out.push(d);
-                        grew = true;
+            let mut seen = std::collections::BTreeSet::from([ci]);
+            let mut stack = vec![ci];
+            while let Some(k) = stack.pop() {
+                for &c in &children[k] {
+                    if seen.insert(c) {
+                        stack.push(c);
                     }
                 }
             }
-            out
+            seen.into_iter().map(|k| s.get(p.classes[k].ty).to_string()).collect()
         };
         let mut accepted: BTreeMap<(usize, usize), (String, String, usize)> = BTreeMap::new();
         for ((class, new, proto), ks) in targets {

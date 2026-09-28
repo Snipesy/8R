@@ -179,7 +179,7 @@ Two generators, both driven only by the library's public API (from the D8 dex of
   5. **Fingerprint** (`fingerprint.rs`): 8R's rewrites first, then keys from the mapping.
      Inline-frame tables are computed per instruction before the rewrites and carried over by pc
      where the instruction is unchanged.
-  6. **Pack** (`eightr_core::libdb::Pack`, `8RPACK01`), written to
+  6. **Pack** (`eightr_core::libdb::Pack`, `8RPACK02`), written to
      `<cache>/packs/<profile key>-<inputs hash>.8rpack`. The cache is `$EIGHTR_FORGE_CACHE`, else
      `~/.cache/8r-forge`.
 - **Reproducible:** a rebuild from an empty work cache gives the same bytes. The ignored test
@@ -191,3 +191,136 @@ Two generators, both driven only by the library's public API (from the D8 dex of
     frames in 84% of cases.
   - The remaining errors are sibling lambdas with identical bodies, and one version gap:
     `androidx.collection` is undeclared, so the resolver's version differs from the fixture's.
+
+### L1 review fixes
+
+- **Resolver fixpoint:** each round now walks the previous round's selection, so the dependencies
+  of an evicted version no longer count. Non-convergence is an error.
+- **POM parsing:** parent POMs, `<properties>`/`project.*` substitution and `dependencyManagement`
+  versions; only top-level `<dependencies>` count, build plugins don't. BOM imports and exclusions
+  are not modelled yet.
+- **POM fallback:** a `.module` file without a runtime library variant falls back to the POM.
+- **Missing modules:** coordinates on neither repository are recorded in the lock as `missing`
+  instead of aborting.
+- **Downloads:** they need curl success as well as HTTP 200, and must match the repository's
+  `.sha1` sidecar.
+- **Frames:** R8's same-name wrapper frames and its own synthesized frames are left out of the
+  inline stacks.
+- **Pack identity:** packs carry `fingerprint = libdb::code_id()`, a hash of the source of 8R's
+  lifting, rewrites and fingerprint code. It is part of the forge cache key, and 8R ignores a pack
+  whose id differs from its own.
+- **Decoding:** `decode` validates every cross-reference and caps the inflated size.
+
+## 8. Packs in 8R (L2)
+
+- **Selection:** `8r undo APP --libdb PACK|DIR` uses the packs whose profile equals the app's
+  (from its marker and `.version` resources) and whose fingerprint code matches. Other packs are
+  reported and ignored.
+- **Matching:** a used pack is converted to a matcher DB (`Pack::to_sigdb`) and goes first. The
+  embedded DBs follow, minus the classes a pack covers (`sigdb::matcher::with_packs`), because the
+  same method in two DBs would make exact matches ambiguous. Every sigdb name stays D, via
+  `r8/sigdb-method-name`.
+- **Embedded fallback DBs:** `cargo xtask sigdb` now forges them. Each `fixtures/sigdb.conf` line
+  is a Maven coordinate forged as "that library alone" with the default catalog. Only the
+  library's own (declared) classes are kept.
+
+On `sigdb_app` (graded matcher test):
+
+| embedded DBs | precision | recall |
+|---|---|---|
+| before (library-alone builds) | 95.1% | 59.3% |
+| forged | 98.1% | 72.9% |
+
+`compose_lib` fixture, 8R labels graded against the mapping:
+
+| setup | sigdb names | correct |
+|---|---|---|
+| embedded DBs only | 151 | 92.7% |
+| with its pack | 2051 | 99.3% |
+
+Gretio:
+
+- The pack covers 160 artifacts, 121 of them declared, including `androidx.fragment` 1.9.1
+  (`fragment`, `-ktx`, `-compose`), and has 195k records. It took 7m35s to forge (13 scenarios,
+  `--jobs 3`).
+- `r8/sigdb-method-name` goes from 544 applications without the pack to 4865 with it.
+
+### Default-argument scenarios (`defaults`)
+
+- **Why:** in Gretio, `setContent { … }` and `enableEdgeToEdge()` stayed unnamed. Both are Kotlin
+  calls that take default arguments. R8 constant-propagates the defaults kotlinc passes (`0`/`null`
+  plus the mask) into the `$default` bridge and the function, drops the parameters, and inlines the
+  bridge. The result, e.g. `setContent(ComponentActivity, ComposableLambdaImpl)`, is a body no
+  opaque-argument scenario produces.
+- **What the scenario does:** it calls a hash-sample of the public bridges (`f$default(…, int, Object)` and
+  constructors ending in `(…, int, DefaultConstructorMarker)`) as kotlinc does for "every default".
+  - Which parameters have defaults is read from the bridge's own bytecode: `iload mask; <bit>;
+    iand; ifeq L; …; <x>store p` (api.rs `default_bits`).
+  - Those parameters get constant `0`/`null`; the others are opaque.
+  - javac can't call synthetic members, so the callers are written as class files directly
+    (`classfile.rs`: straight-line code, no stack map frames needed).
+- **Catalog:** a single `d1` covering 100% of the bridges; there are only about 2,000 of them.
+- **Call shape:**
+  - Each call is made twice, from `gen/D*` and `gen/E*`. With one call site, R8 inlines the callee
+    into it and no method is left to fingerprint.
+  - Each call sits in its own method, because a reified inline function's compiled body always
+    throws, and that turns the rest of its method into dead code.
+- **Keying:** when a bridge survives with its own function inlined into it, the record is keyed
+  as that function (fingerprint.rs). It is "`f` with its defaults", the body an app has once the
+  bridge was inlined into the call site.
+- **`compose_lib` grade:** recall 41.6% → 42.5%, precision 99.45% → 99.52%. Inline frames equal the
+  app's own in 87.5% of matches, up from 84%; that gain comes from the wrapper-frame fix.
+
+### Instantiable argument types
+
+- **Problem:** when a scenario passes an opaque value as a program class nothing instantiates
+  (e.g. `ComponentActivity`), R8's instantiated-types analysis compiles every cast to it as a
+  `ClassCastException`, and the library code behind it is lost. In an app, AGP keeps manifest
+  components' constructors and app code subclasses these types.
+- **Fix:** callers and defaults scenarios now keep the constructors of the concrete classes they
+  pass values as (`gen::instantiable`). Abstract classes and interfaces would need generated
+  subclasses; that is not done yet.
+- **Effect on Gretio:** each callers scenario fingerprints 24–26k methods, up from 11–15k, and
+  the pack grows from 197k to 209k records.
+
+### Performance
+
+These are measured by two investigation agents. Output is unchanged: packs are byte-identical,
+and 8R output is byte-identical with and without a pack.
+
+- **Forge:**
+  - R8 JVMs get `-XX:ActiveProcessorCount = cores / jobs`, and `--jobs` defaults to 4. That
+    alone is about −28% CPU.
+  - Each worker fingerprints its scenario right after R8.
+  - Java keywords are filtered out of the generated callers.
+  - Isolation of files with unattributable javac errors runs in parallel.
+  - Scenario outputs are cached per scenario definition and generator version, separately from
+    the fingerprint code, so catalog edits and fingerprint changes don't re-run unchanged R8
+    builds.
+  - Result on Gretio: 7:35 → about 3–4 min cold, and seconds to minutes when only some
+    scenarios change.
+- **8R:**
+  - `naming::class_labels` computes its reference sites once and prints each method once per
+    round.
+  - `Renaming::apply` memoizes its per-symbol rewrites.
+  - The rebox pre-checks skip the dataflow when a method can't hold a chain.
+  - The sigdb pass builds a child index once.
+  - Result on Gretio: about 36 s → about 22 s quiet (the earlier 2½-minute runs were CPU
+    contention from parallel forge JVMs), and the pack's extra cost fell from +6.6 s to +1.2 s.
+- **Two correctness fixes found on the way:**
+  - A directory input's resources are selected like a package's, so a fixture's `mapping.txt` is
+    never read.
+  - `code_id` now covers `enum_unboxing.rs`.
+
+### Gretio with its pack (final L2)
+
+- **Pack:** 160 artifacts, 14 scenarios, 209k records.
+- **Result:** `r8/sigdb-method-name` 4981 (544 without a pack). Every class ART-verifies, and the
+  app launches and reaches `MainActivity`.
+- **Embedded fallback DBs, re-forged** (`sigdb_app`): 98.4% precision, 76.6% recall. The test
+  ratchets at 97 / 75.
+- **Still unnamed: `setContent`.** Gretio's build pinned `ComposeView` (its original name and full
+  constructor survive, presumably through a layout or manifest keep rule), and that changes how R8
+  compiles `setContent` around it. Next step: derive the app's pins from its own dex, i.e. library
+  classes and members that kept their library names, and apply them as keep rules in every
+  scenario (per-app packs).

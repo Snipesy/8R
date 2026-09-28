@@ -94,7 +94,12 @@ pub fn fetch(url: &str) -> Result<Option<PathBuf>> {
         let out = Command::new("curl").args(["-sSL", "--retry", "2", "-o"]).arg(&tmp).args(["-w", "%{http_code}"]).arg(url).output().map_err(|e| format!("curl: {e}"))?;
         let code = String::from_utf8_lossy(&out.stdout).trim().to_string();
         match code.as_str() {
-            "200" => {
+            // A 200 with a failed transfer (partial file, timeout) is retried, never cached.
+            "200" if out.status.success() => {
+                if let Err(e) = verify_sha1(url, &tmp) {
+                    last = e;
+                    continue;
+                }
                 fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
                 return Ok(Some(path));
             }
@@ -108,6 +113,22 @@ pub fn fetch(url: &str) -> Result<Option<PathBuf>> {
     }
     let _ = fs::remove_file(&tmp);
     Err(last)
+}
+
+/// Checks a download against the repository's `.sha1` sidecar (Maven repositories publish one for
+/// every file), when there is one.
+fn verify_sha1(url: &str, file: &Path) -> Result<()> {
+    if url.ends_with(".sha1") || url.ends_with(".404") {
+        return Ok(());
+    }
+    let Some(side) = fetch(&format!("{url}.sha1"))? else { return Ok(()) };
+    let want = read_string(&side)?.split_whitespace().next().unwrap_or("").to_ascii_lowercase();
+    let got: String = sha1::Sha1::digest(read(file)?).iter().map(|b| format!("{b:02x}")).collect();
+    if want.len() == 40 && want != got {
+        let _ = fs::remove_file(&side);
+        return Err(format!("{url}: sha1 mismatch (expected {want}, got {got})"));
+    }
+    Ok(())
 }
 
 /// The tools a forge run needs, with their identities (recorded in every pack).
