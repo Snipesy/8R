@@ -72,6 +72,21 @@ pub struct ClassRecord {
     pub c3: u64,
 }
 
+/// A dex member simple name (or `<init>`/`<clinit>`): names from a pack end up in the output.
+fn simple_name(n: &str) -> bool {
+    n == "<init>" || n == "<clinit>" || (!n.is_empty() && !n.chars().any(|c| c.is_whitespace() || c.is_control() || "/;[()<>.:".contains(c)))
+}
+
+/// A field or class type descriptor.
+fn type_descriptor(t: &str) -> bool {
+    let base = t.trim_start_matches('[');
+    match base {
+        "Z" | "B" | "C" | "S" | "I" | "J" | "F" | "D" => true,
+        "V" => base.len() == t.len(),
+        _ => base.strip_prefix('L').and_then(|x| x.strip_suffix(';')).is_some_and(|x| x.split('/').all(simple_name) && !x.contains('<')),
+    }
+}
+
 #[derive(Default)]
 struct W(Vec<u8>);
 
@@ -269,6 +284,11 @@ impl Pack {
         if bad {
             return Err("corrupt pack: index out of range".into());
         }
+        let bad_name = classes.iter().any(|(c, _)| !type_descriptor(c) || c.starts_with('['))
+            || methods.iter().any(|(_, n, pr)| !simple_name(n) || eightr_ir::types::parse_proto(pr).is_none_or(|(ps, r)| !ps.iter().all(|t| type_descriptor(t) && *t != "V") || !type_descriptor(r)));
+        if bad_name {
+            return Err("corrupt pack: invalid class or member name".into());
+        }
         Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks })
     }
 }
@@ -296,5 +316,11 @@ mod tests {
         let bytes = p.encode();
         assert_eq!(Pack::decode(&bytes).unwrap(), p);
         assert!(Pack::decode(&bytes[..bytes.len() - 3]).is_err());
+        // Names end up in the output dex: invalid ones reject the pack.
+        for (n, pr) in [("a b", "()V"), ("", "()V"), ("x;y", "()V"), ("f", "(V)V"), ("f", "(Q)V")] {
+            let mut q = p.clone();
+            q.methods[0] = (0, n.into(), pr.into());
+            assert!(Pack::decode(&q.encode()).is_err(), "{n}{pr}");
+        }
     }
 }

@@ -40,7 +40,7 @@ pub struct Evidence {
     /// Small text resources of the package (`Config::resources`).
     pub resources: Vec<(String, String)>,
     /// The packs forged for this app's build profile, as matcher DBs.
-    pub libdb: std::sync::Arc<Vec<crate::sigdb::db::SigDb>>,
+    pub libdb: std::sync::Arc<crate::libdb::LibDbs>,
 }
 
 pub struct Outcome {

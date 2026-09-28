@@ -34,14 +34,15 @@ pub fn embedded() -> &'static [SigDb] {
 }
 
 /// The DBs to match against: LibDB packs forged for this app first, then the embedded DBs
-/// without the classes a pack covers (a pack, built from the app's exact library versions and
-/// R8, is the better witness; the same method in two DBs would make every exact match ambiguous).
-pub fn with_packs(packs: &[SigDb]) -> std::borrow::Cow<'static, [SigDb]> {
-    if packs.is_empty() {
+/// without the classes the packs speak for (their declared artifacts: a pack built from the app's
+/// exact versions and R8 is the better witness, and the same method in two DBs would make every
+/// exact match ambiguous).
+pub fn with_packs(libdb: &crate::libdb::LibDbs) -> std::borrow::Cow<'static, [SigDb]> {
+    if libdb.dbs.is_empty() {
         return std::borrow::Cow::Borrowed(embedded());
     }
-    let covered: BTreeSet<&str> = packs.iter().flat_map(|db| db.records.iter().map(move |r| db.classes[db.methods[r.method as usize].0 as usize].as_str())).collect();
-    let mut out: Vec<SigDb> = packs.to_vec();
+    let covered = &libdb.covered;
+    let mut out: Vec<SigDb> = libdb.dbs.clone();
     for db in embedded() {
         let mut db = db.clone();
         let keep = |c: u32| !covered.contains(db.classes[c as usize].as_str());

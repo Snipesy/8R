@@ -118,7 +118,9 @@ pub fn dir_resources(dir: &Path) -> Vec<(String, String)> {
             if p.is_dir() {
                 stack.push(p);
             } else if let Ok(rel) = p.strip_prefix(dir) {
-                let name = rel.to_string_lossy().replace('\\', "/");
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                // An unpacked .aab keeps the package root under base/root/, as in the zip.
+                let name = rel.strip_prefix("base/root/").unwrap_or(&rel).to_string();
                 let size = e.metadata().map_or(u64::MAX, |m| m.len());
                 if let (true, Ok(text)) = (is_resource(&name, size), fs::read_to_string(&p)) {
                     out.push((name, text));

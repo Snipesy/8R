@@ -26,10 +26,11 @@ pub const FORGE_VERSION: &str = "3";
 fn generator_version(k: Kind) -> u32 {
     match k {
         Kind::LibAlone | Kind::Roots => 1,
-        // 2: opaque argument types instantiable; 3: Java keywords filtered.
-        Kind::Callers => 3,
-        // 2: every call from two call sites; 3: one call per method; 4: argument types instantiable.
-        Kind::Defaults => 4,
+        // 2: opaque argument types instantiable; 3: Java keywords filtered; 4: contextual keywords allowed.
+        Kind::Callers => 4,
+        // 2: every call from two call sites; 3: one call per method; 4: argument types instantiable;
+        // 5: `ifeq` only, bit 31, single-mask bridges.
+        Kind::Defaults => 5,
     }
 }
 
@@ -87,6 +88,13 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
         ("r8".to_string(), format!("{} {r8_sha}", profile.r8)),
         ("javac".to_string(), tools.javac_version.clone()),
         ("android.jar".to_string(), tools.android_jar_sha256.clone()),
+        // Recorded in the pack (packs for one profile from different generators are told apart);
+        // not an input of the R8 runs' shared key (each scenario's own key has its version).
+        ("generators".to_string(), {
+            let mut g: Vec<String> = scenarios.iter().map(|s| format!("{}={}", s.name, generator_version(s.kind))).collect();
+            g.push(format!("fingerprint-rev={}", crate::fingerprint::REVISION));
+            g.join(",")
+        }),
     ];
     let mut h = String::new();
     h.push_str(&profile.canonical());
@@ -99,7 +107,7 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
         h.push('\n');
     }
     // What the R8 runs depend on (not the fingerprint code, which only reads their output).
-    for (k, v) in tool_ids.iter().filter(|t| t.0 != "fingerprint") {
+    for (k, v) in tool_ids.iter().filter(|t| t.0 != "fingerprint" && t.0 != "generators") {
         h.push_str(&format!("\n{k}={v}"));
     }
     let build_hash = sha256_hex(h.as_bytes())[..16].to_string();
@@ -108,7 +116,7 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
         h.push_str(&format!("\ngenerator {} {}", s.name, generator_version(s.kind)));
     }
     h.push_str(&format!("\nforge-fingerprint {}", crate::fingerprint::REVISION));
-    for (k, v) in tool_ids.iter().filter(|t| t.0 == "fingerprint") {
+    for (k, v) in tool_ids.iter().filter(|t| t.0 == "fingerprint" || t.0 == "generators") {
         h.push_str(&format!("\n{k}={v}"));
     }
     let hash = sha256_hex(h.as_bytes())[..16].to_string();

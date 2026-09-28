@@ -47,20 +47,29 @@ enum Command {
     Rules,
 }
 
-/// Packs from files and directories (`*.8rpack`, sorted by path).
+/// Packs from files and directories (`*.8rpack`), sorted by path. A file that isn't a pack this 8R
+/// can read (an older format, a corrupt file) is skipped with a warning.
 fn load_packs(paths: &[PathBuf]) -> Result<Vec<eightr_core::libdb::Pack>, String> {
     let mut files = Vec::new();
     for p in paths {
         if p.is_dir() {
             let rd = std::fs::read_dir(p).map_err(|e| format!("{}: {e}", p.display()))?;
-            let mut v: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|f| f.extension().is_some_and(|x| x == "8rpack")).collect();
-            v.sort();
-            files.extend(v);
+            files.extend(rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|f| f.extension().is_some_and(|x| x == "8rpack")));
         } else {
             files.push(p.clone());
         }
     }
-    files.iter().map(|f| std::fs::read(f).map_err(|e| format!("{}: {e}", f.display())).and_then(|b| eightr_core::libdb::Pack::decode(&b).map_err(|e| format!("{}: {e}", f.display())))).collect()
+    files.sort();
+    files.dedup();
+    let mut out = Vec::new();
+    for f in &files {
+        let bytes = std::fs::read(f).map_err(|e| format!("{}: {e}", f.display()))?;
+        match eightr_core::libdb::Pack::decode(&bytes) {
+            Ok(p) => out.push(p),
+            Err(e) => eprintln!("8r: warning: {}: {e}; skipped", f.display()),
+        }
+    }
+    Ok(out)
 }
 
 fn main() -> ExitCode {

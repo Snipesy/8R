@@ -29,6 +29,28 @@ pub struct ClassInfo {
     pub defaults: BTreeMap<(String, String), (u32, Vec<usize>)>,
 }
 
+/// How many mask ints a default-argument bridge has: the bridge's parameters are its function's
+/// (plus a leading receiver for members), then the masks, then the marker. `None` without the
+/// function.
+fn mask_count(name: &str, desc: &str, methods: &[(String, String, u16)]) -> Option<usize> {
+    let target = if name == "<init>" { "<init>" } else { name.strip_suffix("$default")? };
+    let (ps, _) = eightr_ir::types::parse_proto(desc)?;
+    let n = ps.len().checked_sub(1)?;
+    for (mn, md, _) in methods {
+        if mn != target || (mn == name && md == desc) {
+            continue;
+        }
+        let Some((tp, _)) = eightr_ir::types::parse_proto(md) else { continue };
+        for skip in [0, 1] {
+            let Some(rest) = ps.get(skip..n) else { continue };
+            if rest.len() > tp.len() && rest[..tp.len()] == tp[..] && rest[tp.len()..].iter().all(|t| *t == "I") {
+                return Some(rest.len() - tp.len());
+            }
+        }
+    }
+    None
+}
+
 /// Instruction length at `pc` of JVM bytecode (`None`: malformed).
 fn insn_len(code: &[u8], pc: usize) -> Option<usize> {
     let op = *code.get(pc)?;
@@ -97,12 +119,15 @@ fn default_bits(code: &[u8], mask_slot: usize, param_slots: &[usize], ints: &BTr
         } else {
             continue;
         };
-        if c.1 != 0x7e || !(d.1 == 0x99 || d.1 == 0x9a) || bit <= 0 || bit > i64::from(u32::MAX) {
+        // kotlinc tests `(mask & bit) == 0` → `ifeq L` over the default's code. Bit 31 is the
+        // negative int constant.
+        let bit = if (i64::from(i32::MIN)..0).contains(&bit) { i64::from(bit as i32 as u32) } else { bit };
+        if c.1 != 0x7e || d.1 != 0x99 || bit <= 0 || bit > i64::from(u32::MAX) {
             continue;
         }
         mask |= bit as u32;
-        // `ifeq L` skips the default: the last store before L names the parameter.
-        let end = if d.1 == 0x99 { d.2 as usize } else { usize::MAX };
+        // The last store before L names the parameter.
+        let end = d.2 as usize;
         let store = insns[i + 4..].iter().take_while(|x| x.0 < end).filter(|x| (0x36..=0x3a).contains(&x.1) || (0x3b..=0x4e).contains(&x.1)).last();
         if let Some(&(_, _, slot)) = store {
             if let Some(k) = param_slots.iter().position(|&s| s as i64 == slot) {
@@ -218,7 +243,8 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
             }
         }
         if let (Some(code), Some((ps, _))) = (code, eightr_ir::types::parse_proto(&md)) {
-            // Exactly one mask int, then the marker.
+            // Exactly one mask int, then the marker (functions of more than 32 parameters have
+            // several masks: see `mask_count`, applied once all methods are read).
             let n = ps.len();
             if n >= 2 && ps[n - 2] == "I" && ps[n - 1].starts_with('L') {
                 let mut slot = usize::from(acc & ACC_STATIC == 0);
@@ -235,6 +261,8 @@ pub fn parse_class(b: &[u8]) -> Option<ClassInfo> {
         }
         methods.push((mn, md, acc));
     }
+    // Bridges with more than one mask int aren't modelled: drop them.
+    defaults.retain(|(n, d), _| mask_count(n, d, &methods) == Some(1));
     Some(ClassInfo { descriptor: format!("L{name};"), access, methods, defaults })
 }
 
