@@ -269,23 +269,7 @@ pub fn method_header(m: &crate::model::Method, s: &Interner) -> String {
 
 /// Canonical rendering of one class. Member order isn't semantic, so members are sorted.
 pub fn class(c: &crate::model::Class, s: &Interner) -> String {
-    let mut out = String::new();
-    let _ = writeln!(out, "class {} access {:#x}", s.get(c.ty), c.access);
-    if let Some(sup) = c.superclass {
-        let _ = writeln!(out, "  extends {}", s.get(sup));
-    }
-    for i in &c.interfaces {
-        let _ = writeln!(out, "  implements {}", s.get(*i));
-    }
-    if let Some(f) = c.source_file {
-        let _ = writeln!(out, "  source {:?}", s.get(f));
-    }
-    annotations(&mut out, "  ", &c.annotations, s);
-    let mut fields: Vec<String> = c.fields.iter().map(|f| field(f, s)).collect();
-    fields.sort();
-    out.extend(fields);
-    let methods: Vec<String> = c.methods.iter().map(|m| method(m, s)).collect();
-    class_rest(out, methods)
+    class_with_methods(c, s, c.methods.iter().map(|m| method(m, s)).collect())
 }
 
 /// `class` with its methods already rendered (`method`, in member order).

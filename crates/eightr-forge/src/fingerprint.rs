@@ -20,7 +20,7 @@ use crate::tools::{read, read_string, Result};
 
 /// Bumped whenever this module's output for the same scenario output changes (part of the pack
 /// key, not of the scenario cache: R8 doesn't run again).
-pub const REVISION: u32 = 2;
+pub const REVISION: u32 = 3;
 
 /// An original method: (class descriptor, name, proto).
 pub type Key = (String, String, String);
@@ -173,6 +173,30 @@ pub fn body_frames(table: &FrameTable, b: &eightr_ir::lift::Body) -> Frames {
     fr
 }
 
+/// The function a Kotlin default-argument bridge `f$default(…, int mask…, Object)` stands for,
+/// when that function (same class, name `f`, the bridge's parameters without the masks and marker,
+/// with or without the leading receiver) is inlined into the bridge as the outermost inlined frame.
+fn default_target(key: &Key, frames: &Frames) -> Option<Key> {
+    let name = key.1.strip_suffix("$default")?;
+    let (ps, ret) = eightr_ir::types::parse_proto(&key.2)?;
+    let n = ps.len().checked_sub(1)?;
+    if !ps[n].starts_with('L') {
+        return None;
+    }
+    let masks = ps[..n].iter().rev().take_while(|t| **t == "I").count();
+    // At least one mask; with no way to tell a trailing int parameter from a second mask, the
+    // candidates below try each split.
+    let mut protos = Vec::new();
+    for k in 1..=masks {
+        let m = n - k;
+        protos.push(format!("({}){ret}", ps[..m].concat()));
+        if m > 0 {
+            protos.push(format!("({}){ret}", ps[1..m].concat()));
+        }
+    }
+    frames.iter().filter_map(|x| x.2.last()).map(|x| &x.0).find(|k| k.0 == key.0 && k.1 == name && protos.contains(&k.2)).cloned()
+}
+
 /// Fingerprints one scenario's output directory (dex files + `mapping.txt`). `owned` says whether
 /// an original class belongs to the closure.
 pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut> {
@@ -213,11 +237,8 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
             // A Kotlin default-argument bridge with its own function inlined into it is that
             // function specialized with its defaults: the body an app has where the bridge was
             // inlined into the call site and the function survives (`setContent { … }`).
-            if let Some(target) = key.1.strip_suffix("$default").map(str::to_string) {
-                let inlined = fr.iter().flat_map(|x| x.2.iter()).map(|x| &x.0).find(|k| k.0 == key.0 && k.1 == target).cloned();
-                if let Some(k) = inlined {
-                    key = k;
-                }
+            if let Some(target) = default_target(&key, &fr) {
+                key = target;
             }
             out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });
         }
@@ -225,4 +246,29 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
     out.methods.sort();
     out.classes.sort();
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn k(c: &str, n: &str, p: &str) -> Key {
+        (c.into(), n.into(), p.into())
+    }
+
+    /// `f(x: Int = 0) = f(x, 1)`: `f(I)` inlined into `f$default` with `f(II)` inside it keys the
+    /// bridge as `f(I)` (the outermost frame whose proto the bridge stands for), not `f(II)`.
+    #[test]
+    fn default_bridge_target_is_the_outermost_matching_frame() {
+        let bridge = k("La/K;", "f$default", "(IILjava/lang/Object;)V");
+        let frames: Frames = vec![(0, 3, vec![(k("La/K;", "f", "(II)V"), 5), (k("La/K;", "f", "(I)V"), 2)])];
+        assert_eq!(default_target(&bridge, &frames), Some(k("La/K;", "f", "(I)V")));
+        // Only the inner overload inlined: no key change.
+        let frames: Frames = vec![(0, 3, vec![(k("La/K;", "f", "(II)V"), 5)])];
+        assert_eq!(default_target(&bridge, &frames), None);
+        // A member function: the bridge's receiver isn't a parameter of the target.
+        let member = k("La/K;", "g$default", "(La/K;Ljava/lang/String;ILjava/lang/Object;)I");
+        let frames: Frames = vec![(0, 3, vec![(k("La/K;", "g", "(Ljava/lang/String;)I"), 7)])];
+        assert_eq!(default_target(&member, &frames), Some(k("La/K;", "g", "(Ljava/lang/String;)I")));
+    }
 }

@@ -284,12 +284,25 @@ pub fn parse_pom(xml: &str, base_url: &str, parent: &mut dyn FnMut(&Coord) -> Re
         }
         v
     };
+    // The effective model is interpolated after inheritance: managed keys too.
+    let managed: BTreeMap<(String, String), String> = managed.into_iter().map(|((g, a), v)| ((subst(&g), subst(&a)), v)).collect();
+    // Dependencies are inherited from the parents; the child's declaration of a module wins.
+    let mut effective: BTreeMap<(String, String), (Option<String>, String, bool)> = BTreeMap::new();
+    let mut order: Vec<(String, String)> = Vec::new();
+    for p in chain.iter().rev() {
+        for (g, a, v, scope, optional) in &p.deps {
+            let k = (subst(g), subst(a));
+            if effective.insert(k.clone(), (v.clone(), scope.clone(), *optional)).is_none() {
+                order.push(k);
+            }
+        }
+    }
     let mut deps = Vec::new();
-    for (g, a, v, scope, optional) in &me.deps {
+    for (g, a) in order {
+        let (v, scope, optional) = &effective[&(g.clone(), a.clone())];
         if !matches!(scope.as_str(), "compile" | "runtime") || *optional {
             continue;
         }
-        let (g, a) = (subst(g), subst(a));
         let v = v.clone().or_else(|| managed.get(&(g.clone(), a.clone())).cloned());
         let Some(v) = v.map(|v| subst(&v)).as_deref().and_then(clean_version) else { continue };
         deps.push(Coord { group: g, artifact: a, version: v });
@@ -333,8 +346,9 @@ pub struct Graph {
 }
 
 /// Gradle-style selection: pins keep their versions; every other module gets the highest version
-/// requested by a module of the graph reachable under the current selection, to a fixpoint (the
-/// dependencies of an evicted version don't count).
+/// requested by a module of the graph reachable under the current selection, never lower than it
+/// had in the previous round, to a fixpoint (the dependencies of an evicted version don't add
+/// modules).
 pub fn select(pinned: &[Coord], lookup: &mut dyn FnMut(&Coord) -> Result<Option<Module>>) -> Result<Graph> {
     let pins: BTreeMap<(String, String), String> = pinned.iter().map(|c| ((c.group.clone(), c.artifact.clone()), c.version.clone())).collect();
     let mut want = pins.clone();
@@ -364,8 +378,16 @@ pub fn select(pinned: &[Coord], lookup: &mut dyn FnMut(&Coord) -> Result<Option<
             let Some(m) = modules.get(&c) else { continue };
             for d in &m.deps {
                 let k = (d.group.clone(), d.artifact.clone());
-                if !pins.contains_key(&k) && next.get(&k).is_none_or(|n| version_cmp(&d.version, n).is_gt()) {
-                    next.insert(k.clone(), d.version.clone());
+                if !pins.contains_key(&k) {
+                    // Monotone: a module's version never goes down between rounds (what an evicted
+                    // version asked for may still have raised it), so selection converges.
+                    let floor = want.get(&k).filter(|w| next.get(&k).is_none_or(|n| version_cmp(w, n).is_gt())).cloned();
+                    if let Some(f) = floor {
+                        next.insert(k.clone(), f);
+                    }
+                    if next.get(&k).is_none_or(|n| version_cmp(&d.version, n).is_gt()) {
+                        next.insert(k.clone(), d.version.clone());
+                    }
                 }
                 stack.push(k);
             }
@@ -503,6 +525,29 @@ mod tests {
         assert_eq!(got, ["a:a:1", "b:b:1", "w:w:1", "x:x:2", "y:y:1"]);
         let g2 = select(&[Coord::parse("q:q:1").unwrap()], &mut lookup).unwrap();
         assert_eq!(g2.missing.len(), 1);
+    }
+
+    /// Evicted versions can't make the selection oscillate: P→{A1,B1}, B1→A2, A2→B2.
+    #[test]
+    fn selection_converges_on_mutual_upgrades() {
+        let db: BTreeMap<&str, Vec<&str>> = [("p:p:1", vec!["a:a:1", "b:b:1"]), ("a:a:1", vec![]), ("b:b:1", vec!["a:a:2"]), ("a:a:2", vec!["b:b:2"]), ("b:b:2", vec![])].into_iter().collect();
+        let mut lookup = |c: &Coord| -> Result<Option<Module>> {
+            Ok(db.get(c.to_string().as_str()).map(|ds| Module { url: None, deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(), redirect: false }))
+        };
+        let g = select(&[Coord::parse("p:p:1").unwrap()], &mut lookup).unwrap();
+        let got: Vec<String> = g.selected.iter().map(|((gr, a), v)| format!("{gr}:{a}:{v}")).collect();
+        assert_eq!(got, ["a:a:2", "b:b:2", "p:p:1"]);
+    }
+
+    #[test]
+    fn managed_keys_are_interpolated_and_parent_dependencies_inherited() {
+        let child = "<project><parent><groupId>g</groupId><artifactId>parent</artifactId><version>2</version></parent><artifactId>c</artifactId>
+            <dependencies><dependency><groupId>g</groupId><artifactId>sib</artifactId></dependency></dependencies></project>";
+        let parent = "<project><groupId>g</groupId><artifactId>parent</artifactId><version>2</version>
+            <dependencyManagement><dependencies><dependency><groupId>${project.groupId}</groupId><artifactId>sib</artifactId><version>${project.version}</version></dependency></dependencies></dependencyManagement>
+            <dependencies><dependency><groupId>x</groupId><artifactId>common</artifactId><version>1</version></dependency></dependencies></project>";
+        let m = parse_pom(child, "u", &mut |c| Ok((c.artifact == "parent").then(|| parent.to_string()))).unwrap();
+        assert_eq!(m.deps, vec![Coord::parse("x:common:1").unwrap(), Coord::parse("g:sib:2").unwrap()]);
     }
 
     #[test]

@@ -324,3 +324,26 @@ and 8R output is byte-identical with and without a pack.
   compiles `setContent` around it. Next step: derive the app's pins from its own dex, i.e. library
   classes and members that kept their library names, and apply them as keep rules in every
   scenario (per-app packs).
+
+### L2 review fixes
+
+- **Pack selection doesn't depend on order:** packs are sorted by path and selected in
+  (profile, catalog, tools, lock) order. Packs record their generator versions, so two packs for
+  one profile differ. Selection findings are sorted.
+- **Coverage:** a pack displaces embedded DB records only for its declared artifacts' classes.
+  Undeclared versions (a stdlib the resolver chose) are a guess.
+- **Name validation:** `Pack::decode` rejects names that aren't dex simple names, class
+  descriptors and protos, because those names end up in the output dex.
+- **Code identity:** `code_id` also covers `data/platform-api.txt`, the dex reader and `sym.rs`.
+- **`$default` keying:** a bridge is keyed as its function only when that function (same
+  class, name, the bridge's proto minus masks, marker and optional receiver) is the outermost
+  inlined frame.
+- **`default_bits`:** only `ifeq` patterns count, bit 31 is accepted, and bridges with several
+  masks are skipped.
+- **Resolver:** interpolated `dependencyManagement` keys, dependencies inherited from parents,
+  and monotone version selection (converges).
+- **CLI and inputs:** undecodable pack files are skipped with a warning, and an unpacked `.aab`
+  directory's `base/root/` resources are read.
+- **After the fixes:** `sigdb_app` holds at 98.4% / 76.6%, and Gretio has 4927 sigdb names, down
+  from 4981 before the fixes (exact `$default` keying; no displacement by guessed versions). It
+  ART-verifies and runs.
