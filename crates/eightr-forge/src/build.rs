@@ -25,7 +25,9 @@ pub const FORGE_VERSION: &str = "4";
 /// scenario cache key and of the pack key, so only its scenarios run again.
 fn generator_version(k: Kind) -> u32 {
     match k {
-        Kind::LibAlone | Kind::Roots => 1,
+        // LibAlone 2: generated R classes not kept.
+        Kind::LibAlone => 2,
+        Kind::Roots => 1,
         // 2: opaque argument types instantiable; 3: Java keywords filtered; 4: contextual keywords allowed.
         Kind::Callers => 4,
         // 2: every call from two call sites; 3: one call per method; 4: argument types instantiable;
@@ -128,9 +130,9 @@ fn inputs(profile: &Profile, opts: &Options) -> Result<Inputs> {
     Ok(Inputs { profile: profile.clone(), closure, lock, catalog: opts.catalog.clone(), scenarios, tools, r8, tool_ids, hash, build_hash, cpus_per_jvm })
 }
 
-/// Where the pack for these inputs (and app pins) lives.
-fn pack_path(inp: &Inputs, pins_hash: &str) -> PathBuf {
-    let tag = if pins_hash.is_empty() { inp.hash.clone() } else { sha256_hex(format!("{}|{pins_hash}", inp.hash).as_bytes())[..16].to_string() };
+/// Where the pack for these inputs (and app: its pins and identity) lives.
+fn pack_path(inp: &Inputs, pins_hash: &str, app_id: &str) -> PathBuf {
+    let tag = if pins_hash.is_empty() { inp.hash.clone() } else { sha256_hex(format!("{}|{pins_hash}|{app_id}", inp.hash).as_bytes())[..16].to_string() };
     cache_root().join("packs").join(format!("{}-{tag}.8rpack", inp.profile.key()))
 }
 
@@ -162,7 +164,8 @@ fn run_scenario(inp: &Inputs, sh: &Shared, s: &Scenario, dir: &Path) -> Result<S
     program.extend(extra.iter().cloned());
     let note = match s.kind {
         Kind::LibAlone => {
-            rules.push_str("-keep public class * { public protected *; }\n");
+            // Not the generated R classes: an app's R reads fold into constants.
+            rules.push_str("-keep public class !**.R,!**.R$*,* { public protected *; }\n");
             "keep public API".to_string()
         }
         Kind::Roots => {
@@ -342,7 +345,8 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
     let api = Api::build(&libs)?;
     let pins = opts.app.as_ref().map(|a| crate::pins::rules(&api, a)).unwrap_or_default();
     let pins_hash = if pins.is_empty() { String::new() } else { sha256_hex(pins.as_bytes())[..16].to_string() };
-    let path = pack_path(&inp, &pins_hash);
+    let app_id = if pins.is_empty() { String::new() } else { opts.app.as_ref().map(|a| a.id.clone()).unwrap_or_default() };
+    let path = pack_path(&inp, &pins_hash, &app_id);
     if path.exists() {
         log!(opts, "cached: {}", path.display());
         let pack = Pack::decode(&read(&path)?)?;
@@ -395,9 +399,7 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
         outs.push(r.map_err(|e| format!("{}: {e}", inp.scenarios[i].name))?.1);
     }
     let mut pack = merge(&inp, &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
-    if !pins.is_empty() {
-        pack.app = opts.app.as_ref().map(|a| a.id.clone()).unwrap_or_default();
-    }
+    pack.app = app_id;
     write(&path, pack.encode())?;
     Ok((path, pack))
 }

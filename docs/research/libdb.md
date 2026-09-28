@@ -392,9 +392,23 @@ fingerprints identically (`12fecb805b8c39ff`) in 16 of the 17 scenarios and in t
   ART-verifies and runs.
 - **`enableEdgeToEdge`** is still unmatched. In the app, R8 inlines `SystemBarStyle.auto` into it
   twice, and no scenario reproduces that call-graph context yet.
-- **`compose_lib` fixture:** 40.3% recall, 98.47% precision (99.44% when the 35 cases that name
-  the same code `f` rather than `f$default` count as right).
-  - Recall is down from 42.5% because the fixture build is unrealistic: xtask builds it without
-    AGP, so its 149 library `R` field reads stay unresolved field reads instead of constants.
-  - Follow-up: have the fixture pipeline generate library `R` classes as AGP does.
-- **`sigdb_app`:** 98.4% precision, 76.3% recall.
+- **`compose_lib` fixture:** 40.5% recall, 98.86% precision, after the review fixes below.
+  - 20 of the remaining errors name `f` where the app kept `f$default` for the same specialized
+    body.
+  - Correction: the earlier 42.5% came from a pack built before the L2 review fixes. This commit's
+    parent grades 40.1%.
+  - The fixture's AGP-less build (unresolved library `R` reads) costs only about 0.3 points. It is
+    still a follow-up to generate library `R` classes in the fixture pipeline as AGP does.
+- **`sigdb_app`:** 98.6% precision, 76.5% recall.
+
+**Review fixes:**
+
+- **`$default` re-keying:** decided by the body. A bridge whose `and` still reads an int parameter
+  before any write to it tests its mask and stays a bridge. R8 always drops the unused marker, so
+  arity alone was wrong.
+- **Pack cache path:** includes the app id.
+- **Library-alone scenario:** no longer keeps the generated `R` classes, so its `R` reads fold.
+- **Pins:** constructors and `equals`/`hashCode`/`toString` overrides survive in any build, so
+  they aren't evidence on their own. Constructors are pinned only in classes with other kept
+  members (a view kept for its layout).
+- **Gretio:** `setContent` still matches (16 scenarios), 5004 sigdb names, ART-verifies and runs.
