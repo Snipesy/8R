@@ -145,6 +145,10 @@ fn pure_clinit(p: &Model, owner: eightr_ir::sym::Sym, body: &Body) -> bool {
                 matches!((defs.next().map(|y| &y.op), defs.next()), (Some(Op::Const { value: eightr_ir::op::Const::Narrow(k), .. }), None) if *k >= 0)
             }
             Op::StaticPut { field, .. } => field.class == owner,
+            // A constant primitive array (`filled-new-array {…}, [I`): R8 merges outline holders
+            // with classes whose initializer builds one (e.g. enum ordinal tables).
+            Op::FilledNewArray { ty, .. } => p.syms.get(*ty).len() == 2 && p.syms.get(*ty).starts_with('['),
+            Op::MoveResult { .. } => at > 0 && matches!(body.insns[at - 1].op, Op::FilledNewArray { .. }),
             _ => false,
         })
         && p.syms.get(owner).starts_with('L')
