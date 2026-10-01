@@ -412,3 +412,21 @@ fingerprints identically (`12fecb805b8c39ff`) in 16 of the 17 scenarios and in t
   they aren't evidence on their own. Constructors are pinned only in classes with other kept
   members (a view kept for its layout).
 - **Gretio:** `setContent` still matches (16 scenarios), 5004 sigdb names, ART-verifies and runs.
+
+## 10. Outline detection graded on forge scenarios
+
+Every scenario build is real R8 output over real libraries, with a mapping that marks R8's
+outlines (`com.android.tools.r8.outline`; throw outlines are synthesized methods). That is a far
+larger truth set than the fixtures. Running `8r undo` on 7 of Gretio's scenario builds:
+
+- **Precision:** 822 detections, every one an R8-synthesized method, and none of them app or
+  library code. 572 are marked outlines; the rest are throw outlines.
+- **Recall:** 100% of marked outlines in 6 scenarios. Library-alone missed 30, all in one holder
+  class R8 had merged with a class whose initializer builds a constant `int[]`
+  (`filled-new-array`). The purity check didn't accept that instruction, so the holder was
+  rejected. Now fixed: constant primitive arrays are pure. 1 miss remains: a pure-arithmetic
+  outline (`(a*b)/c + d`). Classic outlines must make a call, so backports (also pure arithmetic)
+  aren't labeled as outlines. Missing one only costs readability.
+- **Label mismatch:** outlines that return the exception their callers throw are labeled
+  `r8/bu-outline-inline`, while R8's mapping marks them as classic outlines. Both are inlined the
+  same way.
