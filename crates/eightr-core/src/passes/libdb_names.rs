@@ -3,8 +3,10 @@
 //!
 //! * `r8/libdb-class-name` (S): an app class with at least two S-named methods matching one pack
 //!   class, every exact match of the class agreeing, and the class's shape among the pack's shapes
-//!   of that class: the original simple name and package (the package is restored by the pipeline
-//!   only where access allows, `crate::repackage`).
+//!   of that class: the original simple name and package. The `Package` label states the original
+//!   package (a fact, S) whether or not the class could go back there: the pipeline moves it only
+//!   where access allows and the name collides with nothing (`crate::repackage`), and records
+//!   refusals as a finding.
 //! * `r8/libdb-field-name` (S) / `r8/libdb-field-hint` (D): matched bodies have the same token
 //!   sequence, so the n-th program field access of the app method is the n-th of its pack twin.
 //!   Every aligned access of a field must name the same pack field, of a compatible type.
@@ -139,10 +141,11 @@ pub fn name_classes_and_fields(
     for c in &claims {
         *count.entry(c.1.as_str()).or_default() += 1;
     }
-    // The package goes back only where the full original name is safe to take: not a platform
-    // class (boot classes load first), not under `java/` (ART refuses to define those), and not a
-    // string of the program (a `Class.forName` probe or `getName()` comparison that fails today
-    // would start to match).
+    // The package goes back only where the full original name is safe to take: not in a package of
+    // the boot class path (boot classes load first; ART refuses to define `java/` classes), and
+    // not named by a string of the program or its resources, in any form (a `Class.forName` probe,
+    // `getName()` comparison, JNI `FindClass` or manifest entry that fails today would start to
+    // match).
     let mut strings: BTreeSet<&str> = BTreeSet::new();
     for c in &p.classes {
         for insn in c.methods.iter().flat_map(|m| m.code.iter().flat_map(|b| &b.insns)) {
@@ -157,8 +160,14 @@ pub fn name_classes_and_fields(
         }
     }
     let restorable = |original: &str| {
-        let dotted = original.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
-        !crate::naming::is_platform_class(original) && !original.starts_with("Ljava/") && !strings.contains(dotted.as_str())
+        let slashed = original.trim_start_matches('L').trim_end_matches(';');
+        let dotted = slashed.replace('/', ".");
+        let named = |n: &str| strings.contains(n) || evidence.resources.iter().any(|(_, text)| text.contains(n));
+        !crate::naming::is_platform_class(original)
+            && !crate::naming::is_platform_package(package(original))
+            && !named(&dotted)
+            && !named(slashed)
+            && !named(original)
     };
     for (ci, original, pc) in &claims {
         if count[original.as_str()] != 1 {
@@ -239,35 +248,34 @@ pub fn name_classes_and_fields(
             }
         }
     }
-    // Field names in use per class hierarchy (supertypes and subtypes share the field namespace
-    // for resolution): a new name must collide with none.
-    let mut children: Vec<Vec<usize>> = vec![Vec::new(); p.classes.len()];
-    for (k, c) in p.classes.iter().enumerate() {
-        if let Some(sup) = c.superclass.and_then(|t| p.find(s.get(t))) {
-            if sup != k {
-                children[sup].push(k);
-            }
+    // Field namespaces: classes linked by superclass or interface edges (field resolution searches
+    // a class, its interfaces, then its superclass, so a new name must collide with no field
+    // reachable either way). Each namespace is keyed by its smallest member after union, a value
+    // that doesn't depend on which link was seen first.
+    let mut parent: Vec<usize> = (0..p.classes.len()).collect();
+    fn find(parent: &mut [usize], mut x: usize) -> usize {
+        while parent[x] != x {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
         }
+        x
     }
-    let hierarchy = |ci: usize| -> BTreeSet<usize> {
-        let mut out = BTreeSet::from([ci]);
-        let mut cur = p.classes[ci].superclass.and_then(|t| p.find(s.get(t)));
-        while let Some(k) = cur {
-            if !out.insert(k) {
-                break;
-            }
-            cur = p.classes[k].superclass.and_then(|t| p.find(s.get(t)));
-        }
-        let mut stack = vec![ci];
-        while let Some(k) = stack.pop() {
-            for &c in &children[k] {
-                if out.insert(c) {
-                    stack.push(c);
+    for (k, c) in p.classes.iter().enumerate() {
+        for t in c.superclass.iter().chain(&c.interfaces) {
+            if let Some(o) = p.find(s.get(*t)) {
+                let (a, b) = (find(&mut parent, k), find(&mut parent, o));
+                if a != b {
+                    let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+                    parent[hi] = lo;
                 }
             }
         }
-        out
-    };
+    }
+    let namespace: Vec<usize> = (0..p.classes.len()).map(|k| find(&mut parent, k)).collect();
+    let mut names_in: BTreeMap<usize, BTreeSet<&str>> = BTreeMap::new();
+    for (k, c) in p.classes.iter().enumerate() {
+        names_in.entry(namespace[k]).or_default().extend(c.fields.iter().map(|f| s.get(f.name)));
+    }
     let mut proposals: BTreeMap<(usize, usize), (String, bool, u16, u32)> = BTreeMap::new();
     for (at, (names, all_s)) in &votes {
         if rejected.contains(at) || names.len() != 1 {
@@ -284,20 +292,10 @@ pub fn name_classes_and_fields(
         let corroborated = support.get(at).is_some_and(|x| x.len() >= 2);
         proposals.insert(*at, (name.clone(), *all_s && (alone || corroborated), db, *pc));
     }
-    // Two fields of one hierarchy proposed the same name: neither.
+    // Two fields of one namespace proposed the same name: neither.
     let mut by_name: BTreeMap<(usize, String), usize> = BTreeMap::new();
-    // One namespace per class tree: its topmost program superclass.
-    let root_of = |ci: usize| -> usize {
-        let mut cur = ci;
-        let mut steps = 0;
-        while let Some(k) = p.classes[cur].superclass.and_then(|t| p.find(s.get(t))).filter(|&k| k != cur && steps < 256) {
-            cur = k;
-            steps += 1;
-        }
-        cur
-    };
     for ((ci, _), (name, ..)) in &proposals {
-        let root = root_of(*ci);
+        let root = namespace[*ci];
         *by_name.entry((root, name.clone())).or_default() += 1;
     }
     for (&(ci, fi), (name, all_s, db, pc)) in &proposals {
@@ -307,10 +305,10 @@ pub fn name_classes_and_fields(
         if labels.get(item, Attribute::MemberName).is_some() || pins.field(s.get(p.classes[ci].ty), current) {
             continue;
         }
-        if by_name[&(root_of(ci), name.clone())] != 1 {
+        if by_name[&(namespace[ci], name.clone())] != 1 {
             continue;
         }
-        let taken = current != name && hierarchy(ci).iter().any(|&k| p.classes[k].fields.iter().any(|x| s.get(x.name) == name));
+        let taken = current != name && names_in[&namespace[ci]].contains(name.as_str());
         if taken {
             continue;
         }

@@ -41,6 +41,7 @@ const PLATFORM_NAME_LIMIT: usize = 6;
 
 struct Platform {
     classes: BTreeSet<&'static str>,
+    packages: BTreeSet<&'static str>,
     methods: BTreeSet<(&'static str, &'static str)>,
 }
 
@@ -48,6 +49,16 @@ struct Platform {
 /// a stub R8 synthesized for a class newer than min-api.
 pub fn is_platform_class(desc: &str) -> bool {
     platform().classes.contains(desc)
+}
+
+/// Boot-classpath packages beyond android.jar's public API (hidden or legacy boot classes): a
+/// program class there is shadowed by the boot class of the same name (parent-first loading).
+const BOOT_PACKAGES: &[&str] = &["java/", "javax/", "dalvik/", "libcore/", "sun/", "com/android/internal/", "org/apache/http/", "org/json/", "org/xmlpull/", "org/w3c/", "org/xml/", "junit/"];
+
+/// Is `pkg` (`a/b`) a package the boot class path defines classes in? A program class moved there
+/// could be shadowed by, or refused next to, the platform's.
+pub fn is_platform_package(pkg: &str) -> bool {
+    platform().packages.contains(pkg) || BOOT_PACKAGES.iter().any(|b| format!("{pkg}/").starts_with(b))
 }
 
 fn platform() -> &'static Platform {
@@ -70,7 +81,8 @@ fn platform() -> &'static Platform {
                 _ => {}
             }
         }
-        Platform { classes, methods }
+        let packages = classes.iter().map(|c| package_of(c)).collect();
+        Platform { classes, packages, methods }
     })
 }
 const MIN_HEX: usize = 4;

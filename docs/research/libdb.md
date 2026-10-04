@@ -453,20 +453,31 @@ larger truth set than the fixtures. Running `8r undo` on 7 of Gretio's scenario 
     `AbstractClickableNode` into `ClickableNode`;
   - every method's erased proto is one of the class's.
   
-  The package is recorded only when the full original name is safe: not a platform class, not
-  under `java/`, and not a string of the program.
+  The package label is recorded only when the full original name is safe:
+  - its package isn't on the boot class path (android.jar's packages, `java/`, legacy boot
+    packages such as `org/apache/http` and `org/json`);
+  - it isn't named, in dotted, slashed or descriptor form, by a program string or a resource.
+
+  The label states the original package even where the move is refused (refusals are reported
+  as a finding).
 - `r8/libdb-field-name` (S) and `r8/libdb-field-hint` (D). The n-th field access of a matched body
   is the n-th of its pack twin. Every aligned access must agree, the owner's identity must match
   the pack field's class, and there must be no collision within the class tree. S also needs every
   supporting match to be S, a strong identity, and a type unique in the class or two methods
-  agreeing.
+  agreeing. The field namespace is a class's whole hierarchy component, interfaces included.
 - Package restoration (`crates/eightr-core/src/repackage.rs`) runs over the whole program after
   every move. A move is cancelled, to a fixpoint, when:
   - it separates a non-public class from a class that references it;
   - it separates a package-private member (or a protected one, outside subclasses) from its user;
   - it changes whether a method overrides a package-private one;
   - it separates a method handle or call site from the classes it mentions;
-  - the target name collides with another class.
+  - the target name collides with another class. This is checked every round, so a cancelled
+    move still holds its name.
+
+  Member access is resolved the way ART does:
+  - fields are static or instance, as the instruction says;
+  - methods are looked up in the superclass chain before interfaces;
+  - method handles are access-checked too.
   
   Items named from a pack carry `@eightr.Library(value = "g:a:v", app = …)`.
 
@@ -485,9 +496,9 @@ saw:
 
 | Truth set | S methods | S classes (name / package) | S fields | D methods | D field hints |
 |---|---|---|---|---|---|
-| Gretio pack, LOO | 25,211 / 25,211 | 1,911 / 1,910, all right | 6,508 / 6,508 | 99.27% | 99.94% |
-| Pokédex pack, LOO | 13,316 / 13,316 | 1,397 / 1,397, all right | 3,548 / 3,548 | 99.16% | 99.94% |
-| Pokédex app (held out) | 569 / 569 | 53 / 53, all right | 165 / 165 | 98.13% | 99.89% |
+| Gretio pack, LOO | 25,211 / 25,211 | 1,911 / 1,910, all right | 6,246 / 6,246 | 99.27% | 99.94% |
+| Pokédex pack, LOO | 13,316 / 13,316 | 1,397 / 1,397, all right | 3,409 / 3,409 | 99.16% | 99.94% |
+| Pokédex app (held out) | 569 / 569 | 53 / 53, all right | 161 / 161 | 98.13% | 99.89% |
 
 Every S label is right on every truth set. Each S error the harness found became a generic rule:
 - vertical merges: class kind, and shape ambiguity within a hierarchy;
@@ -510,7 +521,7 @@ output, with the same packs, gives the same bytes.
 **Idempotence with packs.** A per-app pack also applies to input tagged `@eightr.Library(app = its
 app)`, which is 8R's own output for that app. Matches of already-named methods still count as
 evidence. Provenance (`@eightr.Original`) is the first writer's, and an earlier run counts as
-first. Classes split off merged classes get structural names: `X$$SplitN` is not a kept name.
+first. It is replaced only when it names a different method. Classes split off merged classes get structural names: `X$$SplitN` is not a kept name.
 
 **α and offline tests.** `crates/eightr-forge/tests/oracle_pack.rs` merges a pack from the
 `compose_shapes` and `compose_witness` builds and applies it to `compose_witness2`. It checks:
