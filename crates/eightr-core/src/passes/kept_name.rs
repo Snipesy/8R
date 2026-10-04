@@ -47,6 +47,16 @@ const SYNTHETIC_MARKERS: &[&str] = &[
     "$8r$",
 ];
 
+/// A class 8R split off a merged class: `<base>$$Split<n>;` (or `$$Splitm<n>`) with `<base>;` in
+/// the program.
+fn split_off(p: &Program, desc: &str) -> bool {
+    desc.rsplit_once("$$Split").is_some_and(|(base, tag)| {
+        let n = tag.strip_suffix(';').unwrap_or("");
+        let n = n.strip_prefix('m').unwrap_or(n);
+        !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()) && p.find(&format!("{base};")).is_some()
+    })
+}
+
 /// Smallest length whose cumulative lowercase-generator capacity reaches `count`. Lowercase
 /// gives the fewest names per length (first char 26 options, then 36), so this is the
 /// longest a generated name can be under either casing mode.
@@ -203,9 +213,10 @@ impl Pass for KeptName {
                 && !is_synthetic(simple)
                 && !r8_numbered
                 && !desc.starts_with("Lj$/")
-                // A class 8R split off a merged class: the name is a placeholder naming replaces
-                // (its members are the base's, with their own names).
-                && !simple.contains("$$Split")
+                // A class 8R split off a merged class (`<base>$$Split<n>` or `$$Splitm<n>`, the
+                // base in the program): the name is a placeholder naming replaces (its members are
+                // the base's, with their own names).
+                && !split_off(p, desc)
                 // A kept name moved into a repackaging target gets a numeric suffix on
                 // collision (`Rep` → `Rep1`), so a trailing digit there isn't proof.
                 && !(in_target && t.ends_with(|c: char| c.is_ascii_digit()));

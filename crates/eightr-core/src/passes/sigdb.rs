@@ -301,8 +301,14 @@ impl Pass for Sigdb {
             let (o, v) = (m.syms.intern(&original), m.syms.intern(&via));
             let lib = lib_of.get(&(class, method)).map(|(c, a)| tag(m, c, a));
             let method = &mut m.classes[class].methods[method];
-            // Provenance: the first pass's that named the method (an earlier run's included).
-            if !method.annotations.iter().any(|a| a.annotation.ty == ty) {
+            // Provenance: the first pass's that named the method (an earlier run's included),
+            // unless it is for another name (stale).
+            let syms = &m.syms;
+            let current = |a: &Annotation| {
+                a.annotation.ty == ty && a.annotation.elements.iter().any(|(k, v)| *k == name_k && matches!(v, Value::String(x) if super::compose_libkey::method_name(syms.get(*x)) == super::compose_libkey::method_name(&original)))
+            };
+            if !method.annotations.iter().any(current) {
+                method.annotations.retain(|a| a.annotation.ty != ty);
                 method.annotations.push(Annotation {
                     visibility: Visibility::Build,
                     annotation: EncodedAnnotation { ty, elements: vec![(name_k, Value::String(o)), (via_k, Value::String(v))] },

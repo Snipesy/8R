@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use eightr_dex::class::access;
 use eightr_ir::op::Op;
-use eightr_ir::value::{HandleMember, MethodHandleRef, Value};
+use eightr_ir::value::{HandleMember, MethodHandleKind, MethodHandleRef, Value};
 
 use crate::program::{package_of, simple_name_of, ClassId, Program};
 
@@ -28,15 +28,26 @@ const PUBLIC: u32 = access::PUBLIC;
 const PRIVATE: u32 = access::PRIVATE;
 const PROTECTED: u32 = access::PROTECTED;
 
-/// Where a member reference resolves in the program: (declaring class, access flags). Fields:
-/// the class, its interfaces, then its superclass; methods: the superclass chain, then interfaces.
-fn resolve(p: &Program, class: &str, name: &str, desc: &str, method: bool) -> Option<(ClassId, u32)> {
+/// What a member reference names.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Member {
+    Method,
+    StaticField,
+    InstanceField,
+}
+
+/// Where a member reference resolves in the program: (declaring class, access flags). Fields
+/// (static or instance, as the instruction says): the class, its interfaces, then its
+/// superclass; methods: the superclass chain, then interfaces.
+fn resolve(p: &Program, class: &str, name: &str, desc: &str, kind: Member) -> Option<(ClassId, u32)> {
+    let method = kind == Member::Method;
     let declared = |id: ClassId| -> Option<u32> {
         let c = p.class(id);
         if method {
             c.methods.iter().find(|m| p.str(m.name) == name && p.str(m.proto) == desc).map(|m| m.access)
         } else {
-            c.fields.iter().find(|f| p.str(f.name) == name && p.str(f.ty) == desc).map(|f| f.access)
+            let want_static = kind == Member::StaticField;
+            c.fields.iter().find(|f| p.str(f.name) == name && p.str(f.ty) == desc && (f.access & access::STATIC != 0) == want_static).map(|f| f.access)
         }
     };
     let start = p.find(class)?;
@@ -103,6 +114,17 @@ fn handle_classes(p: &Program, h: &MethodHandleRef, out: &mut Vec<ClassId>) {
         HandleMember::Method(m) => {
             classes_in(p, p.str(m.class), out);
             classes_in(p, p.str(m.proto), out);
+        }
+    }
+}
+
+/// Method handles among call-site arguments.
+fn handles_in(vs: &[Value], out: &mut Vec<MethodHandleRef>) {
+    for v in vs {
+        match v {
+            Value::MethodHandle(h) => out.push(*h),
+            Value::Array(xs) => handles_in(xs, out),
+            _ => {}
         }
     }
 }
@@ -177,22 +199,25 @@ fn constraints(p: &Program) -> (Pairs, Pairs) {
                 }
             }
             for x in &b.insns {
-                let (owner, member): (Option<&str>, Option<(&str, &str, bool)>) = match &x.op {
+                let (owner, member): (Option<&str>, Option<(&str, &str, Member)>) = match &x.op {
                     Op::NewInstance { ty, .. } | Op::ConstClass { ty, .. } | Op::CheckCast { ty, .. } | Op::InstanceOf { ty, .. } | Op::NewArray { ty, .. } | Op::FilledNewArray { ty, .. } => {
                         (Some(p.str(*ty)), None)
                     }
-                    Op::InstanceGet { field, .. } | Op::InstancePut { field, .. } | Op::StaticGet { field, .. } | Op::StaticPut { field, .. } => {
-                        (Some(p.str(field.class)), Some((p.str(field.name), p.str(field.ty), false)))
-                    }
-                    Op::Invoke { method, .. } => (Some(p.str(method.class)), Some((p.str(method.name), p.str(method.proto), true))),
+                    Op::InstanceGet { field, .. } | Op::InstancePut { field, .. } => (Some(p.str(field.class)), Some((p.str(field.name), p.str(field.ty), Member::InstanceField))),
+                    Op::StaticGet { field, .. } | Op::StaticPut { field, .. } => (Some(p.str(field.class)), Some((p.str(field.name), p.str(field.ty), Member::StaticField))),
+                    Op::Invoke { method, .. } => (Some(p.str(method.class)), Some((p.str(method.name), p.str(method.proto), Member::Method))),
                     _ => (None, None),
                 };
                 if let Some(k) = owner.and_then(non_public_class) {
                     need(k);
                 }
                 let mut mentioned = Vec::new();
+                let mut handles: Vec<MethodHandleRef> = Vec::new();
                 match &x.op {
-                    Op::ConstMethodHandle { handle, .. } => handle_classes(p, handle, &mut mentioned),
+                    Op::ConstMethodHandle { handle, .. } => {
+                        handle_classes(p, handle, &mut mentioned);
+                        handles.push(*handle);
+                    }
                     Op::ConstMethodType { proto, .. } => classes_in(p, p.str(*proto), &mut mentioned),
                     Op::InvokePolymorphic { method, proto, .. } => {
                         classes_in(p, p.str(method.class), &mut mentioned);
@@ -200,14 +225,33 @@ fn constraints(p: &Program) -> (Pairs, Pairs) {
                     }
                     Op::InvokeCustom { call_site, .. } => {
                         handle_classes(p, &call_site.bootstrap, &mut mentioned);
+                        handles.push(call_site.bootstrap);
+                        handles_in(&call_site.extra, &mut handles);
                         classes_in(p, p.str(call_site.proto), &mut mentioned);
                         call_site.extra.iter().for_each(|v| value_classes(p, v, &mut mentioned));
                     }
                     _ => {}
                 }
                 mentioned.into_iter().for_each(&mut need);
-                if let (Some(o), Some((n, d, is_method))) = (owner, member) {
-                    if let Some((decl, flags)) = resolve(p, o.trim_start_matches('['), n, d, is_method) {
+                // Members referenced, by instructions and by method handles (ART access-checks a
+                // handle's member against the referrer when resolving it).
+                let mut members: Vec<(&str, &str, &str, Member)> = Vec::new();
+                if let (Some(o), Some((n, d, kind))) = (owner, member) {
+                    members.push((o, n, d, kind));
+                }
+                for h in &handles {
+                    let kind = match h.kind {
+                        MethodHandleKind::StaticPut | MethodHandleKind::StaticGet => Member::StaticField,
+                        MethodHandleKind::InstancePut | MethodHandleKind::InstanceGet => Member::InstanceField,
+                        _ => Member::Method,
+                    };
+                    match &h.member {
+                        HandleMember::Field(f) => members.push((p.str(f.class), p.str(f.name), p.str(f.ty), kind)),
+                        HandleMember::Method(m) => members.push((p.str(m.class), p.str(m.name), p.str(m.proto), kind)),
+                    }
+                }
+                for (o, n, d, kind) in members {
+                    if let Some((decl, flags)) = resolve(p, o.trim_start_matches('['), n, d, kind) {
                         let package_private = flags & (PUBLIC | PROTECTED | PRIVATE) == 0;
                         let protected_outside = flags & PROTECTED != 0 && !sup.contains(&decl) && decl != id;
                         if package_private || protected_outside {
@@ -239,12 +283,6 @@ pub fn restore(p: &Program, wanted: &BTreeMap<ClassId, String>, classes: &mut BT
         moves.insert(id, new);
     }
     let requested = moves.len();
-    // Collisions: two moves to one descriptor, or onto another class's final descriptor.
-    let mut finals: BTreeMap<String, usize> = BTreeMap::new();
-    for id in p.class_ids() {
-        *finals.entry(moves.get(&id).cloned().unwrap_or_else(|| final_desc(id, classes))).or_default() += 1;
-    }
-    moves.retain(|_, new| finals[new.as_str()] == 1 && p.find(new).is_none());
     let (pairs, overrides) = constraints(p);
     let before = |id: ClassId| package_of(&final_desc(id, classes)).to_string();
     loop {
@@ -252,6 +290,15 @@ pub fn restore(p: &Program, wanted: &BTreeMap<ClassId, String>, classes: &mut BT
             package_of(&moves.get(&id).cloned().unwrap_or_else(|| final_desc(id, classes))).to_string()
         };
         let mut cancel: BTreeSet<ClassId> = BTreeSet::new();
+        // Collisions with the final descriptors as they stand (cancelled moves included): two
+        // classes on one descriptor.
+        let mut finals: BTreeMap<String, Vec<ClassId>> = BTreeMap::new();
+        for id in p.class_ids() {
+            finals.entry(moves.get(&id).cloned().unwrap_or_else(|| final_desc(id, classes))).or_default().push(id);
+        }
+        for ids in finals.values().filter(|ids| ids.len() > 1) {
+            cancel.extend(ids.iter().filter(|x| moves.contains_key(x)));
+        }
         for &(a, b) in &pairs {
             if (moves.contains_key(&a) || moves.contains_key(&b)) && pkg(a, &moves) != pkg(b, &moves) {
                 cancel.extend([a, b].into_iter().filter(|x| moves.contains_key(x)));
@@ -351,5 +398,21 @@ mod tests {
         assert_eq!(moved(&p, &[("Lo/C;", "x"), ("Lo/D;", "x")]).len(), 2);
         let p2 = program(&[("Lo/E;", PUBLIC, OBJ, vec![]), ("Lx/E;", PUBLIC, OBJ, vec![])]);
         assert!(moved(&p2, &[("Lo/E;", "x")]).is_empty());
+    }
+
+    /// A cancelled move leaves its class where it was: no other move may take that descriptor.
+    #[test]
+    fn cancelled_moves_still_hold_their_names() {
+        let mut p = program(&[("Lq/a;", 0, OBJ, vec![]), ("Lq/u;", PUBLIC, OBJ, vec![("f", PUBLIC | access::STATIC, vec![Op::Nop])]), ("Lo/x;", PUBLIC, OBJ, vec![])]);
+        // `u` (staying) creates `a` (non-public), so `a` can't leave `q`.
+        let a = p.model.syms.intern("Lq/a;");
+        let u = p.find("Lq/u;").unwrap();
+        p.model.classes[u.0 as usize].methods[0].code.as_mut().unwrap().insns[0].op = Op::NewInstance { dst: 0, ty: a };
+        let mut classes: BTreeMap<String, String> = [("Lq/a;".to_string(), "Lq/Foo;".to_string()), ("Lo/x;".to_string(), "Lo/Foo;".to_string())].into();
+        let wanted = [(p.find("Lq/a;").unwrap(), "r".to_string()), (p.find("Lo/x;").unwrap(), "q".to_string())].into();
+        let (restored, refused) = restore(&p, &wanted, &mut classes);
+        assert_eq!((restored, refused), (0, 2));
+        assert_eq!(classes["Lq/a;"], "Lq/Foo;");
+        assert_eq!(classes["Lo/x;"], "Lo/Foo;");
     }
 }

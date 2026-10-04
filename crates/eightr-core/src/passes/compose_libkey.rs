@@ -99,10 +99,13 @@ impl Pass for ComposeLibKey {
             let (o, h) = (m.syms.intern(&original), m.syms.intern(&how));
             let method = &mut m.classes[class].methods[method];
             // Provenance is the first pass's that named the method, an earlier run's included: a
-            // re-run keeps it whichever passes match again (idempotence).
-            if method.annotations.iter().any(|a| a.annotation.ty == ty) {
+            // re-run keeps it whichever passes match again (idempotence). One for another name is
+            // stale and replaced.
+            let syms = &m.syms;
+            if method.annotations.iter().any(|a| a.annotation.ty == ty && a.annotation.elements.iter().any(|(k, v)| *k == name && matches!(v, Value::String(x) if method_name(syms.get(*x)) == method_name(&original)))) {
                 continue;
             }
+            method.annotations.retain(|a| a.annotation.ty != ty);
             method.annotations.push(Annotation {
                 visibility: Visibility::Build,
                 annotation: EncodedAnnotation { ty, elements: vec![(name, Value::String(o)), (via, Value::String(h))] },
@@ -110,4 +113,11 @@ impl Pass for ComposeLibKey {
         }
         Ok(())
     }
+}
+
+/// The method name of an `@eightr.Original` name (`owner.name(descriptor)`): which method the
+/// provenance is for. Passes may disagree on the owner of one method.
+pub(super) fn method_name(original: &str) -> &str {
+    let head = original.split('(').next().unwrap_or(original);
+    head.rsplit('.').next().unwrap_or(head)
 }
