@@ -430,3 +430,105 @@ larger truth set than the fixtures. Running `8r undo` on 7 of Gretio's scenario 
 - **Label mismatch:** outlines that return the exception their callers throw are labeled
   `r8/bu-outline-inline`, while R8's mapping marks them as classic outlines. Both are inlined the
   same way.
+
+## 11. L3: S names, class, field and package restoration from packs
+
+**Rules** (`crates/eightr-core/src/passes/libdb_names.rs`, `libdb/mod.rs::PackFacts`):
+
+- `r8/libdb-method-name` (S). The match is `exact:all` against a strict record, with at least two
+  such matches of the app class agreeing on one pack class. A strict record meets all of these:
+  - informative and unique in the pack;
+  - not a `$default` bridge and not of a function that has one;
+  - not in a synthetic-looking class, and its artifact is declared;
+  - not mostly one other method inlined;
+  - not a sibling: same class and erased proto with a near-identical sketch, or a thin wrapper
+    of one;
+  - not a code clone: no other method ever had the same body in any build (the copies of
+    `AnchoredDraggableState` in foundation, material and material3).
+- `r8/libdb-class-name` (S), for the simple name and the package. At least two S methods must
+  agree, every exact match must agree, and the class must fit:
+  - its exact shape (supertypes, fields and now its kind: abstract or interface) is one the pack
+    saw for that class, and for no class of its hierarchy. R8 merges a class into its only
+    subclass, which then has its shape: `FragmentFactory` into `FragmentManager$3`, and
+    `AbstractClickableNode` into `ClickableNode`;
+  - every method's erased proto is one of the class's.
+  
+  The package is recorded only when the full original name is safe: not a platform class, not
+  under `java/`, and not a string of the program.
+- `r8/libdb-field-name` (S) and `r8/libdb-field-hint` (D). The n-th field access of a matched body
+  is the n-th of its pack twin. Every aligned access must agree, the owner's identity must match
+  the pack field's class, and there must be no collision within the class tree. S also needs every
+  supporting match to be S, a strong identity, and a type unique in the class or two methods
+  agreeing.
+- Package restoration (`crates/eightr-core/src/repackage.rs`) runs over the whole program after
+  every move. A move is cancelled, to a fixpoint, when:
+  - it separates a non-public class from a class that references it;
+  - it separates a package-private member (or a protected one, outside subclasses) from its user;
+  - it changes whether a method overrides a package-private one;
+  - it separates a method handle or call site from the classes it mentions;
+  - the target name collides with another class.
+  
+  Items named from a pack carry `@eightr.Library(value = "g:a:v", app = …)`.
+
+**Forge.**
+- Pack v6 records each class's original superclass, which gives the hierarchy in the shape rule.
+- Gradle `dependencyConstraints` align modules (collection 1.4 makes `collection-ktx` 1.4).
+- R8 8.4.x comes from R8's release bucket, because Google Maven skips that line.
+- Mapping attribution: without line info, R8 can open a method with a stack that holds only an
+  inlinee and attach the method's residual signature to it. The signature goes to the method's
+  next outermost frame when the frame is inlined elsewhere in the method, or when it has fewer
+  parameters than the signature minus a receiver.
+
+**Truth harness (`8r-forge harness`).** Leave-one-out over each pack's 17 scenario builds, plus the
+full-R8 Pokédex built from source (`scripts/build-pokedex-r8.sh`), whose mapping the pack never
+saw:
+
+| Truth set | S methods | S classes (name / package) | S fields | D methods | D field hints |
+|---|---|---|---|---|---|
+| Gretio pack, LOO | 25,211 / 25,211 | 1,911 / 1,910, all right | 6,508 / 6,508 | 99.27% | 99.94% |
+| Pokédex pack, LOO | 13,316 / 13,316 | 1,397 / 1,397, all right | 3,548 / 3,548 | 99.16% | 99.94% |
+| Pokédex app (held out) | 569 / 569 | 53 / 53, all right | 165 / 165 | 98.13% | 99.89% |
+
+Every S label is right on every truth set. Each S error the harness found became a generic rule:
+- vertical merges: class kind, and shape ambiguity within a hierarchy;
+- code clones;
+- thin wrappers;
+- R8's lone-inlinee frames: forge attribution.
+
+The clone, sibling and shape rules cost about 4% of S recall.
+
+**Real apps** (`scripts/smoke-suite.sh`, ART, packs from `8r-forge build APK`). For each app: the
+whole program verifies, it launches, and a tap reaches the next screen. A second 8R run on the
+output, with the same packs, gives the same bytes.
+
+| App | Packages restored |
+|---|---|
+| Gretio | 89 |
+| Pokédex, full R8 | 51 |
+| Pokédex CTF | none; R8 kept androidx and kotlin, and there are no version files, so no pack |
+
+**Idempotence with packs.** A per-app pack also applies to input tagged `@eightr.Library(app = its
+app)`, which is 8R's own output for that app. Matches of already-named methods still count as
+evidence. Provenance (`@eightr.Original`) is the first writer's, and an earlier run counts as
+first. Classes split off merged classes get structural names: `X$$SplitN` is not a kept name.
+
+**α and offline tests.** `crates/eightr-forge/tests/oracle_pack.rs` merges a pack from the
+`compose_shapes` and `compose_witness` builds and applies it to `compose_witness2`. It checks:
+- every S label is the mapping's truth;
+- packages are restored and tagged;
+- the output is a fixed point with the pack;
+- the result is α-invariant under random renamings (machinery shared in
+  `crates/eightr-core/tests/support/alpha.rs`).
+
+**Fixed on the way, by the Pokédex builds.** A superclass method implementing an interface method
+only through a subclass is now in that method's override group. Without that, the result was an
+`AbstractMethodError`. Package-qualified class names in strings (R8's `-adaptclassstrings`, such
+as Hilt's `@LazyClassKey`) now pin their classes. Fixture: `r94_slot_strings`.
+
+**Not done or known gaps.**
+- Gretio's `ComponentActivityKt.setContent` stays D. Its class has a single method, and S needs
+  two agreeing.
+- Class names in default-package strings (`-repackageclasses ''`) are not pinned. Strings like
+  `"r"` are everyday strings, and pinning on them cost S names.
+- L3f "near-miss": the matcher's call-graph and mutual-best stages already propagate from
+  anchors. D precision stays ≥ 98% (98.1–99.3%).

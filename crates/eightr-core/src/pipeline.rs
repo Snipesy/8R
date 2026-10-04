@@ -29,6 +29,9 @@ pub struct Config {
     pub resources: Vec<(String, String)>,
     /// LibDB packs (`8r-forge`); only those forged for this app's build profile are used.
     pub packs: Vec<crate::libdb::Pack>,
+    /// Grading only (`8r-forge harness`): use every pack forged by this 8R's fingerprint code,
+    /// whatever its profile or app (the input is a scenario build, not an app).
+    pub libdb_trust: bool,
 }
 
 /// Read-only facts gathered before any pass runs.
@@ -121,7 +124,7 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let name_stats = name_stats(&dexes, &program);
     let app_profile = crate::libdb::Profile::from_markers(&markers, &config.resources);
     let app_code = crate::libdb::app_id(&summaries.iter().map(|x| x.sha256.clone()).collect::<Vec<_>>());
-    let libdb = std::sync::Arc::new(crate::libdb::select(&config.packs, app_profile.as_ref(), &app_code, &mut findings));
+    let libdb = std::sync::Arc::new(crate::libdb::select(&config.packs, app_profile.as_ref(), &app_code, &crate::libdb::tagged_apps(&program.model), config.libdb_trust, &mut findings));
     let evidence = Evidence { markers: markers.clone(), sources: sources.clone(), name_stats, resources: config.resources.clone(), libdb };
 
     let mut labels = Labels::default();
@@ -137,6 +140,9 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
     let pins = eightr_ir::reflect::pins(&program.model);
     // Recovered S class simple names (e.g. a data class's `toString` name): the class keeps its
     // package; refused if the descriptor is taken by any other class's final name.
+    // Classes whose recovered name was refused keep their package too (their report label and
+    // their output name stay consistent).
+    let mut name_refused: BTreeSet<String> = BTreeSet::new();
     {
         let finals: BTreeSet<String> = program
             .class_ids()
@@ -160,11 +166,31 @@ pub fn run(inputs: &[DexInput], config: &Config) -> Result<Outcome> {
                 }
                 // Passes check claims against each other and existing names; reaching here leaves
                 // the class with its input name: say so.
-                _ => findings.push(Finding {
-                    severity: Severity::Warning,
-                    message: format!("recovered class name {new} refused: claimed by {olds:?} or taken"),
-                }),
+                _ => {
+                    name_refused.extend(olds.iter().cloned());
+                    findings.push(Finding {
+                        severity: Severity::Warning,
+                        message: format!("recovered class name {new} refused: claimed by {olds:?} or taken"),
+                    })
+                }
             }
+        }
+    }
+    // Original packages of library classes (S `Package` values, e.g. from a LibDB pack): restored
+    // where the whole program still verifies and dispatches the same (crate::repackage).
+    {
+        let wanted: BTreeMap<crate::program::ClassId, String> = labels
+            .iter()
+            .filter_map(|((item, attr), label)| match (*item, *attr, &label.value, label.class) {
+                (ItemId::Class { class }, Attribute::Package, Some(value), eightr_rules::Class::Solved) if !pins.class(program.descriptor(class)) && !name_refused.contains(program.descriptor(class)) => {
+                    Some((class, value.clone()))
+                }
+                _ => None,
+            })
+            .collect();
+        let (restored, refused) = crate::repackage::restore(&program, &wanted, &mut renaming.classes);
+        if refused > 0 {
+            findings.push(Finding { severity: Severity::Info, message: format!("{restored} library packages restored, {refused} kept (access or collision)") });
         }
     }
     for ((item, attr), label) in labels.iter() {

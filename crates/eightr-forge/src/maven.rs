@@ -22,6 +22,9 @@ pub struct Module {
     pub deps: Vec<Coord>,
     /// A Kotlin multiplatform root whose only dependency is the platform variant it stands for.
     pub redirect: bool,
+    /// `dependencyConstraints` (Gradle module metadata): versions these modules get *if* the graph
+    /// has them (e.g. `collection` 1.4 aligning `collection-ktx`, whose classes it absorbed).
+    pub constraints: Vec<Coord>,
 }
 
 /// A resolved artifact of the closure.
@@ -125,7 +128,7 @@ pub fn parse_module(text: &str, dir_url: &str) -> Result<Option<Module>> {
     let m: Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     let Some(v) = pick_variant(&m) else {
         let platform = m.get("variants").and_then(Value::as_array).into_iter().flatten().any(|v| matches!(category(v), "platform" | "enforced-platform"));
-        return Ok(platform.then(|| Module { url: None, deps: Vec::new(), redirect: false }));
+        return Ok(platform.then(|| Module { url: None, deps: Vec::new(), redirect: false, constraints: Vec::new() }));
     };
     if let Some(t) = v.get("available-at") {
         let c = Coord {
@@ -133,17 +136,21 @@ pub fn parse_module(text: &str, dir_url: &str) -> Result<Option<Module>> {
             artifact: t.get("module").and_then(Value::as_str).unwrap_or("").into(),
             version: t.get("version").and_then(Value::as_str).unwrap_or("").into(),
         };
-        return Ok(Some(Module { url: None, deps: vec![c], redirect: true }));
+        return Ok(Some(Module { url: None, deps: vec![c], redirect: true, constraints: Vec::new() }));
     }
-    let mut deps = Vec::new();
-    for d in v.get("dependencies").and_then(Value::as_array).into_iter().flatten() {
-        let ver = d.get("version");
-        let pick = ["strictly", "requires", "prefers"].iter().find_map(|k| ver.and_then(|x| x.get(k)).and_then(Value::as_str));
-        let (Some(g), Some(a), Some(ver)) = (d.get("group").and_then(Value::as_str), d.get("module").and_then(Value::as_str), pick.and_then(clean_version)) else { continue };
-        deps.push(Coord { group: g.into(), artifact: a.into(), version: ver });
-    }
+    let coords = |key: &str| -> Vec<Coord> {
+        let mut out = Vec::new();
+        for d in v.get(key).and_then(Value::as_array).into_iter().flatten() {
+            let ver = d.get("version");
+            let pick = ["strictly", "requires", "prefers"].iter().find_map(|k| ver.and_then(|x| x.get(k)).and_then(Value::as_str));
+            let (Some(g), Some(a), Some(ver)) = (d.get("group").and_then(Value::as_str), d.get("module").and_then(Value::as_str), pick.and_then(clean_version)) else { continue };
+            out.push(Coord { group: g.into(), artifact: a.into(), version: ver });
+        }
+        out
+    };
+    let (deps, constraints) = (coords("dependencies"), coords("dependencyConstraints"));
     let file = v.get("files").and_then(Value::as_array).into_iter().flatten().filter_map(|f| f.get("url").and_then(Value::as_str)).find(|u| u.ends_with(".aar") || u.ends_with(".jar"));
-    Ok(Some(Module { url: file.map(|f| format!("{dir_url}/{f}")), deps, redirect: false }))
+    Ok(Some(Module { url: file.map(|f| format!("{dir_url}/{f}")), deps, redirect: false, constraints }))
 }
 
 /// The text between `<tag>` and `</tag>` of each occurrence in `xml` (not nested in itself).
@@ -312,7 +319,7 @@ pub fn parse_pom(xml: &str, base_url: &str, parent: &mut dyn FnMut(&Coord) -> Re
         "aar" => Some(format!("{base_url}.aar")),
         _ => Some(format!("{base_url}.jar")),
     };
-    Ok(Module { url, deps, redirect: false })
+    Ok(Module { url, deps, redirect: false, constraints: Vec::new() })
 }
 
 fn pom_text(c: &Coord) -> Result<Option<(String, String, String)>> {
@@ -390,6 +397,17 @@ pub fn select(pinned: &[Coord], lookup: &mut dyn FnMut(&Coord) -> Result<Option<
                     }
                 }
                 stack.push(k);
+            }
+        }
+        // Constraints of the walked modules raise the modules the graph has (never adds one).
+        for ga in &seen {
+            let Some(v) = want.get(ga).or_else(|| next.get(ga)) else { continue };
+            let c = Coord { group: ga.0.clone(), artifact: ga.1.clone(), version: v.clone() };
+            for d in modules.get(&c).into_iter().flat_map(|m| &m.constraints) {
+                let k = (d.group.clone(), d.artifact.clone());
+                if seen.contains(&k) && !pins.contains_key(&k) && next.get(&k).is_none_or(|n| version_cmp(&d.version, n).is_gt()) {
+                    next.insert(k, d.version.clone());
+                }
             }
         }
         if next == want {
@@ -472,7 +490,7 @@ mod tests {
         assert_eq!(m.url.as_deref(), Some("https://r/g/x-android/1.0/x-android-1.0.aar"));
         assert_eq!(m.deps, vec![Coord::parse("a:b:2.0").unwrap(), Coord::parse("c:d:1.5").unwrap()]);
         let bom = r#"{"variants":[{"name":"apiElements","attributes":{"org.gradle.usage":"java-runtime","org.gradle.category":"platform"}}]}"#;
-        assert_eq!(parse_module(bom, "u").unwrap(), Some(Module { url: None, deps: vec![], redirect: false }));
+        assert_eq!(parse_module(bom, "u").unwrap(), Some(Module { url: None, deps: vec![], redirect: false, constraints: vec![] }));
         // No library variant and not a platform: the POM decides.
         let odd = r#"{"variants":[{"name":"x","attributes":{"org.gradle.usage":"java-api"}}]}"#;
         assert_eq!(parse_module(odd, "u").unwrap(), None);
@@ -517,7 +535,7 @@ mod tests {
     fn selection_follows_selected_versions() {
         let db: BTreeMap<&str, Vec<&str>> = [("a:a:1", vec!["x:x:2"]), ("b:b:1", vec!["y:y:1"]), ("y:y:1", vec!["x:x:1"]), ("x:x:1", vec!["z:z:1"]), ("x:x:2", vec!["w:w:1"]), ("z:z:1", vec![]), ("w:w:1", vec![])].into_iter().collect();
         let mut lookup = |c: &Coord| -> Result<Option<Module>> {
-            Ok(db.get(c.to_string().as_str()).map(|ds| Module { url: Some(c.to_string()), deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(), redirect: false }))
+            Ok(db.get(c.to_string().as_str()).map(|ds| Module { url: Some(c.to_string()), deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(), redirect: false, constraints: Vec::new() }))
         };
         let pins = [Coord::parse("a:a:1").unwrap(), Coord::parse("b:b:1").unwrap()];
         let g = select(&pins, &mut lookup).unwrap();
@@ -527,12 +545,41 @@ mod tests {
         assert_eq!(g2.missing.len(), 1);
     }
 
+    /// `dependencyConstraints` raise modules the graph has and never add one: c:1.4 constrains
+    /// ktx to 1.4 (it absorbed ktx's classes) and absent to 9.
+    #[test]
+    fn constraints_align_present_modules_only() {
+        let db: BTreeMap<&str, (Vec<&str>, Vec<&str>)> = [
+            ("app:app:1", (vec!["c:c:1.4", "lib:lib:1"], vec![])),
+            ("lib:lib:1", (vec!["ktx:ktx:1.2"], vec![])),
+            ("ktx:ktx:1.2", (vec!["c:c:1.2"], vec![])),
+            ("ktx:ktx:1.4", (vec!["c:c:1.4"], vec![])),
+            ("c:c:1.4", (vec![], vec!["ktx:ktx:1.4", "absent:absent:9"])),
+        ]
+        .into_iter()
+        .collect();
+        let mut lookup = |c: &Coord| -> Result<Option<Module>> {
+            Ok(db.get(c.to_string().as_str()).map(|(ds, cs)| Module {
+                url: None,
+                deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(),
+                redirect: false,
+                constraints: cs.iter().map(|d| Coord::parse(d).unwrap()).collect(),
+            }))
+        };
+        let g = select(&[Coord::parse("app:app:1").unwrap()], &mut lookup).unwrap();
+        let got: Vec<String> = g.selected.iter().map(|((gr, a), v)| format!("{gr}:{a}:{v}")).collect();
+        assert_eq!(got, ["app:app:1", "c:c:1.4", "ktx:ktx:1.4", "lib:lib:1"]);
+        let m = parse_module(r#"{"variants":[{"name":"releaseRuntimeElements","attributes":{"org.gradle.usage":"java-runtime","org.gradle.category":"library"},
+            "dependencyConstraints":[{"group":"g","module":"ktx","version":{"requires":"1.4.0"}}],"files":[{"url":"x-1.4.0.aar"}]}]}"#, "u").unwrap().unwrap();
+        assert_eq!(m.constraints, vec![Coord::parse("g:ktx:1.4.0").unwrap()]);
+    }
+
     /// Evicted versions can't make the selection oscillate: P→{A1,B1}, B1→A2, A2→B2.
     #[test]
     fn selection_converges_on_mutual_upgrades() {
         let db: BTreeMap<&str, Vec<&str>> = [("p:p:1", vec!["a:a:1", "b:b:1"]), ("a:a:1", vec![]), ("b:b:1", vec!["a:a:2"]), ("a:a:2", vec!["b:b:2"]), ("b:b:2", vec![])].into_iter().collect();
         let mut lookup = |c: &Coord| -> Result<Option<Module>> {
-            Ok(db.get(c.to_string().as_str()).map(|ds| Module { url: None, deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(), redirect: false }))
+            Ok(db.get(c.to_string().as_str()).map(|ds| Module { url: None, deps: ds.iter().map(|d| Coord::parse(d).unwrap()).collect(), redirect: false, constraints: Vec::new() }))
         };
         let g = select(&[Coord::parse("p:p:1").unwrap()], &mut lookup).unwrap();
         let got: Vec<String> = g.selected.iter().map(|((gr, a), v)| format!("{gr}:{a}:{v}")).collect();

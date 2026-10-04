@@ -22,5 +22,8 @@ sha2.workspace = true
 zip.workspace = true
 clap = { version = "4", features = ["derive"] }
 
+[dev-dependencies]
+eightr-dexwrite.workspace = true
+
 [lints]
 workspace = true

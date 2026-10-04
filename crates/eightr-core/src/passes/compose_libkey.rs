@@ -98,7 +98,11 @@ impl Pass for ComposeLibKey {
         for (class, method, original, how) in notes {
             let (o, h) = (m.syms.intern(&original), m.syms.intern(&how));
             let method = &mut m.classes[class].methods[method];
-            method.annotations.retain(|a| a.annotation.ty != ty);
+            // Provenance is the first pass's that named the method, an earlier run's included: a
+            // re-run keeps it whichever passes match again (idempotence).
+            if method.annotations.iter().any(|a| a.annotation.ty == ty) {
+                continue;
+            }
             method.annotations.push(Annotation {
                 visibility: Visibility::Build,
                 annotation: EncodedAnnotation { ty, elements: vec![(name, Value::String(o)), (via, Value::String(h))] },

@@ -20,7 +20,7 @@ use crate::tools::{read, read_string, Result};
 
 /// Bumped whenever this module's output for the same scenario output changes (part of the pack
 /// key, not of the scenario cache: R8 doesn't run again).
-pub const REVISION: u32 = 6;
+pub const REVISION: u32 = 10;
 
 /// An original method: (class descriptor, name, proto).
 pub type Key = (String, String, String);
@@ -39,14 +39,20 @@ pub struct MethodOut {
     pub proto: u64,
     pub sketch: [u32; SKETCH],
     pub callees: Vec<(u64, Option<Key>)>,
+    /// Program field accesses: (erased token, original field (owner, name, type)).
+    pub fields: Vec<(u64, Option<Key>)>,
     pub frames: Frames,
+    /// Keyed as `f` though R8 kept the bridge `f$default` (see `default_target`).
+    pub bridge: bool,
+    pub insns: u32,
 }
 
 #[derive(Debug, Default)]
 pub struct ScenarioOut {
     pub methods: Vec<MethodOut>,
     /// (original class, C2, C3).
-    pub classes: Vec<(String, u64, u64)>,
+    /// (original class, C2, C3, original superclass when a program class).
+    pub classes: Vec<(String, u64, u64, Option<String>)>,
 }
 
 pub fn load_dex_dir(dir: &Path) -> Result<Model> {
@@ -259,7 +265,8 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
         let oc = names.class(rc);
         if owned(&oc) {
             let cp = class_print(model, ci, &stable);
-            out.classes.push((oc, cp.c2, cp.c3));
+            let sup = c.superclass.map(|t| s.get(t)).filter(|t| program.contains(*t)).map(|t| names.class(t));
+            out.classes.push((oc, cp.c2, cp.c3, sup));
         }
         for (mi, m) in c.methods.iter().enumerate() {
             let Some(mp) = method_print(model, ci, mi, &stable, &reflective) else { continue };
@@ -277,10 +284,13 @@ pub fn scenario(dir: &Path, owned: &dyn Fn(&str) -> bool) -> Result<ScenarioOut>
             // function specialized with its defaults: the body an app has where the bridge was
             // inlined into the call site and the function survives (`setContent { … }`).
             let tests_a_mask = m.code.as_ref().is_some_and(|b| tests_int_param(b, rp, m.access & eightr_dex::class::access::STATIC != 0));
+            let mut bridge = false;
             if let Some(target) = default_target(&key, rp, &fr).filter(|_| !tests_a_mask) {
                 key = target;
+                bridge = true;
             }
-            out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, frames: fr });
+            let fields = mp.fields.iter().map(|(tok, (fc, fname, fty))| (*tok, if program.contains(fc.as_str()) { names.field(fc, fname, fty) } else { None })).collect();
+            out.methods.push(MethodOut { key, informative: mp.informative, all: mp.all, strings: mp.strings, proto: mp.proto, sketch: mp.sketch, callees, fields, frames: fr, bridge, insns: m.code.as_ref().map_or(0, |b| b.insns.len() as u32) });
         }
     }
     out.methods.sort();

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use eightr_core::libdb::pack::{ClassRecord, Record, NO_ARTIFACT, NO_METHOD};
+use eightr_core::libdb::pack::{ClassRecord, Record, NO_ARTIFACT, NO_CLASS, NO_FIELD, NO_METHOD};
 use eightr_core::libdb::{Coord, Pack, Profile};
 
 use crate::api::{Api, Entry};
@@ -226,13 +226,20 @@ fn run_scenario(inp: &Inputs, sh: &Shared, s: &Scenario, dir: &Path) -> Result<S
 struct Interner {
     classes: BTreeMap<String, u32>,
     methods: BTreeMap<Key, u32>,
+    fields: BTreeMap<Key, u32>,
     stacks: BTreeMap<Vec<(u32, i32)>, u32>,
 }
 
-/// Merges scenario outputs (in scenario order) into a pack.
-fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pack {
-    let mut it = Interner::default();
-    let mut pack = Pack {
+/// A synthetic-looking class (`Foo$1`, `Foo$bar$2`, `$lambda`, `$$…`, `ComposableSingletons…lambda-1`):
+/// R8 and kotlinc make many with identical bodies, so a body says less about which one it is.
+pub fn synthetic_looking(class: &str) -> bool {
+    let simple = class.trim_end_matches(';').rsplit('/').next().unwrap_or(class);
+    simple.contains("$$") || simple.contains('-') || simple.split('$').skip(1).any(|seg| seg.is_empty() || seg.bytes().all(|b| b.is_ascii_digit()) || seg.starts_with("lambda"))
+}
+
+/// A pack's header for `inp`, without records.
+fn head(inp: &Inputs) -> Pack {
+    Pack {
         profile: inp.profile.clone(),
         lock: inp.lock.clone(),
         catalog: inp.catalog.clone(),
@@ -241,17 +248,29 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
         artifacts: inp.closure.iter().map(|r| (r.coord.to_string(), r.declared)).collect(),
         classes: Vec::new(),
         methods: Vec::new(),
+        fields: Vec::new(),
         records: Vec::new(),
         class_records: Vec::new(),
         stacks: Vec::new(),
         app: String::new(),
-    };
+    }
+}
+
+/// Merges scenario outputs (in `head.scenarios` order) into `head`, a pack without records.
+/// `owner`: a class's artifact (index into `head.artifacts`, or `NO_ARTIFACT`).
+pub fn merge(head: Pack, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pack {
+    let mut it = Interner::default();
+    let mut pack = head;
     // Keys first, in sorted order, so indices don't depend on scenario order.
     let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut methods: BTreeSet<Key> = BTreeSet::new();
+    let mut fields: BTreeSet<Key> = BTreeSet::new();
     for o in outs {
         for m in &o.methods {
             methods.insert(m.key.clone());
+            for f in m.fields.iter().filter_map(|x| x.1.as_ref()) {
+                fields.insert(f.clone());
+            }
             for (_, c) in &m.callees {
                 if let Some(c) = c {
                     methods.insert(c.clone());
@@ -263,11 +282,12 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
                 }
             }
         }
-        for (c, _, _) in &o.classes {
+        for (c, _, _, sup) in &o.classes {
             classes.insert(c.clone());
+            classes.extend(sup.iter().cloned());
         }
     }
-    for m in &methods {
+    for m in methods.iter().chain(&fields) {
         classes.insert(m.0.clone());
     }
     for c in classes {
@@ -278,6 +298,10 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
     for m in methods {
         it.methods.insert(m.clone(), pack.methods.len() as u32);
         pack.methods.push((it.classes[&m.0], m.1, m.2));
+    }
+    for f in fields {
+        it.fields.insert(f.clone(), pack.fields.len() as u32);
+        pack.fields.push((it.classes[&f.0], f.1, f.2));
     }
     // Stacks, sorted.
     let mut stacks: BTreeSet<Vec<(u32, i32)>> = BTreeSet::new();
@@ -303,17 +327,22 @@ fn merge(inp: &Inputs, owner: &dyn Fn(&str) -> u32, outs: &[ScenarioOut]) -> Pac
                 scenarios: 0,
                 informative: m.informative,
                 unique: false,
+                bridge: m.bridge,
+                synthetic_owner: synthetic_looking(&m.key.0),
                 all: m.all,
                 strings: m.strings,
                 proto: m.proto,
                 sketch: m.sketch,
                 callees: m.callees.iter().map(|(t, c)| (*t, c.as_ref().map_or(NO_METHOD, |c| it.methods[c]))).collect(),
+                fields: m.fields.iter().map(|(t, f)| (*t, f.as_ref().map_or(NO_FIELD, |f| it.fields[f]))).collect(),
                 frames: m.frames.iter().map(|(a, b, st)| (*a, *b, it.stacks[&conv(&it, st)])).collect(),
+                insns: m.insns,
             };
             *records.entry(r).or_default() |= bit;
         }
-        for (c, c2, c3) in &o.classes {
-            *class_records.entry(ClassRecord { class: it.classes[c], scenarios: 0, c2: *c2, c3: *c3 }).or_default() |= bit;
+        for (c, c2, c3, sup) in &o.classes {
+            let sup = sup.as_ref().map_or(NO_CLASS, |s| it.classes[s]);
+            *class_records.entry(ClassRecord { class: it.classes[c], scenarios: 0, c2: *c2, c3: *c3, sup }).or_default() |= bit;
         }
     }
     // A body hash is unique when every record having it is the same method.
@@ -398,7 +427,7 @@ pub fn build(profile: &Profile, opts: &Options) -> Result<(PathBuf, Pack)> {
     for (i, r) in results {
         outs.push(r.map_err(|e| format!("{}: {e}", inp.scenarios[i].name))?.1);
     }
-    let mut pack = merge(&inp, &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
+    let mut pack = merge(head(&inp), &|c| owner_of(c).unwrap_or(NO_ARTIFACT), &outs);
     pack.app = app_id;
     write(&path, pack.encode())?;
     Ok((path, pack))

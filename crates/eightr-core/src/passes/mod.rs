@@ -6,6 +6,7 @@ mod data_class;
 pub mod kxs;
 mod protobuf;
 mod sigdb;
+pub mod libdb_names;
 pub mod compose_libkey;
 pub mod compose_params;
 pub mod enum_unboxing;
