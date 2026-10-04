@@ -1,6 +1,6 @@
 {
   "coverage": {
-    "inlined_occurrences": 159899,
+    "inlined_occurrences": 159911,
     "recall": 0.02,
     "touched": 3256
   },
@@ -47,6 +47,7 @@
     "r94_merging",
     "r94_outline",
     "r94_reflect_names",
+    "r94_slot_strings",
     "shapes",
     "sigdb_app"
   ],

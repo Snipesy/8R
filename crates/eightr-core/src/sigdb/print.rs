@@ -53,6 +53,8 @@ pub struct MethodPrint {
     pub sketch: [u32; SKETCH],
     /// Program callees in order: (erased call token, callee as referenced).
     pub callees: Vec<(u64, (String, String, String))>,
+    /// Program field accesses in order: (erased access token, field as referenced).
+    pub fields: Vec<(u64, (String, String, String))>,
 }
 
 /// A class's shape: (C2 with static field types, C3 without).
@@ -155,11 +157,12 @@ struct Tokens {
     nums: Vec<i64>,
     stable_refs: usize,
     callees: Vec<(u64, (String, String, String))>,
+    fields: Vec<(u64, (String, String, String))>,
 }
 
 fn tokens(p: &Model, body: &Body, stable: &dyn Fn(&str) -> bool, reflective: &dyn Fn(u32) -> bool) -> Tokens {
     let s = &p.syms;
-    let mut t = Tokens { ops: Vec::new(), refs: Vec::new(), strings: Vec::new(), nums: Vec::new(), stable_refs: 0, callees: Vec::new() };
+    let mut t = Tokens { ops: Vec::new(), refs: Vec::new(), strings: Vec::new(), nums: Vec::new(), stable_refs: 0, callees: Vec::new(), fields: Vec::new() };
     let ty_ref = |t: &mut Tokens, kind: &str, ty: &str| {
         let e = erase_type(ty, stable);
         if e == ty {
@@ -204,7 +207,9 @@ fn tokens(p: &Model, body: &Body, stable: &dyn Fn(&str) -> bool, reflective: &dy
                     t.stable_refs += 1;
                     t.refs.push(format!("{dir}:{c}->{n}:{ft}"));
                 } else {
-                    t.refs.push(format!("{dir}:?:{}", erase_type(ft, stable)));
+                    let tok = format!("{dir}:?:{}", erase_type(ft, stable));
+                    t.fields.push((fnv(tok.as_bytes()), (c.to_string(), n.to_string(), ft.to_string())));
+                    t.refs.push(tok);
                 }
             }
             Op::Invoke { kind, method, .. } => {
@@ -299,6 +304,7 @@ pub fn method_print(p: &Model, ci: usize, mi: usize, stable: &dyn Fn(&str) -> bo
         proto: fnv(proto.as_bytes()),
         sketch,
         callees: t.callees,
+        fields: t.fields,
     })
 }
 
@@ -331,7 +337,10 @@ pub fn class_print(p: &Model, ci: usize, stable: &dyn Fn(&str) -> bool) -> Class
     inst.sort();
     let sup = sup.unwrap_or_default();
     let base = [sup.as_str(), &ifaces.join(","), &inst.join(",")];
-    ClassPrint { class: ci, c2: hash_parts(&[base[0], base[1], base[2], &stat.join(",")]), c3: hash_parts(&base) }
+    // The kind is part of the exact shape: an abstract class merged into its only subclass, whose
+    // own members were all inlined, has the abstract class's fields and protos but is concrete.
+    let kind = c.access & (eightr_dex::class::access::ABSTRACT | eightr_dex::class::access::INTERFACE);
+    ClassPrint { class: ci, c2: hash_parts(&[base[0], base[1], base[2], &stat.join(","), &kind.to_string()]), c3: hash_parts(&base) }
 }
 
 #[cfg(test)]

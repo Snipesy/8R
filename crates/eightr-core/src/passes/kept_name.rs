@@ -203,6 +203,9 @@ impl Pass for KeptName {
                 && !is_synthetic(simple)
                 && !r8_numbered
                 && !desc.starts_with("Lj$/")
+                // A class 8R split off a merged class: the name is a placeholder naming replaces
+                // (its members are the base's, with their own names).
+                && !simple.contains("$$Split")
                 // A kept name moved into a repackaging target gets a numeric suffix on
                 // collision (`Rep` → `Rep1`), so a trailing digit there isn't proof.
                 && !(in_target && t.ends_with(|c: char| c.is_ascii_digit()));

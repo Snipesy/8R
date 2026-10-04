@@ -42,6 +42,19 @@ enum Command {
     },
     /// Summarize a pack.
     Show { pack: PathBuf },
+    /// L3 truth harness: grade 8R's library labels on scenario builds (leave-one-out) and on
+    /// apps with their own mapping.
+    Harness {
+        pack: PathBuf,
+        /// Scenario directories (`<name>-<hash>…`, holding `out/` with dex files and mapping).
+        #[arg(long)]
+        scenario: Vec<PathBuf>,
+        /// An app directory (dex files) graded with the pack as is; needs --mapping.
+        #[arg(long)]
+        app: Option<PathBuf>,
+        #[arg(long)]
+        mapping: Option<PathBuf>,
+    },
     /// Developer check: fingerprints of an app's methods in one (residual) class, after 8R's rewrites.
     Hash { app: PathBuf, class: String },
     /// List a pack's records for methods whose `class->name` contains a string.
@@ -133,6 +146,15 @@ fn run(cli: Cli) -> Result<(), String> {
                     println!("{key}  all={:016x} informative={} unique={} scenarios={}", r.all, r.informative, r.unique, sc.join(","));
                 }
             }
+        }
+        Command::Harness { pack, scenario, app, mapping } => {
+            let p = eightr_core::libdb::Pack::decode(&std::fs::read(&pack).map_err(|e| format!("{}: {e}", pack.display()))?)?;
+            let mut grades = eightr_forge::harness::Grades::new();
+            eightr_forge::harness::leave_one_out(&p, &scenario, &mut grades, true)?;
+            if let (Some(a), Some(m)) = (app, mapping) {
+                eightr_forge::harness::grade(&a, &m, &p, &mut grades)?;
+            }
+            eightr_forge::harness::print(&grades);
         }
         Command::Show { pack } => {
             let p = eightr_core::libdb::Pack::decode(&std::fs::read(&pack).map_err(|e| format!("{}: {e}", pack.display()))?)?;

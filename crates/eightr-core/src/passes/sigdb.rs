@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use eightr_dex::class::access;
 use eightr_ir::value::{Annotation, EncodedAnnotation, Value, Visibility};
-use eightr_rules::{Attribute, Source, SIGDB_METHOD_NAME};
+use eightr_rules::{Attribute, Source, LIBDB_METHOD_NAME, SIGDB_METHOD_NAME};
 
 use super::{Context, Pass};
 use crate::error::Result;
@@ -63,10 +63,38 @@ impl Pass for Sigdb {
             }
             true
         };
+        // LibDB S eligibility (r8/libdb-method-name): an exact match of a strict pack record (see
+        // `libdb::PackFacts::strict`), with another such match of the same app class to the same
+        // pack class.
+        let facts = &cx.evidence.libdb.packs;
+        let stable = |d: &str| crate::sigdb::print::platform_stable(d);
+        let reflective = crate::sigdb::print::reflective_strings(p);
+        let mut prints: BTreeMap<usize, crate::sigdb::print::MethodPrint> = BTreeMap::new();
+        for (k, m) in matches.methods.iter().enumerate() {
+            if (m.key.0 as usize) < facts.len() {
+                if let Some(mp) = crate::sigdb::print::method_print(p, m.class, m.method, &stable, &reflective) {
+                    prints.insert(k, mp);
+                }
+            }
+        }
+        let pack_class = |m: &crate::sigdb::matcher::Match| dbs[m.key.0 as usize].methods[m.key.1 as usize].0;
+        let strict = |k: usize, m: &crate::sigdb::matcher::Match| {
+            m.via == "exact:all" && prints.get(&k).is_some_and(|mp| facts[m.key.0 as usize].strict.contains(&(m.key.1, mp.all)))
+        };
+        let mut per_class: BTreeMap<(usize, u16, u32), Vec<usize>> = BTreeMap::new();
+        for (k, m) in matches.methods.iter().enumerate() {
+            if strict(k, m) {
+                per_class.entry((m.class, m.key.0, pack_class(m))).or_default().push(k);
+            }
+        }
+        let s_ok: std::collections::BTreeSet<usize> = per_class.values().filter(|v| v.len() >= 2).flatten().copied().collect();
         // (class, new name, proto) → matches; names that collide are dropped.
         let mut targets: BTreeMap<(usize, String, String), Vec<usize>> = BTreeMap::new();
         let mut notes = Vec::new();
-        let mut same: Vec<(ItemId, String)> = Vec::new();
+        let mut same: Vec<(ItemId, String, usize)> = Vec::new();
+        // Matches of methods already called that and labelled (kept by R8, or named by an earlier
+        // 8R run): no label, but evidence for class and field names like any named match.
+        let mut confirmed: Vec<usize> = Vec::new();
         let note = |m: &crate::sigdb::matcher::Match| {
             let db = &dbs[m.key.0 as usize];
             let (dc, dn, dp) = &db.methods[m.key.1 as usize];
@@ -107,8 +135,10 @@ impl Pass for Sigdb {
             // the D name so structural naming leaves it (re-runs stay idempotent).
             if name == new {
                 notes.push(note(m));
-                if !labelled {
-                    same.push((item, new));
+                if labelled {
+                    confirmed.push(k);
+                } else {
+                    same.push((item, new, k));
                 }
                 continue;
             }
@@ -227,12 +257,20 @@ impl Pass for Sigdb {
         }
         let mut labels = Vec::new();
         for ((class, method), (new, _, k)) in accepted {
-            labels.push((ItemId::Method { class: ClassId(class as u32), index: method as u32 }, new));
+            labels.push((ItemId::Method { class: ClassId(class as u32), index: method as u32 }, new, k));
             notes.push(note(&matches.methods[k]));
         }
-        for (item, name) in labels.into_iter().chain(same) {
-            cx.labels.record_value(item, Attribute::MemberName, SIGDB_METHOD_NAME, None, Some(name))?;
+        // Matches named (renamed or confirmed), by match index: S or D.
+        let mut named: BTreeMap<usize, bool> = BTreeMap::new();
+        for (item, name, k) in labels.into_iter().chain(same) {
+            let s_tier = s_ok.contains(&k);
+            cx.labels.record_value(item, Attribute::MemberName, if s_tier { LIBDB_METHOD_NAME } else { SIGDB_METHOD_NAME }, None, Some(name))?;
+            named.insert(k, s_tier);
         }
+        for k in confirmed {
+            named.insert(k, s_ok.contains(&k));
+        }
+        let library = super::libdb_names::name_classes_and_fields(p, cx.evidence, cx.labels, &dbs, &matches, &prints, &named)?;
         // Class hints.
         for (&ci, &(li, dc)) in &matches.classes {
             let d = &dbs[li as usize].classes[dc as usize];
@@ -240,17 +278,51 @@ impl Pass for Sigdb {
             let tail = simple.rsplit('$').find(|t| !t.is_empty() && !t.bytes().all(|b| b.is_ascii_digit())).unwrap_or(simple);
             cx.program.class_hints.entry(ClassId(ci as u32)).or_insert_with(|| tail.to_string());
         }
+        // The library of every method named from a pack (and of the matched notes).
+        let lib_of: BTreeMap<(usize, usize), (String, String)> = matches
+            .methods
+            .iter()
+            .filter(|m| (m.key.0 as usize) < facts.len())
+            .filter_map(|m| {
+                let f = &facts[m.key.0 as usize];
+                let coord = f.coord.get(pack_class(m) as usize).cloned().flatten()?;
+                Some(((m.class, m.method), (coord, f.app.clone())))
+            })
+            .collect();
         let m = &mut cx.program.model;
         let ty = m.syms.intern(super::compose_libkey::ORIGINAL);
-        let (name_k, via_k) = (m.syms.intern("name"), m.syms.intern("via"));
+        let lib_ty = m.syms.intern(super::libdb_names::LIBRARY);
+        let (name_k, via_k, value_k, app_k) = (m.syms.intern("name"), m.syms.intern("via"), m.syms.intern("value"), m.syms.intern("app"));
+        let tag = |m: &mut eightr_ir::model::Program, coord: &str, app: &str| -> Annotation {
+            let (c, a) = (m.syms.intern(coord), m.syms.intern(app));
+            Annotation { visibility: Visibility::Build, annotation: EncodedAnnotation { ty: lib_ty, elements: vec![(app_k, Value::String(a)), (value_k, Value::String(c))] } }
+        };
         for (class, method, original, via) in notes {
             let (o, v) = (m.syms.intern(&original), m.syms.intern(&via));
+            let lib = lib_of.get(&(class, method)).map(|(c, a)| tag(m, c, a));
             let method = &mut m.classes[class].methods[method];
-            method.annotations.retain(|a| a.annotation.ty != ty);
-            method.annotations.push(Annotation {
-                visibility: Visibility::Build,
-                annotation: EncodedAnnotation { ty, elements: vec![(name_k, Value::String(o)), (via_k, Value::String(v))] },
-            });
+            // Provenance: the first pass's that named the method (an earlier run's included).
+            if !method.annotations.iter().any(|a| a.annotation.ty == ty) {
+                method.annotations.push(Annotation {
+                    visibility: Visibility::Build,
+                    annotation: EncodedAnnotation { ty, elements: vec![(name_k, Value::String(o)), (via_k, Value::String(v))] },
+                });
+            }
+            if let Some(lib) = lib {
+                method.annotations.retain(|a| a.annotation.ty != lib_ty);
+                method.annotations.push(lib);
+            }
+        }
+        // Classes and fields named from a pack carry the tag too.
+        for (item, coord, app) in library {
+            let t = tag(m, &coord, &app);
+            let anns = match item {
+                ItemId::Class { class } => &mut m.classes[class.0 as usize].annotations,
+                ItemId::Field { class, index } => &mut m.classes[class.0 as usize].fields[index as usize].annotations,
+                ItemId::Method { class, index } => &mut m.classes[class.0 as usize].methods[index as usize].annotations,
+            };
+            anns.retain(|a| a.annotation.ty != lib_ty);
+            anns.push(t);
         }
         Ok(())
     }

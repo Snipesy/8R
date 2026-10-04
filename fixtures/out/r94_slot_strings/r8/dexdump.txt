@@ -1,0 +1,529 @@
+Processing 'classes.dex'...
+Opened 'classes.dex', DEX version '038'
+Class #0            -
+  Class descriptor  : 'Lcom/example/slots/Main;'
+  Access flags      : 0x0001 (PUBLIC)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+    #0              : (in Lcom/example/slots/Main;)
+      name          : 'main'
+      type          : '([Ljava/lang/String;)V'
+      access        : 0x0009 (PUBLIC STATIC)
+      code          -
+      registers     : 10
+      ins           : 1
+      outs          : 3
+      insns size    : 194 16-bit code units
+000454:                                        |[000454] com.example.slots.Main.main:([Ljava/lang/String;)V
+000464: 2209 0c00                              |0000: new-instance v9, Lo/c; // type@000c
+000468: 7010 0e00 0900                         |0002: invoke-direct {v9}, Lo/a;.<init>:()V // method@000e
+00046e: 2200 0e00                              |0005: new-instance v0, Lo/e; // type@000e
+000472: 7010 0300 0000                         |0007: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0003
+000478: 1221                                   |000a: const/4 v1, #int 2 // #2
+00047a: 2312 1600                              |000b: new-array v2, v1, [Lo/g; // type@0016
+00047e: 1203                                   |000d: const/4 v3, #int 0 // #0
+000480: 4d09 0203                              |000e: aput-object v9, v2, v3
+000484: 1214                                   |0010: const/4 v4, #int 1 // #1
+000486: 4d00 0204                              |0011: aput-object v0, v2, v4
+00048a: 0130                                   |0013: move v0, v3
+00048c: 3510 2700                              |0014: if-ge v0, v1, 003b // +0027
+000490: 4605 0200                              |0016: aget-object v5, v2, v0
+000494: 6206 0000                              |0018: sget-object v6, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0000
+000498: 7210 1600 0500                         |001a: invoke-interface {v5}, Lo/g;.state:()Lo/h; // method@0016
+00049e: 0c07                                   |001d: move-result-object v7
+0004a0: 5477 0400                              |001e: iget-object v7, v7, Lo/h;.a:Ljava/lang/String; // field@0004
+0004a4: 7210 1500 0500                         |0020: invoke-interface {v5}, Lo/g;.a:()Z // method@0015
+0004aa: 0a05                                   |0023: move-result v5
+0004ac: 2208 0700                              |0024: new-instance v8, Ljava/lang/StringBuilder; // type@0007
+0004b0: 7020 0400 7800                         |0026: invoke-direct {v8, v7}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@0004
+0004b6: 1a07 0100                              |0029: const-string v7, ":" // string@0001
+0004ba: 6e20 0700 7800                         |002b: invoke-virtual {v8, v7}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0007
+0004c0: 6e20 0800 5800                         |002e: invoke-virtual {v8, v5}, Ljava/lang/StringBuilder;.append:(Z)Ljava/lang/StringBuilder; // method@0008
+0004c6: 6e10 0900 0800                         |0031: invoke-virtual {v8}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0009
+0004cc: 0c05                                   |0034: move-result-object v5
+0004ce: 6e20 0100 5600                         |0035: invoke-virtual {v6, v5}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0001
+0004d4: d800 0001                              |0038: add-int/lit8 v0, v0, #int 1 // #01
+0004d8: 28da                                   |003a: goto 0014 // -0026
+0004da: 6200 0000                              |003b: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0000
+0004de: 5292 0200                              |003d: iget v2, v9, Lo/a;.b:I // field@0002
+0004e2: 2205 0700                              |003f: new-instance v5, Ljava/lang/StringBuilder; // type@0007
+0004e6: 1a06 2f00                              |0041: const-string v6, "offered " // string@002f
+0004ea: 7020 0400 6500                         |0043: invoke-direct {v5, v6}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@0004
+0004f0: 6e20 0500 2500                         |0046: invoke-virtual {v5, v2}, Ljava/lang/StringBuilder;.append:(I)Ljava/lang/StringBuilder; // method@0005
+0004f6: 6e10 0900 0500                         |0049: invoke-virtual {v5}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0009
+0004fc: 0c02                                   |004c: move-result-object v2
+0004fe: 6e20 0100 2000                         |004d: invoke-virtual {v0, v2}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0001
+000504: 2200 0f00                              |0050: new-instance v0, Lo/f; // type@000f
+000508: 7010 1300 0000                         |0052: invoke-direct {v0}, Lo/f;.<init>:()V // method@0013
+00050e: 2312 1500                              |0055: new-array v2, v1, [Lo/a; // type@0015
+000512: 4d09 0203                              |0057: aput-object v9, v2, v3
+000516: 4d00 0204                              |0059: aput-object v0, v2, v4
+00051a: 3513 1200                              |005b: if-ge v3, v1, 006d // +0012
+00051e: 4609 0203                              |005d: aget-object v9, v2, v3
+000522: 6200 0000                              |005f: sget-object v0, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0000
+000526: 6e10 1000 0900                         |0061: invoke-virtual {v9}, Lo/a;.state:()Lo/h; // method@0010
+00052c: 0c09                                   |0064: move-result-object v9
+00052e: 5499 0400                              |0065: iget-object v9, v9, Lo/h;.a:Ljava/lang/String; // field@0004
+000532: 6e20 0100 9000                         |0067: invoke-virtual {v0, v9}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0001
+000538: d803 0301                              |006a: add-int/lit8 v3, v3, #int 1 // #01
+00053c: 28ef                                   |006c: goto 005b // -0011
+00053e: 2209 0900                              |006d: new-instance v9, Ljava/util/HashMap; // type@0009
+000542: 7010 0b00 0900                         |006f: invoke-direct {v9}, Ljava/util/HashMap;.<init>:()V // method@000b
+000548: 2200 0d00                              |0072: new-instance v0, Lo/d; // type@000d
+00054c: 7010 0300 0000                         |0074: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0003
+000552: 1a01 2e00                              |0077: const-string v1, "o.d" // string@002e
+000556: 6e30 0d00 1900                         |0079: invoke-virtual {v9, v1, v0}, Ljava/util/HashMap;.put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; // method@000d
+00055c: 2200 0b00                              |007c: new-instance v0, Lo/b; // type@000b
+000560: 7010 0300 0000                         |007e: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0003
+000566: 1a01 2d00                              |0081: const-string v1, "o.b" // string@002d
+00056a: 6e30 0d00 1900                         |0083: invoke-virtual {v9, v1, v0}, Ljava/util/HashMap;.put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object; // method@000d
+000570: 1c00 0d00                              |0086: const-class v0, Lo/d; // type@000d
+000574: 6e10 0200 0000                         |0088: invoke-virtual {v0}, Ljava/lang/Class;.getName:()Ljava/lang/String; // method@0002
+00057a: 0c00                                   |008b: move-result-object v0
+00057c: 6e20 0c00 0900                         |008c: invoke-virtual {v9, v0}, Ljava/util/HashMap;.get:(Ljava/lang/Object;)Ljava/lang/Object; // method@000c
+000582: 0c00                                   |008f: move-result-object v0
+000584: 1f00 0d00                              |0090: check-cast v0, Lo/d; // type@000d
+000588: 1c01 0b00                              |0092: const-class v1, Lo/b; // type@000b
+00058c: 6e10 0200 0100                         |0094: invoke-virtual {v1}, Ljava/lang/Class;.getName:()Ljava/lang/String; // method@0002
+000592: 0c01                                   |0097: move-result-object v1
+000594: 6e20 0c00 1900                         |0098: invoke-virtual {v9, v1}, Ljava/util/HashMap;.get:(Ljava/lang/Object;)Ljava/lang/Object; // method@000c
+00059a: 0c09                                   |009b: move-result-object v9
+00059c: 1f09 0b00                              |009c: check-cast v9, Lo/b; // type@000b
+0005a0: 6201 0000                              |009e: sget-object v1, Ljava/lang/System;.out:Ljava/io/PrintStream; // field@0000
+0005a4: 1a02 2b00                              |00a0: const-string v2, "missing" // string@002b
+0005a8: 3900 0400                              |00a2: if-nez v0, 00a6 // +0004
+0005ac: 0720                                   |00a4: move-object v0, v2
+0005ae: 2803                                   |00a5: goto 00a8 // +0003
+0005b0: 1a00 2900                              |00a6: const-string v0, "home" // string@0029
+0005b4: 3909 0300                              |00a8: if-nez v9, 00ab // +0003
+0005b8: 2803                                   |00aa: goto 00ad // +0003
+0005ba: 1a02 2600                              |00ab: const-string v2, "detail" // string@0026
+0005be: 2209 0700                              |00ad: new-instance v9, Ljava/lang/StringBuilder; // type@0007
+0005c2: 7020 0400 0900                         |00af: invoke-direct {v9, v0}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@0004
+0005c8: 1a00 0000                              |00b2: const-string v0, " " // string@0000
+0005cc: 6e20 0700 0900                         |00b4: invoke-virtual {v9, v0}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0007
+0005d2: 6e20 0700 2900                         |00b7: invoke-virtual {v9, v2}, Ljava/lang/StringBuilder;.append:(Ljava/lang/String;)Ljava/lang/StringBuilder; // method@0007
+0005d8: 6e10 0900 0900                         |00ba: invoke-virtual {v9}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0009
+0005de: 0c09                                   |00bd: move-result-object v9
+0005e0: 6e20 0100 9100                         |00be: invoke-virtual {v1, v9}, Ljava/io/PrintStream;.println:(Ljava/lang/String;)V // method@0001
+0005e6: 0e00                                   |00c1: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0002 line=2
+        0x0005 line=3
+        0x0007 line=4
+        0x000b line=5
+        0x0016 line=6
+        0x0018 line=7
+        0x001a line=8
+        0x0035 line=9
+        0x003b line=10
+        0x003d line=11
+        0x003f line=12
+        0x0050 line=13
+        0x005d line=14
+        0x005f line=15
+        0x006d line=16
+        0x0072 line=17
+        0x0074 line=18
+        0x0077 line=19
+        0x007c line=20
+        0x007e line=21
+        0x0081 line=22
+        0x0086 line=23
+        0x0088 line=24
+        0x0090 line=25
+        0x0092 line=26
+        0x0094 line=27
+        0x009c line=28
+        0x009e line=29
+      locals        :
+        0x0000 - 0x00c2 reg=9 (null) [Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #1            -
+  Class descriptor  : 'Lo/a;'
+  Access flags      : 0x0401 (PUBLIC ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lo/a;)
+      name          : 'a'
+      type          : 'Lo/h;'
+      access        : 0x0011 (PUBLIC FINAL)
+    #1              : (in Lo/a;)
+      name          : 'b'
+      type          : 'I'
+      access        : 0x0001 (PUBLIC)
+  Direct methods    -
+    #0              : (in Lo/a;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 6
+      ins           : 1
+      outs          : 3
+      insns size    : 32 16-bit code units
+000620:                                        |[000620] o.a.<init>:()V
+000630: 7010 0300 0500                         |0000: invoke-direct {v5}, Ljava/lang/Object;.<init>:()V // method@0003
+000636: 2200 1100                              |0003: new-instance v0, Lo/h; // type@0011
+00063a: 7100 0a00 0000                         |0005: invoke-static {}, Ljava/lang/System;.nanoTime:()J // method@000a
+000640: 0b01                                   |0008: move-result-wide v1
+000642: 1603 0100                              |0009: const-wide/16 v3, #int 1 // #1
+000646: bf31                                   |000b: rem-long/2addr v1, v3
+000648: 2203 0700                              |000c: new-instance v3, Ljava/lang/StringBuilder; // type@0007
+00064c: 1a04 2400                              |000e: const-string v4, "base-" // string@0024
+000650: 7020 0400 4300                         |0010: invoke-direct {v3, v4}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@0004
+000656: 6e30 0600 1302                         |0013: invoke-virtual {v3, v1, v2}, Ljava/lang/StringBuilder;.append:(J)Ljava/lang/StringBuilder; // method@0006
+00065c: 6e10 0900 0300                         |0016: invoke-virtual {v3}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0009
+000662: 0c01                                   |0019: move-result-object v1
+000664: 7020 1700 1000                         |001a: invoke-direct {v0, v1}, Lo/h;.<init>:(Ljava/lang/String;)V // method@0017
+00066a: 5b50 0100                              |001d: iput-object v0, v5, Lo/a;.a:Lo/h; // field@0001
+00066e: 0e00                                   |001f: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+        0x000c line=13
+        0x000d line=14
+        0x000e line=15
+        0x000f line=16
+        0x0010 line=17
+        0x0011 line=18
+        0x0012 line=19
+        0x0013 line=20
+        0x0014 line=21
+        0x0015 line=22
+        0x0016 line=23
+        0x0017 line=24
+        0x0018 line=25
+        0x0019 line=26
+        0x001a line=27
+        0x001b line=28
+        0x001c line=29
+        0x001d line=30
+        0x001e line=31
+        0x001f line=32
+      locals        :
+        0x0000 - 0x0020 reg=5 this Lo/a;
+
+  Virtual methods   -
+    #0              : (in Lo/a;)
+      name          : 'a'
+      type          : '()Z'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 3
+      ins           : 1
+      outs          : 0
+      insns size    : 7 16-bit code units
+0005e8:                                        |[0005e8] o.a.a:()Z
+0005f8: 5220 0200                              |0000: iget v0, v2, Lo/a;.b:I // field@0002
+0005fc: 1211                                   |0002: const/4 v1, #int 1 // #1
+0005fe: b010                                   |0003: add-int/2addr v0, v1
+000600: 5920 0200                              |0004: iput v0, v2, Lo/a;.b:I // field@0002
+000604: 0f01                                   |0006: return v1
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+      locals        :
+        0x0000 - 0x0007 reg=2 this Lo/a;
+
+    #1              : (in Lo/a;)
+      name          : 'state'
+      type          : '()Lo/h;'
+      access        : 0x0001 (PUBLIC)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 0
+      insns size    : 3 16-bit code units
+000608:                                        |[000608] o.a.state:()Lo/h;
+000618: 5400 0100                              |0000: iget-object v0, v0, Lo/a;.a:Lo/h; // field@0001
+00061c: 1100                                   |0002: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+      locals        :
+        0x0000 - 0x0003 reg=0 this Lo/a;
+
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #2            -
+  Class descriptor  : 'Lo/b;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #3            -
+  Class descriptor  : 'Lo/g;'
+  Access flags      : 0x0601 (PUBLIC INTERFACE ABSTRACT)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lo/g;)
+      name          : 'a'
+      type          : '()Z'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+    #1              : (in Lo/g;)
+      name          : 'state'
+      type          : '()Lo/h;'
+      access        : 0x0401 (PUBLIC ABSTRACT)
+      code          : (none)
+
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #4            -
+  Class descriptor  : 'Lo/c;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lo/a;'
+  Interfaces        -
+    #0              : 'Lo/g;'
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #5            -
+  Class descriptor  : 'Lo/d;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #6            -
+  Class descriptor  : 'Lo/e;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+    #0              : 'Lo/g;'
+  Static fields     -
+  Instance fields   -
+  Direct methods    -
+  Virtual methods   -
+    #0              : (in Lo/e;)
+      name          : 'a'
+      type          : '()Z'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 1
+      ins           : 1
+      outs          : 0
+      insns size    : 2 16-bit code units
+000670:                                        |[000670] o.e.a:()Z
+000680: 1200                                   |0000: const/4 v0, #int 0 // #0
+000682: 0f00                                   |0001: return v0
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+      locals        :
+        0x0000 - 0x0002 reg=0 this Lo/e;
+
+    #1              : (in Lo/e;)
+      name          : 'state'
+      type          : '()Lo/h;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 8 16-bit code units
+000684:                                        |[000684] o.e.state:()Lo/h;
+000694: 2201 1100                              |0000: new-instance v1, Lo/h; // type@0011
+000698: 1a00 3000                              |0002: const-string v0, "other" // string@0030
+00069c: 7020 1700 0100                         |0004: invoke-direct {v1, v0}, Lo/h;.<init>:(Ljava/lang/String;)V // method@0017
+0006a2: 1101                                   |0007: return-object v1
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+      locals        :
+        0x0000 - 0x0008 reg=1 this Lo/e;
+
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #7            -
+  Class descriptor  : 'Lo/f;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Lo/a;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lo/f;)
+      name          : 'c'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+  Direct methods    -
+    #0              : (in Lo/f;)
+      name          : '<init>'
+      type          : '()V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 5
+      ins           : 1
+      outs          : 3
+      insns size    : 27 16-bit code units
+0006c4:                                        |[0006c4] o.f.<init>:()V
+0006d4: 7010 0e00 0400                         |0000: invoke-direct {v4}, Lo/a;.<init>:()V // method@000e
+0006da: 7100 0a00 0000                         |0003: invoke-static {}, Ljava/lang/System;.nanoTime:()J // method@000a
+0006e0: 0b00                                   |0006: move-result-wide v0
+0006e2: 1602 0100                              |0007: const-wide/16 v2, #int 1 // #1
+0006e6: bf20                                   |0009: rem-long/2addr v0, v2
+0006e8: 2202 0700                              |000a: new-instance v2, Ljava/lang/StringBuilder; // type@0007
+0006ec: 1a03 3200                              |000c: const-string v3, "plain" // string@0032
+0006f0: 7020 0400 3200                         |000e: invoke-direct {v2, v3}, Ljava/lang/StringBuilder;.<init>:(Ljava/lang/String;)V // method@0004
+0006f6: 6e30 0600 0201                         |0011: invoke-virtual {v2, v0, v1}, Ljava/lang/StringBuilder;.append:(J)Ljava/lang/StringBuilder; // method@0006
+0006fc: 6e10 0900 0200                         |0014: invoke-virtual {v2}, Ljava/lang/StringBuilder;.toString:()Ljava/lang/String; // method@0009
+000702: 0c00                                   |0017: move-result-object v0
+000704: 5b40 0300                              |0018: iput-object v0, v4, Lo/f;.c:Ljava/lang/String; // field@0003
+000708: 0e00                                   |001a: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+        0x0008 line=9
+        0x0009 line=10
+        0x000a line=11
+        0x000b line=12
+        0x000c line=13
+        0x000d line=14
+        0x000e line=15
+        0x000f line=16
+        0x0010 line=17
+        0x0011 line=18
+        0x0012 line=19
+        0x0013 line=20
+        0x0014 line=21
+        0x0015 line=22
+        0x0016 line=23
+        0x0017 line=24
+        0x0018 line=25
+        0x0019 line=26
+        0x001a line=27
+      locals        :
+        0x0000 - 0x001b reg=4 this Lo/f;
+
+  Virtual methods   -
+    #0              : (in Lo/f;)
+      name          : 'state'
+      type          : '()Lo/h;'
+      access        : 0x0011 (PUBLIC FINAL)
+      code          -
+      registers     : 2
+      ins           : 1
+      outs          : 2
+      insns size    : 8 16-bit code units
+0006a4:                                        |[0006a4] o.f.state:()Lo/h;
+0006b4: 2200 1100                              |0000: new-instance v0, Lo/h; // type@0011
+0006b8: 5411 0300                              |0002: iget-object v1, v1, Lo/f;.c:Ljava/lang/String; // field@0003
+0006bc: 7020 1700 1000                         |0004: invoke-direct {v0, v1}, Lo/h;.<init>:(Ljava/lang/String;)V // method@0017
+0006c2: 1100                                   |0007: return-object v0
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+        0x0006 line=7
+        0x0007 line=8
+      locals        :
+        0x0000 - 0x0008 reg=1 this Lo/f;
+
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+
+Class #8            -
+  Class descriptor  : 'Lo/h;'
+  Access flags      : 0x0011 (PUBLIC FINAL)
+  Superclass        : 'Ljava/lang/Object;'
+  Interfaces        -
+  Static fields     -
+  Instance fields   -
+    #0              : (in Lo/h;)
+      name          : 'a'
+      type          : 'Ljava/lang/String;'
+      access        : 0x0011 (PUBLIC FINAL)
+  Direct methods    -
+    #0              : (in Lo/h;)
+      name          : '<init>'
+      type          : '(Ljava/lang/String;)V'
+      access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      code          -
+      registers     : 2
+      ins           : 2
+      outs          : 1
+      insns size    : 6 16-bit code units
+00070c:                                        |[00070c] o.h.<init>:(Ljava/lang/String;)V
+00071c: 7010 0300 0000                         |0000: invoke-direct {v0}, Ljava/lang/Object;.<init>:()V // method@0003
+000722: 5b01 0400                              |0003: iput-object v1, v0, Lo/h;.a:Ljava/lang/String; // field@0004
+000726: 0e00                                   |0005: return-void
+      catches       : (none)
+      positions     :
+        0x0000 line=1
+        0x0001 line=2
+        0x0002 line=3
+        0x0003 line=4
+        0x0004 line=5
+        0x0005 line=6
+      locals        :
+        0x0000 - 0x0006 reg=0 this Lo/h;
+        0x0000 - 0x0006 reg=1 (null) Ljava/lang/String;
+
+  Virtual methods   -
+  source_file_idx   : 53 (r8-map-id-705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee)
+

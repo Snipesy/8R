@@ -6,7 +6,7 @@
 //! per distinct body, with the set of scenarios that produced it. `unique` marks a body hash that
 //! belongs to exactly one original method across every scenario of the pack.
 //!
-//! File format (`*.8rpack`): `8RPACK03`, then a raw-deflate stream of little-endian fields
+//! File format (`*.8rpack`): `8RPACK06`, then a raw-deflate stream of little-endian fields
 //! (strings as u32 length + UTF-8, lists as u32 count + items).
 
 use std::io::{Read, Write};
@@ -14,13 +14,15 @@ use std::io::{Read, Write};
 use super::profile::Profile;
 use crate::sigdb::print::SKETCH;
 
-const MAGIC: &[u8; 8] = b"8RPACK03";
+const MAGIC: &[u8; 8] = b"8RPACK06";
 /// Largest inflated pack accepted (a corrupt or hostile file can't exhaust memory).
 const MAX_RAW: u64 = 2 << 30;
 /// No artifact (a class the closure doesn't own, e.g. R8's own).
 pub const NO_ARTIFACT: u32 = u32::MAX;
 /// A callee or frame method outside the key table.
 pub const NO_METHOD: u32 = u32::MAX;
+/// A field access outside the field table.
+pub const NO_FIELD: u32 = u32::MAX;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pack {
@@ -40,6 +42,8 @@ pub struct Pack {
     pub classes: Vec<(String, u32)>,
     /// (class index, original name, original proto descriptor).
     pub methods: Vec<(u32, String, String)>,
+    /// (class index, original name, original type descriptor).
+    pub fields: Vec<(u32, String, String)>,
     pub records: Vec<Record>,
     pub class_records: Vec<ClassRecord>,
     /// Inline stacks, innermost frame first: (method index, original line or -1).
@@ -56,15 +60,24 @@ pub struct Record {
     pub informative: bool,
     /// The body hash maps to this method only, across the whole pack.
     pub unique: bool,
+    /// Keyed as `f` but taken from a default-argument bridge `f$default` (`f` specialized with its
+    /// defaults): an app may call the same body either name.
+    pub bridge: bool,
+    /// The owner is a synthetic-looking class (`Foo$1`, `$lambda`, …) whose siblings can share a body.
+    pub synthetic_owner: bool,
     pub all: u64,
     pub strings: u64,
     pub proto: u64,
     pub sketch: [u32; SKETCH],
     /// Program callees: (erased call token, callee method index or [`NO_METHOD`]).
     pub callees: Vec<(u64, u32)>,
+    /// Program field accesses in order: (erased access token, field index or [`NO_FIELD`]).
+    pub fields: Vec<(u64, u32)>,
     /// Inlined code: (first instruction, end instruction exclusive, stack index), over the body
     /// as fingerprinted (after 8R's rewrites).
     pub frames: Vec<(u32, u32, u32)>,
+    /// Instructions in the body as fingerprinted.
+    pub insns: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -73,7 +86,12 @@ pub struct ClassRecord {
     pub scenarios: u64,
     pub c2: u64,
     pub c3: u64,
+    /// The original superclass, when it is a program class of that build (else [`NO_CLASS`]).
+    pub sup: u32,
 }
+
+/// No class (a [`ClassRecord::sup`] outside the program).
+pub const NO_CLASS: u32 = u32::MAX;
 
 /// A dex member simple name (or `<init>`/`<clinit>`): names from a pack end up in the output.
 fn simple_name(n: &str) -> bool {
@@ -182,28 +200,33 @@ impl Pack {
             w.str(c);
             w.u32(*a);
         }
-        w.len(self.methods.len());
-        for (c, n, p) in &self.methods {
-            w.u32(*c);
-            w.str(n);
-            w.str(p);
+        for table in [&self.methods, &self.fields] {
+            w.len(table.len());
+            for (c, n, p) in table {
+                w.u32(*c);
+                w.str(n);
+                w.str(p);
+            }
         }
         w.len(self.records.len());
         for r in &self.records {
             w.u32(r.method);
             w.u64(r.scenarios);
-            w.u8(u8::from(r.informative) | (u8::from(r.unique) << 1));
+            w.u8(u8::from(r.informative) | (u8::from(r.unique) << 1) | (u8::from(r.bridge) << 2) | (u8::from(r.synthetic_owner) << 3));
             w.u64(r.all);
             w.u64(r.strings);
             w.u64(r.proto);
             for x in r.sketch {
                 w.u32(x);
             }
-            w.len(r.callees.len());
-            for (t, k) in &r.callees {
-                w.u64(*t);
-                w.u32(*k);
+            for list in [&r.callees, &r.fields] {
+                w.len(list.len());
+                for (t, k) in list {
+                    w.u64(*t);
+                    w.u32(*k);
+                }
             }
+            w.u32(r.insns);
             w.len(r.frames.len());
             for (a, b, s) in &r.frames {
                 w.u32(*a);
@@ -217,6 +240,7 @@ impl Pack {
             w.u64(r.scenarios);
             w.u64(r.c2);
             w.u64(r.c3);
+            w.u32(r.sup);
         }
         w.len(self.stacks.len());
         for st in &self.stacks {
@@ -250,6 +274,7 @@ impl Pack {
         let artifacts: Vec<(String, bool)> = (0..r.len()?).map(|_| Ok((r.str()?, r.u8()? != 0))).collect::<Result<_, String>>()?;
         let classes: Vec<(String, u32)> = (0..r.len()?).map(|_| Ok((r.str()?, r.u32()?))).collect::<Result<_, String>>()?;
         let methods: Vec<(u32, String, String)> = (0..r.len()?).map(|_| Ok((r.u32()?, r.str()?, r.str()?))).collect::<Result<_, String>>()?;
+        let fields: Vec<(u32, String, String)> = (0..r.len()?).map(|_| Ok((r.u32()?, r.str()?, r.str()?))).collect::<Result<_, String>>()?;
         let n = r.len()?;
         let mut records = Vec::with_capacity(n);
         for _ in 0..n {
@@ -262,10 +287,12 @@ impl Pack {
                 *x = r.u32()?;
             }
             let callees = (0..r.len()?).map(|_| Ok((r.u64()?, r.u32()?))).collect::<Result<_, String>>()?;
+            let fields = (0..r.len()?).map(|_| Ok((r.u64()?, r.u32()?))).collect::<Result<_, String>>()?;
+            let insns = r.u32()?;
             let frames = (0..r.len()?).map(|_| Ok((r.u32()?, r.u32()?, r.u32()?))).collect::<Result<_, String>>()?;
-            records.push(Record { method, scenarios, informative: flags & 1 != 0, unique: flags & 2 != 0, all, strings, proto, sketch, callees, frames });
+            records.push(Record { method, scenarios, informative: flags & 1 != 0, unique: flags & 2 != 0, bridge: flags & 4 != 0, synthetic_owner: flags & 8 != 0, all, strings, proto, sketch, callees, fields, frames, insns });
         }
-        let class_records: Vec<ClassRecord> = (0..r.len()?).map(|_| Ok(ClassRecord { class: r.u32()?, scenarios: r.u64()?, c2: r.u64()?, c3: r.u64()? })).collect::<Result<_, String>>()?;
+        let class_records: Vec<ClassRecord> = (0..r.len()?).map(|_| Ok(ClassRecord { class: r.u32()?, scenarios: r.u64()?, c2: r.u64()?, c3: r.u64()?, sup: r.u32()? })).collect::<Result<_, String>>()?;
         let stacks: Vec<Vec<(u32, i32)>> = (0..r.len()?).map(|_| (0..r.len()?).map(|_| Ok((r.u32()?, r.i32()?))).collect::<Result<Vec<_>, String>>()).collect::<Result<_, _>>()?;
         if r.at != raw.len() {
             return Err("trailing bytes in pack".into());
@@ -277,24 +304,26 @@ impl Pack {
         let bits = if scenarios.len() == 64 { u64::MAX } else { (1u64 << scenarios.len()) - 1 };
         let (nc, nm, ns, na) = (classes.len(), methods.len(), stacks.len(), artifacts.len());
         let bad = classes.iter().any(|(_, a): &(String, u32)| *a != NO_ARTIFACT && *a as usize >= na)
-            || methods.iter().any(|(c, _, _): &(u32, String, String)| *c as usize >= nc)
+            || methods.iter().chain(&fields).any(|(c, _, _): &(u32, String, String)| *c as usize >= nc)
             || records.iter().any(|r| {
                 r.method as usize >= nm
                     || r.scenarios & !bits != 0
                     || r.callees.iter().any(|(_, k)| *k != NO_METHOD && *k as usize >= nm)
+                    || r.fields.iter().any(|(_, k)| *k != NO_FIELD && *k as usize >= fields.len())
                     || r.frames.iter().any(|(a, b, st)| a > b || *st as usize >= ns)
             })
-            || class_records.iter().any(|r: &ClassRecord| r.class as usize >= nc || r.scenarios & !bits != 0)
+            || class_records.iter().any(|r: &ClassRecord| r.class as usize >= nc || (r.sup != NO_CLASS && r.sup as usize >= nc) || r.scenarios & !bits != 0)
             || stacks.iter().any(|st: &Vec<(u32, i32)>| st.iter().any(|(m, _)| *m as usize >= nm));
         if bad {
             return Err("corrupt pack: index out of range".into());
         }
         let bad_name = classes.iter().any(|(c, _)| !type_descriptor(c) || c.starts_with('['))
-            || methods.iter().any(|(_, n, pr)| !simple_name(n) || eightr_ir::types::parse_proto(pr).is_none_or(|(ps, r)| !ps.iter().all(|t| type_descriptor(t) && *t != "V") || !type_descriptor(r)));
+            || methods.iter().any(|(_, n, pr)| !simple_name(n) || eightr_ir::types::parse_proto(pr).is_none_or(|(ps, r)| !ps.iter().all(|t| type_descriptor(t) && *t != "V") || !type_descriptor(r)))
+            || fields.iter().any(|(_, n, t)| !simple_name(n) || n.starts_with('<') || !type_descriptor(t) || t == "V");
         if bad_name {
             return Err("corrupt pack: invalid class or member name".into());
         }
-        Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, records, class_records, stacks, app })
+        Ok(Pack { profile, lock, catalog, tools, scenarios, artifacts, classes, methods, fields, records, class_records, stacks, app })
     }
 }
 
@@ -314,8 +343,9 @@ mod tests {
             artifacts: vec![("a.b:c:1.0".into(), true)],
             classes: vec![("La/b/C;".into(), 0), ("LR8$$;".into(), NO_ARTIFACT)],
             methods: vec![(0, "f".into(), "()V".into())],
-            records: vec![Record { method: 0, scenarios: 1, informative: true, unique: true, all: 7, strings: 0, proto: 3, sketch: [9; SKETCH], callees: vec![(5, NO_METHOD)], frames: vec![(0, 3, 0)] }],
-            class_records: vec![ClassRecord { class: 0, scenarios: 1, c2: 1, c3: 2 }],
+            fields: vec![(0, "count".into(), "I".into())],
+            records: vec![Record { method: 0, scenarios: 1, informative: true, unique: true, bridge: false, synthetic_owner: true, all: 7, strings: 0, proto: 3, sketch: [9; SKETCH], callees: vec![(5, NO_METHOD)], fields: vec![(6, 0), (6, NO_FIELD)], frames: vec![(0, 3, 0)], insns: 4 }],
+            class_records: vec![ClassRecord { class: 0, scenarios: 1, c2: 1, c3: 2, sup: NO_CLASS }],
             stacks: vec![vec![(0, 12), (0, -1)]],
             app: "ab12".into(),
         };

@@ -11,6 +11,7 @@ pub mod classfile;
 pub mod fingerprint;
 pub mod gen;
 pub mod grade;
+pub mod harness;
 pub mod maven;
 pub mod names;
 pub mod pins;

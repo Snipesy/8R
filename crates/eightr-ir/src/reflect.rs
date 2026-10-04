@@ -232,6 +232,36 @@ pub fn pins(p: &Program) -> Pins {
         }
     }
     let s = &p.syms;
+    // Class binary names as strings anywhere in code or static values (R8's
+    // `-adaptclassstrings` output, e.g. Hilt's `@LazyClassKey` map keys compared with
+    // `Class.getName()`): R8 rewrote them to the input names, so the classes keep them.
+    // Package-qualified names only: default-package names (`"r"`) are everyday strings (a
+    // serial name, a default value), and pinning on them would cost recovered names.
+    let binary: BTreeMap<String, String> = p
+        .classes
+        .iter()
+        .filter_map(|c| {
+            let d = s.get(c.ty);
+            let inner = d.strip_prefix('L')?.strip_suffix(';')?;
+            inner.contains('/').then(|| (inner.replace('/', "."), d.to_string()))
+        })
+        .collect();
+    for c in &p.classes {
+        let mut strings: BTreeSet<&str> = BTreeSet::new();
+        for insn in c.methods.iter().flat_map(|m| m.code.iter().flat_map(|b| &b.insns)) {
+            if let Op::ConstString { value, .. } = &insn.op {
+                strings.insert(s.get(*value));
+            }
+        }
+        for f in &c.fields {
+            collect_value_strings(f.static_value.as_ref(), s, &mut strings);
+        }
+        for t in strings {
+            if let Some(d) = binary.get(t) {
+                pins.classes.insert(d.clone());
+            }
+        }
+    }
     for c in &p.classes {
         let owner = s.get(c.ty).to_string();
         let mut strings: BTreeSet<&str> = BTreeSet::new();

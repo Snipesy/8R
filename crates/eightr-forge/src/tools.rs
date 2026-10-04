@@ -172,9 +172,19 @@ fn newest_platform(dir: &Path) -> Result<PathBuf> {
     v.pop().map(|x| x.1).ok_or_else(|| format!("no platforms/android-N/android.jar in {}", dir.display()))
 }
 
-/// R8 of `version` from Google Maven: (jar, sha256).
+/// R8's release bucket: every release, including the ones Google Maven skips (all of 8.4.x, the
+/// versions AGP 8.4 bundles). `r8lib.jar` is the artifact Maven publishes as `r8-{version}.jar`.
+const R8_RELEASES: &str = "https://storage.googleapis.com/r8-releases/raw";
+
+/// R8 of `version` from Google Maven, else R8's release bucket: (jar, sha256).
 pub fn r8_jar(version: &str) -> Result<(PathBuf, String)> {
     let url = format!("{}/com/android/tools/r8/{version}/r8-{version}.jar", crate::maven::GOOGLE);
-    let jar = fetch(&url)?.ok_or_else(|| format!("R8 {version} is not on Google Maven ({url})"))?;
+    let jar = match fetch(&url)? {
+        Some(jar) => jar,
+        None => {
+            let bucket = format!("{R8_RELEASES}/{version}/r8lib.jar");
+            fetch(&bucket)?.ok_or_else(|| format!("R8 {version} is neither on Google Maven ({url}) nor in R8's releases ({bucket})"))?
+        }
+    };
     Ok((jar.clone(), sha256_hex(&read(&jar)?)))
 }

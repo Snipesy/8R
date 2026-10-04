@@ -1,0 +1,87 @@
+# compiler: R8
+# compiler_version: 9.4.24
+# min_api: 26
+# common_typos_disable
+# {"id":"com.android.tools.r8.mapping","version":"2.2"}
+# pg_map_id: 705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee
+# pg_map_hash: SHA-256 705c259575f38cfb6344b568b88320fa8f20e3d0199ba1a9531cbb7339a4beee
+com.example.slots.Base -> o.a:
+# {"id":"sourceFile","fileName":"Main.java"}
+    com.example.slots.State current -> a
+      # {"id":"com.android.tools.r8.residualsignature","signature":"Lo/h;"}
+    int offered -> b
+    1:3:void <init>():20:20 -> <init>
+    4:32:void <init>():21:21 -> <init>
+    1:7:boolean offer(java.lang.Object):31:31 -> a
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Z"}
+    1:3:com.example.slots.State state():27:27 -> state
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lo/h;"}
+com.example.slots.DetailModel -> o.b:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.slots.Flow -> o.c:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.slots.HomeModel -> o.d:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.slots.Main -> com.example.slots.Main:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:1:void main(java.lang.String[]):93:93 -> main
+    2:2:void com.example.slots.Flow.<init>():40:40 -> main
+    2:2:void main(java.lang.String[]):93 -> main
+    3:3:void main(java.lang.String[]):94:94 -> main
+    4:4:void com.example.slots.Other.<init>():53:53 -> main
+    4:4:void main(java.lang.String[]):94 -> main
+    5:7:void main(java.lang.String[]):94:96 -> main
+    8:8:java.lang.String describe(com.example.slots.Source):89:89 -> main
+    8:8:void main(java.lang.String[]):96 -> main
+    9:9:void main(java.lang.String[]):96:96 -> main
+    10:10:void main(java.lang.String[]):98:98 -> main
+    11:11:int com.example.slots.Base.offered():36:36 -> main
+    11:11:void main(java.lang.String[]):98 -> main
+    12:15:void main(java.lang.String[]):98:101 -> main
+    16:16:void com.example.slots.Registry.<init>():74:74 -> main
+    16:16:void main(java.lang.String[]):103 -> main
+    17:17:void com.example.slots.Registry.<init>():78:78 -> main
+    17:17:void main(java.lang.String[]):103 -> main
+    18:18:void com.example.slots.HomeModel.<init>():65:65 -> main
+    18:18:void com.example.slots.Registry.<init>():78 -> main
+    18:18:void main(java.lang.String[]):103 -> main
+    19:20:void com.example.slots.Registry.<init>():78:79 -> main
+    19:20:void main(java.lang.String[]):103 -> main
+    21:21:void com.example.slots.DetailModel.<init>():69:69 -> main
+    21:21:void com.example.slots.Registry.<init>():79 -> main
+    21:21:void main(java.lang.String[]):103 -> main
+    22:22:void com.example.slots.Registry.<init>():79:79 -> main
+    22:22:void main(java.lang.String[]):103 -> main
+    23:23:void main(java.lang.String[]):104:104 -> main
+    24:24:java.lang.Object com.example.slots.Registry.get(java.lang.Class):83:83 -> main
+    24:24:void main(java.lang.String[]):104 -> main
+    25:26:void main(java.lang.String[]):104:105 -> main
+    27:27:java.lang.Object com.example.slots.Registry.get(java.lang.Class):83:83 -> main
+    27:27:void main(java.lang.String[]):105 -> main
+    28:29:void main(java.lang.String[]):105:106 -> main
+com.example.slots.Other -> o.e:
+# {"id":"sourceFile","fileName":"Main.java"}
+    1:2:boolean offer(java.lang.Object):61:61 -> a
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Z"}
+    1:8:com.example.slots.State state():56:56 -> state
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lo/h;"}
+com.example.slots.Plain -> o.f:
+# {"id":"sourceFile","fileName":"Main.java"}
+    java.lang.String tag -> c
+    1:3:void <init>():44:44 -> <init>
+    4:27:void <init>():45:45 -> <init>
+    1:8:com.example.slots.State state():49:49 -> state
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lo/h;"}
+com.example.slots.Registry -> R8$$REMOVED$$CLASS$$0:
+# {"id":"sourceFile","fileName":"Main.java"}
+com.example.slots.Source -> o.g:
+# {"id":"sourceFile","fileName":"Main.java"}
+    boolean offer(java.lang.Object) -> a
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Z"}
+    com.example.slots.State state() -> state
+      # {"id":"com.android.tools.r8.residualsignature","signature":"()Lo/h;"}
+com.example.slots.State -> o.h:
+# {"id":"sourceFile","fileName":"Main.java"}
+    java.lang.String label -> a
+    1:3:void <init>(java.lang.String):15:15 -> <init>
+    4:6:void <init>(java.lang.String):16:16 -> <init>

@@ -250,6 +250,7 @@ dependencies = [
  "clap",
  "eightr-core",
  "eightr-dex",
+ "eightr-dexwrite",
  "eightr-ir",
  "eightr-mapping",
  "eightr-rules",

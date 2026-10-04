@@ -30,6 +30,10 @@ pub struct Names {
     /// Residual classes and methods R8 synthesized: their names are R8's, not the library's.
     pub synthesized_classes: BTreeSet<String>,
     synthesized_methods: BTreeSet<(String, String, String)>,
+    /// (residual class, residual name, residual type) → (original owner, original name, original type).
+    fields: BTreeMap<(String, String, String), (String, String, String)>,
+    /// Residual fields R8 synthesized: no original.
+    synthesized_fields: BTreeSet<(String, String)>,
 }
 
 impl Names {
@@ -44,6 +48,8 @@ impl Names {
             }
         };
         let mut methods = BTreeMap::new();
+        let mut fields = BTreeMap::new();
+        let mut synthesized_fields = BTreeSet::new();
         let mut synthesized_classes = BTreeSet::new();
         let mut synthesized_methods = BTreeSet::new();
         for c in &mapping.classes {
@@ -51,16 +57,56 @@ impl Names {
             if c.metadata.iter().any(|x| x.parsed == Metadata::Synthesized) {
                 synthesized_classes.insert(rc.clone());
             }
-            for (m, md) in c.outermost_methods() {
-                let ps: Vec<String> = m.params.iter().map(|t| descriptor(t)).collect();
-                let original = format!("({}){}", ps.concat(), descriptor(&m.return_type));
-                let residual = md
+            for member in &c.members {
+                let eightr_mapping::MemberKind::Field(f) = &member.kind else { continue };
+                if member.metadata.iter().any(|x| x.parsed == Metadata::Synthesized) {
+                    synthesized_fields.insert((rc.clone(), f.obfuscated.clone()));
+                    continue;
+                }
+                let residual = member
+                    .metadata
                     .iter()
                     .find_map(|x| match &x.parsed {
                         Metadata::ResidualSignature(s) => Some(s.clone()),
                         _ => None,
                     })
-                    .unwrap_or_else(|| format!("({}){}", ps.iter().map(|t| residual_type(t)).collect::<String>(), residual_type(&descriptor(&m.return_type))));
+                    .unwrap_or_else(|| residual_type(&descriptor(&f.ty)));
+                let owner = f.original_owner.as_deref().map_or_else(|| descriptor(&c.original), descriptor);
+                fields.insert((rc.clone(), f.obfuscated.clone(), residual), (owner, f.original_name.clone(), descriptor(&f.ty)));
+            }
+            // Frames inlined into each residual method (a caller line follows them in their stack).
+            // Without line info R8 can open a method with a stack holding only an inlinee, and
+            // put the method's residual signature on it (`18:20:int Encoding.readUInt16(…):0:0
+            // -> l` + `residualsignature (…[BI…)`, then `21:25:` readUInt16 inside
+            // readMetadataV002Body): a method is never inlined into itself, nor has fewer
+            // parameters than its residual signature minus a receiver, so the signature belongs to
+            // the method's next outermost frame.
+            let frame = |m: &eightr_mapping::MethodMapping| (m.obfuscated.clone(), m.original_owner.clone(), m.original_name.clone(), m.params.clone(), m.return_type.clone());
+            let entries: Vec<_> = c.methods().collect();
+            let inlinees: BTreeSet<_> = entries
+                .windows(2)
+                .filter(|w| w[0].0.minified_range.is_some() && w[1].0.obfuscated == w[0].0.obfuscated && w[1].0.minified_range == w[0].0.minified_range)
+                .map(|w| frame(w[0].0))
+                .collect();
+            let mut carried: Option<(String, String)> = None;
+            for (m, md) in c.outermost_methods() {
+                let ps: Vec<String> = m.params.iter().map(|t| descriptor(t)).collect();
+                let original = format!("({}){}", ps.concat(), descriptor(&m.return_type));
+                let own = md.iter().find_map(|x| match &x.parsed {
+                    Metadata::ResidualSignature(s) => Some(s.clone()),
+                    _ => None,
+                });
+                // R8 drops parameters and may add a receiver (making a method static), never more:
+                // a frame with fewer parameters than that isn't the method either.
+                let arity = |sig: &str| eightr_ir::types::parse_proto(sig).map(|(ps, _)| ps.len());
+                let too_few = own.as_deref().and_then(arity).is_some_and(|n| n > m.params.len() + 1);
+                if own.is_some() && (inlinees.contains(&frame(m)) || too_few) {
+                    carried = own.map(|sig| (m.obfuscated.clone(), sig));
+                    continue;
+                }
+                let own = own.or_else(|| carried.take().filter(|(o, _)| *o == m.obfuscated).map(|x| x.1));
+                carried = None;
+                let residual = own.unwrap_or_else(|| format!("({}){}", ps.iter().map(|t| residual_type(t)).collect::<String>(), residual_type(&descriptor(&m.return_type))));
                 let key = (rc.clone(), m.obfuscated.clone(), residual);
                 if md.iter().any(|x| x.parsed == Metadata::Synthesized) {
                     synthesized_methods.insert(key);
@@ -71,11 +117,23 @@ impl Names {
                 methods.insert(key, (owner, m.original_name.clone(), original));
             }
         }
-        Names { classes, methods, synthesized_classes, synthesized_methods }
+        Names { classes, methods, synthesized_classes, synthesized_methods, fields, synthesized_fields }
     }
 
     pub fn class(&self, residual: &str) -> String {
         self.classes.get(residual).cloned().unwrap_or_else(|| residual.to_string())
+    }
+
+    /// The original (owner, name, type) of a residual field; unmapped fields kept their names.
+    pub fn field(&self, class: &str, name: &str, ty: &str) -> Option<(String, String, String)> {
+        if self.synthesized_classes.contains(class) || self.synthesized_fields.contains(&(class.to_string(), name.to_string())) {
+            return None;
+        }
+        if let Some(x) = self.fields.get(&(class.to_string(), name.to_string(), ty.to_string())) {
+            return Some(x.clone());
+        }
+        let dims = ty.bytes().take_while(|&b| b == b'[').count();
+        Some((self.class(class), name.to_string(), format!("{}{}", &ty[..dims], self.class(&ty[dims..]))))
     }
 
     /// The original (owner, name, proto) of a residual method; `None` for R8's own methods and
@@ -127,6 +185,26 @@ com.lib.Foo$0 -> c:
         assert_eq!(n.method("La;", "c", "(Ljava/lang/String;)V"), Some(("Lcom/lib/Moved;".into(), "helper".into(), "(Ljava/lang/String;)V".into())));
         assert_eq!(n.method("La;", "d", "()V"), None);
         assert_eq!(n.method("Lc;", "a", "()V"), None);
+        // Without line info, a method opened by a lone inlinee frame carrying its signature.
+        let text = "\
+com.lib.Reader -> r:
+    18:20:int com.lib.Enc.readU16(java.io.InputStream):0:0 -> l
+      # {\"id\":\"com.android.tools.r8.residualsignature\",\"signature\":\"(Ljava/io/ByteArrayInputStream;I)I\"}
+    21:25:int com.lib.Enc.readU16(java.io.InputStream):0:0 -> l
+    21:25:int body(java.io.InputStream,int):0 -> l
+    26:30:int body(java.io.InputStream,int):0:0 -> l
+";
+        let n2 = Names::new(&Mapping::parse_normalized(text).unwrap());
+        assert_eq!(n2.method("Lr;", "l", "(Ljava/io/ByteArrayInputStream;I)I"), Some(("Lcom/lib/Reader;".into(), "body".into(), "(Ljava/io/InputStream;I)I".into())));
+        // The lone frame isn't inlined elsewhere, but can't have the signature's parameters.
+        let text = "\
+com.lib.Focus -> f:
+    20:21:com.lib.Node com.lib.Node.getNode():0:0 -> x
+      # {\"id\":\"com.android.tools.r8.residualsignature\",\"signature\":\"(Lf;I)I\"}
+    22:25:com.lib.Result perform(com.lib.Focus,int):0:0 -> x
+";
+        let n3 = Names::new(&Mapping::parse_normalized(text).unwrap());
+        assert_eq!(n3.method("Lf;", "x", "(Lf;I)I").map(|x| x.1), Some("perform".into()));
         // Not in the mapping: kept name, types mapped one by one.
         assert_eq!(n.method("La;", "toString", "(Lb;)Ljava/lang/String;"), Some(("Lcom/lib/Foo;".into(), "toString".into(), "(Lcom/lib/Bar;)Ljava/lang/String;".into())));
     }

@@ -468,18 +468,22 @@ pub fn name(p: &Program, labels: &mut Labels, findings: &mut Vec<Finding>) -> Re
         lib_supers.insert(id, libs);
     }
 
-    // Override groups.
+    // Override groups: within a class and its supertypes, the virtual methods with one name and
+    // proto are one dispatch slot. That includes a superclass method implementing an interface
+    // method only through a subclass (`C extends B implements I`, `B.m` implements `I.m`).
     let mut groups = Groups { parent: BTreeMap::new() };
     for id in p.class_ids() {
-        for (i, m) in p.class(id).methods.iter().enumerate() {
-            if !is_virtual(m) {
-                continue;
-            }
-            for &sid in &supers[&id] {
-                for (j, sm) in p.class(sid).methods.iter().enumerate() {
-                    if is_virtual(sm) && sm.name == m.name && sm.proto == m.proto {
-                        groups.union((id, i as u32), (sid, j as u32));
+        let mut slots: BTreeMap<(&str, &str), (ClassId, u32)> = BTreeMap::new();
+        for k in std::iter::once(id).chain(supers[&id].iter().copied()) {
+            for (i, m) in p.class(k).methods.iter().enumerate() {
+                if !is_virtual(m) {
+                    continue;
+                }
+                match slots.entry((p.str(m.name), p.str(m.proto))) {
+                    std::collections::btree_map::Entry::Vacant(e) => {
+                        e.insert((k, i as u32));
                     }
+                    std::collections::btree_map::Entry::Occupied(e) => groups.union(*e.get(), (k, i as u32)),
                 }
             }
         }

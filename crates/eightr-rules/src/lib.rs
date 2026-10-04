@@ -120,6 +120,10 @@ pub const COMPOSE_SYNTHETIC_PARAMS: &str = "compose/synthetic-params";
 pub const ANNOTATION_MEMBER_NAME: &str = "r8/annotation-member-name";
 pub const LIBRARY_OVERRIDE_NAME: &str = "r8/library-override-name";
 pub const LATEINIT_FIELD_NAME: &str = "kotlinc/lateinit-field-name";
+pub const LIBDB_CLASS_NAME: &str = "r8/libdb-class-name";
+pub const LIBDB_FIELD_HINT: &str = "r8/libdb-field-hint";
+pub const LIBDB_FIELD_NAME: &str = "r8/libdb-field-name";
+pub const LIBDB_METHOD_NAME: &str = "r8/libdb-method-name";
 
 /// All registered rules, sorted by id.
 pub static REGISTRY: &[Rule] = &[
@@ -339,6 +343,57 @@ pub static REGISTRY: &[Rule] = &[
         ],
         fallback: Some(IDENTITY),
         fixtures: &["hello", "shapes", "opcodes", "names_stress"],
+    },
+    Rule {
+        id: LIBDB_CLASS_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::Package, A::ClassName],
+        summary: "A library class's original name and package from a LibDB pack: its methods matched the pack's methods of one library class (docs/research/libdb.md §11). Annotated @eightr.Library.",
+        preconditions: &[
+            "At least two of its methods carry r8/libdb-method-name (S) for the same pack class, none of its exact matches disagrees, and its shape (supertypes, interfaces, field types, erased) equals the pack's record of that class.",
+            "Package restored only when no package-private or protected access, override or class reference crosses a package boundary afterwards (checked over the whole program); otherwise the original simple name in the class's current package.",
+        ],
+        fallback: Some(IDENTITY),
+        fixtures: &["compose_lib"],
+    },
+    Rule {
+        id: LIBDB_FIELD_HINT,
+        source: Source::R8,
+        class: Class::Deterministic,
+        attributes: &[A::MemberName],
+        summary: "A library field's name from a LibDB pack, aligned through field accesses of matched methods (some only D matches). Annotated like its class.",
+        preconditions: &["Every aligned access of the field across matched methods names the same pack field, of the same type; no other field of the class takes the name."],
+        fallback: Some(STRUCTURAL_NAME),
+        fixtures: &["compose_lib"],
+    },
+    Rule {
+        id: LIBDB_FIELD_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "A library field's original name from a LibDB pack: the n-th program field access of an S-matched method is the n-th access of its pack twin.",
+        preconditions: &[
+            "Every aligned access of the field across S-matched methods (r8/libdb-method-name) names the same pack field, of the same type, and no D match disagrees.",
+            "No other field of the class takes the name; the field isn't reflectively pinned.",
+        ],
+        fallback: Some(LIBDB_FIELD_HINT),
+        fixtures: &["compose_lib"],
+    },
+    Rule {
+        id: LIBDB_METHOD_NAME,
+        source: Source::R8,
+        class: Class::Solved,
+        attributes: &[A::MemberName],
+        summary: "A library method's original name from a LibDB pack forged for the app's build profile: an exact, informative body unique in the pack and in the app, in a library version the app declares. Annotated @eightr.Original and @eightr.Library.",
+        preconditions: &[
+            "The pack matches the app's build profile (R8 version, min-api, mode, declared library versions from META-INF/*.version) and this 8R's fingerprint code; the method's library is a declared artifact.",
+            "Exact match of the normalized body (sigdb `all` hash), informative, the hash unique among every method of every scenario of the pack and among the app's methods; not a default-argument bridge keyed as its function, not in a synthetic-looking class (siblings share bodies).",
+            "Another method of the same app class independently matches the same pack class exactly and S-eligibly.",
+            "The rename is otherwise as for r8/sigdb-method-name (outside override groups, no collision, not pinned).",
+        ],
+        fallback: Some(SIGDB_METHOD_NAME),
+        fixtures: &["compose_lib"],
     },
     Rule {
         id: LIBRARY_OVERRIDE_NAME,
