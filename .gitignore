@@ -1,2 +1,10 @@
 /target
 hs_err_pid*.log
+# Apps, packs and signing material never go in the repo.
+*.apk
+*.aab
+*.apks
+*.idsig
+*.8rpack
+*.jks
+*.keystore
